@@ -1,1 +1,1 @@
-from skypy import Skype
+from core import Skype
