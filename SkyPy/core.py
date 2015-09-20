@@ -5,12 +5,28 @@ from conn import SkypeConnection
 class Skype(object):
     def __init__(self, user, pwd):
         self.conn = SkypeConnection(user, pwd)
-        self.getUser()
-        self.getContacts()
+        self.user = self.getUser()
+        self.contacts = self.getContacts()
     def getUser(self):
-        self.user = self.conn("GET", "https://api.skype.com/users/self/displayname", auth=SkypeConnection.Auth.Skype).json()
+        json = self.conn("GET", "https://api.skype.com/users/self/displayname", auth=SkypeConnection.Auth.Skype).json()
+        return SkypeUser(id=json.get("username"), type="skype", name={
+            "first": json.get("firstname"),
+            "last": json.get("lastname"),
+            "display": json.get("displayname")
+        })
     def getContacts(self):
-        self.contacts = self.conn("GET", "https://contacts.skype.com/contacts/v1/users/" + self.user["username"] + "/contacts", auth=SkypeConnection.Auth.Skype).json()["contacts"]
+        contacts = []
+        for json in self.conn("GET", "https://contacts.skype.com/contacts/v1/users/" + self.user.id + "/contacts", auth=SkypeConnection.Auth.Skype).json()["contacts"]:
+            loc = None
+            if "locations" in json and json["locations"]:
+                loc = json["locations"][0]
+                loc["country"] = loc["country"].upper()
+            contacts.append(SkypeUser(id=json.get("id"), type=json.get("type"), name={
+                "first": json["name"].get("first"),
+                "last": json["name"].get("surname"),
+                "display": json.get("display_name")
+            }, location=loc, phones=json.get("phones")))
+        return sorted(contacts, key=(lambda user: user.id.split(":")[-1]))
     def getEvents(self):
         return self.conn("POST", self.conn.msgsHost + "/endpoints/SELF/subscriptions/0/poll", auth=SkypeConnection.Auth.Reg).json()["eventMessages"]
     def sendMsg(self, conv, msg, edit=None):
@@ -23,4 +39,14 @@ class Skype(object):
         })
         return msgId
     def __repr__(self):
-        return "<Skype: " + self.user["username"] + ">"
+        return "<{0}: {1}>".format(self.__class__.__name__, self.user.id)
+
+class SkypeUser(object):
+    def __init__(self, id, type="skype", name={}, location=None, phones=[]):
+        self.id = id
+        self.type = type
+        self.name = name
+        self.location = location
+        self.phones = phones
+    def __repr__(self):
+        return "<{0}: {1}>".format(self.__class__.__name__, self.id)
