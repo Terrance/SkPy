@@ -20,9 +20,9 @@ class SkypeConnection(object):
                 try:
                     return func(self, *args, **kwargs)
                 except SkypeApiException as e:
-                    if len(e.args) >= 2 and instanceof(e.args[1], requests.Response) and e.args[1].status_code in codes:
-                        self.getRegToken()
-                        self.subscribe()
+                    if len(e.args) >= 2 and isinstance(e.args[1], requests.Response) and e.args[1].status_code in codes:
+                        self.conn.getRegToken()
+                        self.conn.subscribe()
                         return func(self, *args, **kwargs)
                     else:
                         raise e
