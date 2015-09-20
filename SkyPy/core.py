@@ -27,6 +27,7 @@ class Skype(object):
                 "display": json.get("display_name")
             }, location=loc, phones=json.get("phones")))
         return sorted(contacts, key=(lambda user: user.id.split(":")[-1]))
+    @SkypeConnection.resubscribeOn(404)
     def getEvents(self):
         return self.conn("POST", self.conn.msgsHost + "/endpoints/SELF/subscriptions/0/poll", auth=SkypeConnection.Auth.Reg).json().get("eventMessages", [])
     def sendMsg(self, conv, msg, edit=None):

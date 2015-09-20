@@ -1,4 +1,5 @@
 import os
+import functools
 import datetime
 import time
 import hashlib
@@ -11,28 +12,42 @@ class SkypeConnection(object):
         Skype, Reg = range(2)
     API_LOGIN = "https://login.skype.com/login?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com"
     API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1/users/ME"
+    @staticmethod
+    def resubscribeOn(*codes):
+        def decorator(func):
+            @functools.wraps(func)
+            def wrapper(self, *args, **kwargs):
+                try:
+                    return func(self, *args, **kwargs)
+                except SkypeApiException as e:
+                    if len(e.args) >= 2 and instanceof(e.args[1], requests.Response) and e.args[1].status_code in codes:
+                        self.getRegToken()
+                        self.subscribe()
+                        return func(self, *args, **kwargs)
+                    else:
+                        raise e
+            return wrapper
+        return decorator
     def __init__(self, user=None, pwd=None, tokenFile=None):
         self.tokens = {}
         self.tokenExpiry = {}
         if tokenFile and os.path.isfile(tokenFile):
             with open(tokenFile, "r") as f:
-                skypeToken, skypeExpiry, regToken, msgsHost = f.read().splitlines()
+                skypeToken, skypeExpiry, msgsHost = f.read().splitlines()
                 skypeExpiry = datetime.datetime.fromtimestamp(int(skypeExpiry))
                 if datetime.datetime.now() < skypeExpiry:
                     self.tokens["skype"] = skypeToken
                     self.tokenExpiry["skype"] = skypeExpiry
-                    self.tokens["reg"] = regToken
                     self.msgsHost = msgsHost
         if not self.tokens:
             self.login(user, pwd)
             self.msgsHost = self.API_MSGSHOST
-            self.getRegToken()
             if tokenFile:
                 with open(tokenFile, "w") as f:
                     f.write(self.tokens["skype"] + "\n")
                     f.write(str(int(time.mktime(self.tokenExpiry["skype"].timetuple()))) + "\n")
-                    f.write(self.tokens["reg"] + "\n")
                     f.write(self.msgsHost + "\n")
+        self.getRegToken()
         self.subscribe()
     def __call__(self, method, url, codes=[200, 201], auth=None, headers={}, data=None, json=None):
         if auth == self.Auth.Skype:
