@@ -3,8 +3,8 @@ import time
 from conn import SkypeConnection
 
 class Skype(object):
-    def __init__(self, user, pwd):
-        self.conn = SkypeConnection(user, pwd)
+    def __init__(self, user=None, pwd=None, tokenFile=None):
+        self.conn = SkypeConnection(user, pwd, tokenFile)
         self.user = self.getUser()
         self.contacts = self.getContacts()
     def getUser(self):
@@ -16,9 +16,9 @@ class Skype(object):
         })
     def getContacts(self):
         contacts = []
-        for json in self.conn("GET", "https://contacts.skype.com/contacts/v1/users/" + self.user.id + "/contacts", auth=SkypeConnection.Auth.Skype).json()["contacts"]:
+        for json in self.conn("GET", "https://contacts.skype.com/contacts/v1/users/" + self.user.id + "/contacts", auth=SkypeConnection.Auth.Skype).json().get("contacts", []):
             loc = None
-            if "locations" in json and json["locations"]:
+            if json.get("locations"):
                 loc = json["locations"][0]
                 loc["country"] = loc["country"].upper()
             contacts.append(SkypeUser(id=json.get("id"), type=json.get("type"), name={
@@ -28,7 +28,7 @@ class Skype(object):
             }, location=loc, phones=json.get("phones")))
         return sorted(contacts, key=(lambda user: user.id.split(":")[-1]))
     def getEvents(self):
-        return self.conn("POST", self.conn.msgsHost + "/endpoints/SELF/subscriptions/0/poll", auth=SkypeConnection.Auth.Reg).json()["eventMessages"]
+        return self.conn("POST", self.conn.msgsHost + "/endpoints/SELF/subscriptions/0/poll", auth=SkypeConnection.Auth.Reg).json().get("eventMessages", [])
     def sendMsg(self, conv, msg, edit=None):
         msgId = edit or int(time.time())
         msgResp = self.req("POST", self.conn.msgsHost + "/conversations/" + conv + "/messages", auth=SkypeConnection.Auth.Reg, json={

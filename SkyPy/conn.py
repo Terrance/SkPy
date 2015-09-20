@@ -1,3 +1,4 @@
+import os
 import datetime
 import time
 import hashlib
@@ -10,12 +11,28 @@ class SkypeConnection(object):
         Skype, Reg = range(2)
     API_LOGIN = "https://login.skype.com/login?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com"
     API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1/users/ME"
-    def __init__(self, user, pwd):
+    def __init__(self, user=None, pwd=None, tokenFile=None):
         self.tokens = {}
         self.tokenExpiry = {}
-        self.login(user, pwd)
-        self.msgsHost = self.API_MSGSHOST
-        self.getRegToken()
+        if tokenFile and os.path.isfile(tokenFile):
+            with open(tokenFile, "r") as f:
+                skypeToken, skypeExpiry, regToken, msgsHost = f.read().splitlines()
+                skypeExpiry = datetime.datetime.fromtimestamp(int(skypeExpiry))
+                if datetime.datetime.now() < skypeExpiry:
+                    self.tokens["skype"] = skypeToken
+                    self.tokenExpiry["skype"] = skypeExpiry
+                    self.tokens["reg"] = regToken
+                    self.msgsHost = msgsHost
+        if not self.tokens:
+            self.login(user, pwd)
+            self.msgsHost = self.API_MSGSHOST
+            self.getRegToken()
+            if tokenFile:
+                with open(tokenFile, "w") as f:
+                    f.write(self.tokens["skype"] + "\n")
+                    f.write(str(int(time.mktime(self.tokenExpiry["skype"].timetuple()))) + "\n")
+                    f.write(self.tokens["reg"] + "\n")
+                    f.write(self.msgsHost + "\n")
         self.subscribe()
     def __call__(self, method, url, codes=[200, 201], auth=None, headers={}, data=None, json=None):
         if auth == self.Auth.Skype:
@@ -59,7 +76,7 @@ class SkypeConnection(object):
         if not location == self.msgsHost:
             self.msgsHost = location
             return self.getRegToken()
-        self.tokens["reg"]= regTokenHead
+        self.tokens["reg"] = regTokenHead
     def subscribe(self):
         self("POST", self.msgsHost + "/endpoints/SELF/subscriptions", auth=self.Auth.Reg, json={
             "interestedResources": [
