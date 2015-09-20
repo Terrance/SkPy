@@ -1,4 +1,3 @@
-import functools
 import datetime
 import time
 import hashlib
@@ -7,7 +6,8 @@ import bs4
 import requests
 
 class SkypeConnection(object):
-    AUTH_SKYPETOKEN, AUTH_REGTOKEN = range(2)
+    class Auth:
+        Skype, Reg = range(2)
     API_LOGIN = "https://login.skype.com/login?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com"
     API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1/users/ME"
     def __init__(self, user, pwd):
@@ -18,9 +18,9 @@ class SkypeConnection(object):
         self.getRegToken()
         self.subscribe()
     def __call__(self, method, url, codes=[200, 201], auth=None, headers={}, data=None, json=None):
-        if auth == self.AUTH_SKYPETOKEN:
+        if auth == self.Auth.Skype:
             headers["X-SkypeToken"] = self.tokens["skype"]
-        elif auth == self.AUTH_REGTOKEN:
+        elif auth == self.Auth.Reg:
             headers["RegistrationToken"] = self.tokens["reg"]
         resp = requests.request(method, url, headers=headers, data=data, json=json)
         if resp.status_code not in codes:
@@ -61,7 +61,7 @@ class SkypeConnection(object):
             return self.getRegToken()
         self.tokens["reg"]= regTokenHead
     def subscribe(self):
-        self("POST", self.msgsHost + "/endpoints/SELF/subscriptions", auth=self.AUTH_REGTOKEN, json={
+        self("POST", self.msgsHost + "/endpoints/SELF/subscriptions", auth=self.Auth.Reg, json={
             "interestedResources": [
                 "/v1/threads/ALL",
                 "/v1/users/ME/contacts/ALL",
@@ -111,22 +111,16 @@ def getMac256Hash(challenge, appId, key):
         for i in range(len(sA)):
             sC += "0" if sA[i] == sB[i] else "1"
         return int(sC, 2)
-    def cS64_C(pdwData, pInHash, pOutHash):
-        MODULUS = 2147483647
+    def cS64_C(pdwData, pInHash):
         if len(pdwData) < 2 or len(pdwData) & 1 == 1:
-            return False
-        ulCS64_a = pInHash[0] & MODULUS
-        ulCS64_b = pInHash[1] & MODULUS
-        ulCS64_c = pInHash[2] & MODULUS
-        ulCS64_d = pInHash[3] & MODULUS
-        ulCS64_e = 242854337
-        CS64_a = ulCS64_a
-        CS64_b = ulCS64_b
-        CS64_c = ulCS64_c
-        CS64_d = ulCS64_d
-        CS64_e = ulCS64_e
+            return None
+        MODULUS = 2147483647
+        CS64_a = pInHash[0] & MODULUS
+        CS64_b = pInHash[1] & MODULUS
+        CS64_c = pInHash[2] & MODULUS
+        CS64_d = pInHash[3] & MODULUS
+        CS64_e = 242854337
         pos = 0
-        mod = MODULUS
         qwDatum = 0
         qwMAC = 0
         qwSum = 0
@@ -134,25 +128,23 @@ def getMac256Hash(challenge, appId, key):
             qwDatum = int(pdwData[pos])
             pos += 1
             qwDatum *= CS64_e
-            qwDatum = qwDatum % mod
+            qwDatum = qwDatum % MODULUS
             qwMAC += qwDatum
             qwMAC *= CS64_a
             qwMAC += CS64_b
-            qwMAC = qwMAC % mod
+            qwMAC = qwMAC % MODULUS
             qwSum += qwMAC
             qwMAC += int(pdwData[pos])
             pos += 1
             qwMAC *= CS64_c
             qwMAC += CS64_d
-            qwMAC = qwMAC % mod
+            qwMAC = qwMAC % MODULUS
             qwSum += qwMAC
         qwMAC += CS64_b
-        qwMAC = qwMAC % mod
+        qwMAC = qwMAC % MODULUS
         qwSum += CS64_d
-        qwSum = qwSum % mod
-        pOutHash[0] = qwMAC
-        pOutHash[1] = qwSum
-        return True
+        qwSum = qwSum % MODULUS
+        return [qwMAC, qwSum]
     clearText = challenge + appId
     remaining = 8 - len(clearText) % 8
     if remaining != 8:
@@ -183,8 +175,7 @@ def getMac256Hash(challenge, appId, key):
         pos += 2
         sha256Hash[i] += int(hash[pos:pos+2], 16) * 16777216
         pos += 2
-    macHash = [0, 0]
-    cS64_C(pClearText, sha256Hash, macHash)
+    macHash = cS64_C(pClearText, sha256Hash)
     a = int64Xor(sha256Hash[0], macHash[0])
     b = int64Xor(sha256Hash[1], macHash[1])
     c = int64Xor(sha256Hash[2], macHash[0])
