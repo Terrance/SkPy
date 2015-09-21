@@ -26,6 +26,10 @@ class SkypeConnection(object):
                         return func(self, *args, **kwargs)
                     else:
                         raise e
+                except requests.exceptions.ConnectionError:
+                    self.conn.getRegToken()
+                    self.conn.subscribe()
+                    return func(self, *args, **kwargs)
             return wrapper
         return decorator
     def __init__(self, user=None, pwd=None, tokenFile=None):
