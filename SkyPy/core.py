@@ -1,6 +1,7 @@
 import time
 
 from .conn import SkypeConnection
+from .event import SkypeEvent, SkypePresenceEvent, SkypeMessageEvent
 
 class Skype(object):
     def __init__(self, user=None, pwd=None, tokenFile=None):
@@ -29,10 +30,20 @@ class Skype(object):
         return sorted(contacts, key=(lambda user: user.id.split(":")[-1]))
     @SkypeConnection.resubscribeOn(404)
     def getEvents(self):
-        return self.conn("POST", self.conn.msgsHost + "/endpoints/SELF/subscriptions/0/poll", auth=SkypeConnection.Auth.Reg).json().get("eventMessages", [])
+        events = []
+        for json in self.conn("POST", self.conn.msgsHost + "/endpoints/SELF/subscriptions/0/poll", auth=SkypeConnection.Auth.Reg).json().get("eventMessages", []):
+            resType = json.get("resourceType")
+            if resType == "UserPresence":
+                ev = SkypePresenceEvent(json)
+            elif resType == "NewMessage":
+                ev = SkypeMessageEvent(json)
+            else:
+                ev = SkypeEvent(json)
+            events.append(ev)
+        return events
     def sendMsg(self, conv, msg, edit=None):
         msgId = edit or int(time.time())
-        msgResp = self.req("POST", self.conn.msgsHost + "/conversations/" + conv + "/messages", auth=SkypeConnection.Auth.Reg, json={
+        msgResp = self.conn("POST", self.conn.msgsHost + "/conversations/" + conv + "/messages", auth=SkypeConnection.Auth.Reg, json={
             "clientmessageid": msgId,
             "messagetype": "RichText",
             "contenttype": "text",
