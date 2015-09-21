@@ -8,6 +8,7 @@ class SkypeBot(Skype):
     def __init__(self, user, pwd, tokenFile, autoAck=True):
         super(SkypeBot, self).__init__(user, pwd, tokenFile)
         self.autoAck = autoAck
+        self.setStatus("Online")
     def iter(self):
         for event in self.getEvents():
             self.onEvent(event)

@@ -47,10 +47,14 @@ class Skype(object):
                 ev = SkypeEvent(json, self)
             events.append(ev)
         return events
+    def setStatus(self, status):
+        self.conn("PUT", self.conn.msgsHost + "/presenceDocs/messagingService", json={
+            "status": status
+        })
     def sendMsg(self, conv, msg, edit=None):
         msgId = edit or int(time.time())
         msgResp = self.conn("POST", self.conn.msgsHost + "/conversations/" + conv + "/messages", auth=SkypeConnection.Auth.Reg, json={
-            "clientmessageid": msgId,
+            "skypeeditedid": msgId,
             "messagetype": "RichText",
             "contenttype": "text",
             "content": msg

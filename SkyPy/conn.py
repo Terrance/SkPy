@@ -53,7 +53,7 @@ class SkypeConnection(object):
                     f.write(self.msgsHost + "\n")
         self.getRegToken()
         self.subscribe()
-    def __call__(self, method, url, codes=[200, 201], auth=None, headers={}, data=None, json=None):
+    def __call__(self, method, url, codes=[200, 201, 207], auth=None, headers={}, data=None, json=None):
         if auth == self.Auth.Skype:
             headers["X-SkypeToken"] = self.tokens["skype"]
         elif auth == self.Auth.Reg:

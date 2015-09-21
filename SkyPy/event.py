@@ -25,7 +25,9 @@ class SkypePresenceEvent(SkypeEvent):
 class SkypeTypingEvent(SkypeEvent):
     def __init__(self, raw, skype):
         super(self.__class__, self).__init__(raw, skype)
+        self.sender = userToId(raw["resource"].get("from"))
         self.active = (raw["resource"].get("messagetype") == "Control/Typing")
+        self.chat = chatToId(raw["resource"].get("conversationLink"))
 
 class SkypeMessageEvent(SkypeEvent):
     def __init__(self, raw, skype):
