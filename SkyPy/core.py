@@ -1,7 +1,7 @@
 import time
 
 from .conn import SkypeConnection
-from .event import SkypeEvent, SkypePresenceEvent, SkypeMessageEvent
+from .event import SkypeEvent, SkypePresenceEvent, SkypeTypingEvent, SkypeMessageEvent
 
 class Skype(object):
     def __init__(self, user=None, pwd=None, tokenFile=None):
@@ -34,11 +34,17 @@ class Skype(object):
         for json in self.conn("POST", self.conn.msgsHost + "/endpoints/SELF/subscriptions/0/poll", auth=SkypeConnection.Auth.Reg).json().get("eventMessages", []):
             resType = json.get("resourceType")
             if resType == "UserPresence":
-                ev = SkypePresenceEvent(json)
+                ev = SkypePresenceEvent(json, self)
             elif resType == "NewMessage":
-                ev = SkypeMessageEvent(json)
+                msgType = json["resource"].get("messagetype")
+                if msgType in ["Control/Typing", "Control/ClearTyping"]:
+                    ev = SkypeTypingEvent(json, self)
+                elif msgType == "RichText":
+                    ev = SkypeMessageEvent(json, self)
+                else:
+                    ev = SkypeEvent(json, self)
             else:
-                ev = SkypeEvent(json)
+                ev = SkypeEvent(json, self)
             events.append(ev)
         return events
     def sendMsg(self, conv, msg, edit=None):
