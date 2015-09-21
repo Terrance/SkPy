@@ -156,7 +156,7 @@ def getMac256Hash(challenge, appId, key):
         qwDatum = 0
         qwMAC = 0
         qwSum = 0
-        for i in range(len(pdwData) / 2):
+        for i in range(len(pdwData) // 2):
             qwDatum = int(pdwData[pos])
             pos += 1
             qwDatum *= CS64_e
@@ -181,7 +181,7 @@ def getMac256Hash(challenge, appId, key):
     remaining = 8 - len(clearText) % 8
     if remaining != 8:
         clearText = padRight(clearText, len(clearText) + remaining, "0")
-    cchClearText = len(clearText) / 4
+    cchClearText = len(clearText) // 4
     pClearText = []
     pos = 0
     for i in range(cchClearText):
@@ -195,7 +195,7 @@ def getMac256Hash(challenge, appId, key):
         pClearText[i] += ord(clearText[pos]) * 16777216
         pos += 1
     sha256Hash = [0, 0, 0, 0]
-    hash = hashlib.sha256(challenge + key).hexdigest().upper()
+    hash = hashlib.sha256((challenge + key).encode("utf-8")).hexdigest().upper()
     pos = 0
     for i in range(len(sha256Hash)):
         sha256Hash[i] = 0

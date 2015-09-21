@@ -1,6 +1,6 @@
 import time
 
-from conn import SkypeConnection
+from .conn import SkypeConnection
 
 class Skype(object):
     def __init__(self, user=None, pwd=None, tokenFile=None):
