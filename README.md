@@ -25,4 +25,23 @@ sk.sendMsg(conversationId, message) # say something
 
 If you make too many authentication attempts, the Skype API may temporarily rate limit you, or require a captcha to continue.  For the latter, you will need to complete this in a browser with a matching IP address.
 
-To avoid this, you should reuse the Skype token where possible.  A token _usually_ lasts 24 hours (see `sk.tokenExpiry`).  Pass a filename as the third argument to the `Skype()` constructor to read and write session information to that file.
+To avoid this, you should reuse the Skype token where possible.  A token _usually_ lasts 24 hours (the actual expiry is stored in `sk.tokenExpiry`).  Pass a filename as the third argument to the `Skype()` constructor to read and write session information to that file.
+
+## Writing a bot
+
+Create a class that subclasses `SkypeBot`, then override the `onEvent(event)` method to handle incoming messages.
+
+```python
+import re
+from SkyPy import SkypeBot, SkypeMessageEvent
+class MyBot(SkypeBot):
+    def __init__(self):
+        super(SkypeBot, self).__init__(username, password)
+    def onEvent(self, event):
+        if isinstance(event, SkypeMessageEvent)
+          and not event.sender == self.user.id:
+            if re.search("ping", event.body, re.IGNORECASE):
+                self.sendMsg(event.chat, "Pong!")
+```
+
+To run a `SkypeBot`, call its `loop()` method.
