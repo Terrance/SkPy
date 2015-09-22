@@ -2,6 +2,7 @@ import time
 
 from .conn import SkypeConnection
 from .event import SkypeEvent, SkypePresenceEvent, SkypeTypingEvent, SkypeMessageEvent
+from .util import objToStr
 
 class Skype(object):
     def __init__(self, user=None, pwd=None, tokenFile=None):
@@ -10,36 +11,12 @@ class Skype(object):
         self.contacts = self.getContacts()
     def getUser(self):
         json = self.conn("GET", "https://api.skype.com/users/self/displayname", auth=SkypeConnection.Auth.Skype).json()
-        return SkypeUser(json, id=json.get("username"), type="skype", name={
-            "first": json.get("firstname"),
-            "last": json.get("lastname")
-        })
+        return SkypeUser(json, True)
     def getContacts(self):
-        contacts = []
+        contacts = {}
         for json in self.conn("GET", "https://contacts.skype.com/contacts/v1/users/" + self.user.id + "/contacts", auth=SkypeConnection.Auth.Skype).json().get("contacts", []):
-            loc = None
-            if json.get("locations"):
-                loc = json["locations"][0]
-            contacts.append(SkypeUser(json, id=json["id"], type=json["type"], authorised=json.get("authorized"), blocked=json.get("blocked"), name={
-                "first": json["name"].get("first"),
-                "last": json["name"].get("surname"),
-                "display": json.get("display_name")
-            }, location=loc, phones=(json.get("phones") or []), avatar=json.get("avatar_url")))
-        return sorted(contacts, key=(lambda user: user.id.split(":")[-1]))
-    def findContact(self, id=None, phone=None):
-        if not id and not phone:
-            return
-        for contact in self.contacts:
-            idMatch = (not id or contact.id == id)
-            phoneMatch = not phone
-            if phone:
-                for conPhone in (contact.phones or []):
-                    if conPhone["number"] == phone:
-                        print(contact.id + "/" + conPhone["number"])
-                        phoneMatch = True
-                        break
-            if idMatch and phoneMatch:
-                return contact
+            contacts[json.get("id")] = SkypeUser(json)
+        return contacts
     @SkypeConnection.resubscribeOn(404)
     def getEvents(self):
         events = []
@@ -76,20 +53,26 @@ class Skype(object):
         return "<{0}: {1}>".format(self.__class__.__name__, self.user.id)
 
 class SkypeUser(object):
-    def __init__(self, raw, id, type="skype", authorised=None, blocked=None, name={}, location=None, phones=[], avatar=None):
-        self.id = id
-        self.type = type
-        self.authorised = authorised
-        self.blocked = blocked
-        self.name = name
-        self.location = location
-        self.phones = phones
-        self.avatar = avatar
+    def __init__(self, raw, isMe=False):
+        if isMe:
+            self.id = raw.get("username")
+            self.name = {
+                "first": raw.get("firstname"),
+                "last": raw.get("lastname")
+            }
+        else:
+            self.id = raw.get("id")
+            self.type = raw.get("type")
+            self.authorised = raw.get("authorized")
+            self.blocked = raw.get("blocked")
+            self.name = raw.get("name")
+            self.location = raw.get("locations")[0] if "locations" in raw else None
+            self.phones = raw.get("phones") or []
+            self.avatar = raw.get("avatar_url")
         self.raw = raw
+        self.isMe = isMe
     def __str__(self):
-        out = "[{0}]".format(self.__class__.__name__)
-        for attr in ["id", "type", "authorised", "blocked", "name", "location", "phones", "avatar"]:
-            out += "\n{0}: {1}".format(attr.capitalize(), getattr(self, attr))
-        return out
+        attrs = [] if self.isMe else ["type", "authorised", "blocked", "location", "phones", "avatar"]
+        return objToStr(self, "id", "name", *attrs)
     def __repr__(self):
         return "<{0}: {1}>".format(self.__class__.__name__, self.id)

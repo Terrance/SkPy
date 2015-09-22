@@ -2,6 +2,7 @@ import datetime
 import re
 
 from .conn import SkypeConnection
+from .util import objToStr, userToId, chatToId
 
 class SkypeEvent(object):
     def __init__(self, raw, skype):
@@ -21,7 +22,7 @@ class SkypeEvent(object):
 class SkypePresenceEvent(SkypeEvent):
     def __init__(self, raw, skype):
         super(self.__class__, self).__init__(raw, skype)
-        self.user = skype.findContact(id=userToId(raw["resourceLink"]))
+        self.user = skype.contacts[userToId(raw["resourceLink"])]
         self.status = raw["resource"].get("status")
     def __str__(self):
         return objToStr(self, "id", "time", "type", "user", "status")
@@ -29,7 +30,7 @@ class SkypePresenceEvent(SkypeEvent):
 class SkypeTypingEvent(SkypeEvent):
     def __init__(self, raw, skype):
         super(self.__class__, self).__init__(raw, skype)
-        self.user = skype.findContact(id=userToId(raw["resource"].get("from")))
+        self.user = skype.contacts[userToId(raw["resource"].get("from"))]
         self.active = (raw["resource"].get("messagetype") == "Control/Typing")
         self.chat = chatToId(raw["resource"].get("conversationLink"))
     def __str__(self):
@@ -47,21 +48,7 @@ class SkypeMessageEvent(SkypeEvent):
                 self.deleteId = int(raw["resource"].get("skypeeditedid"))
         else:
             self.body = raw["resource"].get("content")
-        self.user = skype.findContact(id=userToId(raw["resource"].get("from")))
+        self.user = skype.contacts[userToId(raw["resource"].get("from"))]
         self.chat = chatToId(raw["resource"].get("conversationLink"))
     def __str__(self):
         return objToStr(self, "id", "time", "type", "msgId", "editId", "user", "chat", "body")
-
-def userToId(url):
-    match = re.search(r"/v1/users/ME/contacts/8:([A-Za-z0-9\.,_-]+)", url)
-    return match.group(1) if match else None
-
-def chatToId(url):
-    match = re.search(r"/v1/users/ME/conversations/([0-9]+:[A-Za-z0-9\.,_-]+(@thread\.skype)?)", url)
-    return match.group(1) if match else None
-
-def objToStr(obj, *attrs):
-    out = "[{0}]".format(obj.__class__.__name__)
-    for attr in attrs:
-        out += "\n{0}: {1}".format(attr.capitalize(), str(getattr(obj, attr)).replace("\n", "\n  " + (" " * len(attr))))
-    return out
