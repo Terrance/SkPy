@@ -10,10 +10,9 @@ class Skype(object):
         self.contacts = self.getContacts()
     def getUser(self):
         json = self.conn("GET", "https://api.skype.com/users/self/displayname", auth=SkypeConnection.Auth.Skype).json()
-        return SkypeUser(id=json.get("username"), type="skype", name={
+        return SkypeUser(json, id=json.get("username"), type="skype", name={
             "first": json.get("firstname"),
-            "last": json.get("lastname"),
-            "display": json.get("displayname")
+            "last": json.get("lastname")
         })
     def getContacts(self):
         contacts = []
@@ -21,12 +20,11 @@ class Skype(object):
             loc = None
             if json.get("locations"):
                 loc = json["locations"][0]
-                loc["country"] = loc["country"].upper()
-            contacts.append(SkypeUser(id=json.get("id"), type=json.get("type"), name={
+            contacts.append(SkypeUser(json, id=json["id"], type=json["type"], authorised=json.get("authorized"), blocked=json.get("blocked"), name={
                 "first": json["name"].get("first"),
                 "last": json["name"].get("surname"),
                 "display": json.get("display_name")
-            }, location=loc, phones=json.get("phones")))
+            }, location=loc, phones=(json.get("phones") or []), avatar=json.get("avatar_url")))
         return sorted(contacts, key=(lambda user: user.id.split(":")[-1]))
     @SkypeConnection.resubscribeOn(404)
     def getEvents(self):
@@ -64,11 +62,20 @@ class Skype(object):
         return "<{0}: {1}>".format(self.__class__.__name__, self.user.id)
 
 class SkypeUser(object):
-    def __init__(self, id, type="skype", name={}, location=None, phones=[]):
+    def __init__(self, raw, id, type="skype", authorised=None, blocked=None, name={}, location=None, phones=[], avatar=None):
         self.id = id
         self.type = type
+        self.authorised = authorised
+        self.blocked = blocked
         self.name = name
         self.location = location
         self.phones = phones
+        self.avatar = avatar
+        self.raw = raw
+    def __str__(self):
+        out = "[{0}]".format(self.__class__.__name__)
+        for attr in ["id", "type", "authorised", "blocked", "name", "location", "phones", "avatar"]:
+            out += "\n{0}: {1}".format(attr.capitalize(), getattr(self, attr))
+        return out
     def __repr__(self):
         return "<{0}: {1}>".format(self.__class__.__name__, self.id)
