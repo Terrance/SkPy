@@ -26,6 +26,20 @@ class Skype(object):
                 "display": json.get("display_name")
             }, location=loc, phones=(json.get("phones") or []), avatar=json.get("avatar_url")))
         return sorted(contacts, key=(lambda user: user.id.split(":")[-1]))
+    def findContact(self, id=None, phone=None):
+        if not id and not phone:
+            return
+        for contact in self.contacts:
+            idMatch = (not id or contact.id == id)
+            phoneMatch = not phone
+            if phone:
+                for conPhone in (contact.phones or []):
+                    if conPhone["number"] == phone:
+                        print(contact.id + "/" + conPhone["number"])
+                        phoneMatch = True
+                        break
+            if idMatch and phoneMatch:
+                return contact
     @SkypeConnection.resubscribeOn(404)
     def getEvents(self):
         events = []
