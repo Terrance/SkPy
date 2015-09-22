@@ -21,7 +21,7 @@ class SkypeEvent(object):
 
 class SkypePresenceEvent(SkypeEvent):
     def __init__(self, raw, skype):
-        super(self.__class__, self).__init__(raw, skype)
+        super(SkypePresenceEvent, self).__init__(raw, skype)
         self.user = skype.contacts[userToId(raw["resourceLink"])]
         self.status = raw["resource"].get("status")
     def __str__(self):
@@ -29,7 +29,7 @@ class SkypePresenceEvent(SkypeEvent):
 
 class SkypeTypingEvent(SkypeEvent):
     def __init__(self, raw, skype):
-        super(self.__class__, self).__init__(raw, skype)
+        super(SkypeTypingEvent, self).__init__(raw, skype)
         self.user = skype.contacts[userToId(raw["resource"].get("from"))]
         self.active = (raw["resource"].get("messagetype") == "Control/Typing")
         self.chat = chatToId(raw["resource"].get("conversationLink"))
@@ -38,17 +38,25 @@ class SkypeTypingEvent(SkypeEvent):
 
 class SkypeMessageEvent(SkypeEvent):
     def __init__(self, raw, skype):
-        super(self.__class__, self).__init__(raw, skype)
+        super(SkypeMessageEvent, self).__init__(raw, skype)
         self.msgId = int(raw["resource"].get("id"))
-        if "skypeeditedid" in raw["resource"]:
-            if "content" in raw["resource"]:
-                self.editId = int(raw["resource"].get("skypeeditedid"))
-                self.body = raw["resource"].get("content")
-            else:
-                self.deleteId = int(raw["resource"].get("skypeeditedid"))
-        else:
-            self.body = raw["resource"].get("content")
         self.user = skype.contacts[userToId(raw["resource"].get("from"))]
         self.chat = chatToId(raw["resource"].get("conversationLink"))
     def __str__(self):
         return objToStr(self, "id", "time", "type", "msgId", "editId", "user", "chat", "body")
+
+class SkypeNewMessageEvent(SkypeMessageEvent):
+    def __init__(self, raw, skype):
+        super(SkypeNewMessageEvent, self).__init__(raw, skype)
+        self.body = raw["resource"].get("content")
+
+class SkypeEditMessageEvent(SkypeMessageEvent):
+    def __init__(self, raw, skype):
+        super(SkypeEditMessageEvent, self).__init__(raw, skype)
+        self.oldMsgId = int(raw["resource"].get("skypeeditedid"))
+        self.body = raw["resource"].get("content")
+
+class SkypeDeleteMessageEvent(SkypeMessageEvent):
+    def __init__(self, raw, skype):
+        super(SkypeDeleteMessageEvent, self).__init__(raw, skype)
+        self.oldMsgId = int(raw["resource"].get("skypeeditedid"))
