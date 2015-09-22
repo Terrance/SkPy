@@ -39,10 +39,16 @@ class SkypeMessageEvent(SkypeEvent):
     def __init__(self, raw, skype):
         super(self.__class__, self).__init__(raw, skype)
         self.msgId = int(raw["resource"].get("id"))
-        self.editId = int(raw["resource"].get("skypeeditedid")) if "skypeeditedid" in raw["resource"] else None
+        if "skypeeditedid" in raw["resource"]:
+            if "content" in raw["resource"]:
+                self.editId = int(raw["resource"].get("skypeeditedid"))
+                self.body = raw["resource"].get("content")
+            else:
+                self.deleteId = int(raw["resource"].get("skypeeditedid"))
+        else:
+            self.body = raw["resource"].get("content")
         self.user = skype.findContact(id=userToId(raw["resource"].get("from")))
         self.chat = chatToId(raw["resource"].get("conversationLink"))
-        self.body = raw["resource"].get("content")
     def __str__(self):
         return objToStr(self, "id", "time", "type", "msgId", "editId", "user", "chat", "body")
 
