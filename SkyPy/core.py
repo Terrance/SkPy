@@ -16,6 +16,8 @@ class Skype(object):
         contacts = {}
         for json in self.conn("GET", "https://contacts.skype.com/contacts/v1/users/" + self.user.id + "/contacts", auth=SkypeConnection.Auth.Skype).json().get("contacts", []):
             contacts[json.get("id")] = SkypeUser(json)
+        if hasattr(self, "user"):
+            contacts[self.user.id] = self.user
         return contacts
     @SkypeConnection.resubscribeOn(404)
     def getEvents(self):
