@@ -2,9 +2,9 @@ import datetime
 import re
 
 from .conn import SkypeConnection
-from .util import objToStr, userToId, chatToId
+from .util import objToStr, userToId, chatToId, SkypeObj
 
-class SkypeEvent(object):
+class SkypeEvent(SkypeObj):
     def __init__(self, raw, skype):
         self.id = raw["id"]
         self.time = datetime.datetime.strptime(raw["time"], "%Y-%m-%dT%H:%M:%SZ")
@@ -16,8 +16,6 @@ class SkypeEvent(object):
             self.skype.conn("POST", self.raw["resource"]["ackrequired"], auth=SkypeConnection.Auth.Reg)
     def __str__(self):
         return objToStr(self, "id", "time", "type")
-    def __repr__(self):
-        return "<{0}: {1}>".format(self.__class__.__name__, self.id)
 
 class SkypePresenceEvent(SkypeEvent):
     def __init__(self, raw, skype):

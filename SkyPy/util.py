@@ -13,3 +13,10 @@ def userToId(url):
 def chatToId(url):
     match = re.search(r"/v1/users/ME/conversations/([0-9]+:[A-Za-z0-9\.,_-]+(@thread\.skype)?)", url)
     return match.group(1) if match else None
+
+class SkypeObj(object):
+    def __init__(self, conn, raw):
+        self.conn = conn
+        self.raw = raw
+    def __repr__(self):
+        return "<{0}: {1}>".format(self.__class__.__name__, self.id)

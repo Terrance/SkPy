@@ -53,12 +53,12 @@ class SkypeConnection(object):
                     f.write(self.msgsHost + "\n")
         self.getRegToken()
         self.subscribe()
-    def __call__(self, method, url, codes=[200, 201, 207], auth=None, headers={}, data=None, json=None):
+    def __call__(self, method, url, codes=[200, 201, 207], auth=None, headers={}, params=None, data=None, json=None):
         if auth == self.Auth.Skype:
             headers["X-SkypeToken"] = self.tokens["skype"]
         elif auth == self.Auth.Reg:
             headers["RegistrationToken"] = self.tokens["reg"]
-        resp = requests.request(method, url, headers=headers, data=data, json=json)
+        resp = requests.request(method, url, headers=headers, params=params, data=data, json=json)
         if resp.status_code not in codes:
             raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
         return resp
@@ -69,12 +69,14 @@ class SkypeConnection(object):
         pie = loginPage.find(id="pie").get("value")
         etm = loginPage.find(id="etm").get("value")
         secs = int(time.time())
+        frac, hour = math.modf(time.timezone)
+        timezone = "{0:+03d}|{1}".format(int(hour), int(frac * 60))
         loginResp = self("POST", self.API_LOGIN, data={
             "username": user,
             "password": pwd,
             "pie": pie,
             "etm": etm,
-            "timezone_field": "+00|00", # TODO: use the correct value
+            "timezone_field": timezone,
             "js_time": secs
         })
         loginRespPage = bs4.BeautifulSoup(loginResp.text, "html.parser")
