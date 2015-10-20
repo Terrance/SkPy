@@ -9,12 +9,23 @@ import bs4
 import requests
 
 class SkypeConnection(object):
+    """
+    The main connection class -- handles all requests to API resources.
+
+    An instance of this class is callable, and performs an API request.  Arguments are similar to the underlying requests library.
+    """
     class Auth:
+        """
+        Enum for authentication types.  Skype uses X-SkypeToken, whereas Reg includes RegistrationToken.
+        """
         Skype, Reg = range(2)
     API_LOGIN = "https://login.skype.com/login?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com"
     API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1/users/ME"
     @staticmethod
     def resubscribeOn(*codes):
+        """
+        Decorator: if a given status code is received, try resubscribing to avoid the error.
+        """
         def decorator(func):
             @functools.wraps(func)
             def wrapper(self, *args, **kwargs):
@@ -55,6 +66,13 @@ class SkypeConnection(object):
         self.getRegToken()
         self.subscribe()
     def __call__(self, method, url, codes=[200, 201, 207], auth=None, headers={}, params=None, data=None, json=None):
+        """
+        Make an API call.  Most parameters are passed directly to requests.
+
+        Set codes to a list of valid HTTP response codes -- an exception is raised if the response does not match.
+
+        If authentication is required, set auth to one of the SkypeConnection.Auth constants.
+        """
         if auth == self.Auth.Skype:
             headers["X-SkypeToken"] = self.tokens["skype"]
         elif auth == self.Auth.Reg:
@@ -64,6 +82,9 @@ class SkypeConnection(object):
             raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
         return resp
     def login(self, user, pwd):
+        """
+        Scrape the Skype Web login page, and perform a login with the given username and password.
+        """
         loginPage = bs4.BeautifulSoup(self("GET", self.API_LOGIN).text, "html.parser")
         if loginPage.find(id="recaptcha_response_field"):
             raise SkypeApiException("Captcha required")
@@ -90,6 +111,9 @@ class SkypeConnection(object):
         except AttributeError as e:
             raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
     def getRegToken(self):
+        """
+        Acquire a registration token.  See getMac256Hash(...) for the hash generation.
+        """
         secs = int(time.time())
         endpointResp = self("POST", self.msgsHost + "/endpoints", codes=[201, 301], headers={
             "LockAndKey": "appId=msmsgs@msnmsgr.com; time=" + str(secs) + "; lockAndKeyResponse=" + getMac256Hash(str(secs), "msmsgs@msnmsgr.com", "Q1P7W2E4J9R8U3S5"),
@@ -103,6 +127,9 @@ class SkypeConnection(object):
             return self.getRegToken()
         self.tokens["reg"] = regTokenHead
     def subscribe(self):
+        """
+        Subscribe to contact and conversation events.  These are accessible through Skype.getEvents().
+        """
         self("POST", self.msgsHost + "/endpoints/SELF/subscriptions", auth=self.Auth.Reg, json={
             "interestedResources": [
                 "/v1/threads/ALL",
@@ -119,6 +146,9 @@ class SkypeConnection(object):
         return "{0}()".format(self.__class__.__name__)
 
 class SkypeApiException(Exception):
+    """
+    A generic Skype-related exception.
+    """
     pass
 
 def getMac256Hash(challenge, appId, key):

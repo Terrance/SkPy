@@ -5,6 +5,11 @@ from .conn import SkypeConnection
 from .util import SkypeObj, lazyLoad, stateLoad
 
 class SkypeUser(SkypeObj):
+    """
+    A user on Skype -- either the current user, or a contact.
+
+    Properties differ slightly between the current user and others (current has language, others have authorised and blocked).
+    """
     attrs = ["id", "isMe", "type", "authorised", "blocked", "name", "location", "phones", "avatar"]
     def __init__(self, skype, raw, isMe=False):
         super(SkypeUser, self).__init__(skype, raw)
@@ -38,15 +43,28 @@ class SkypeUser(SkypeObj):
     @property
     @lazyLoad
     def chat(self):
+        """
+        Lazy: return the conversation object for this user.
+        """
         return SkypeChat(self.skype, self.skype.conn("GET", self.skype.conn.msgsHost + "/conversations/8:" + self.id, auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json())
 
 class SkypeChat(SkypeObj):
+    """
+    A conversation within Skype.
+
+    Can be either one-to-one (identifiers of the form <type>:<username>) or a cloud group (<type>:<identifier>@thread.skype).
+    """
     attrs = ["id"]
     def __init__(self, skype, raw):
         super(SkypeChat, self).__init__(skype, raw)
         self.id = raw.get("id")
     @stateLoad
     def getMsgs(self):
+        """
+        Stateful: retrieve any new messages in the conversation.
+
+        On first access, this method should be repeatedly called to retrieve older messages.
+        """
         url = self.skype.conn.msgsHost + "/conversations/" + self.id + "/messages"
         params = {
             "startTime": 0,
@@ -62,22 +80,38 @@ class SkypeChat(SkypeObj):
                 msgs.append(SkypeMsg(self.skype, json))
             return msgs
         return url, params, fetch, process
-    def sendMsg(self, msg, edit=None):
-        msgId = edit or int(time.time())
-        msgResp = self.skype.conn("POST", self.skype.conn.msgsHost + "/conversations/" + self.id + "/messages", auth=SkypeConnection.Auth.Reg, json={
-            "skypeeditedid": msgId,
-            "messagetype": "RichText",
+    def sendMsg(self, content, edit=None):
+        """
+        Send a message to the conversation.
+
+        If edit is specified, perform an edit of the message with that identifier.
+        """
+        msgId = int(time.time())
+        editId = edit or msgId
+        self.skype.conn("POST", self.skype.conn.msgsHost + "/conversations/" + self.id + "/messages", auth=SkypeConnection.Auth.Reg, json={
+            "skypeeditedid": editId,
+            "messagetype": "Text",
             "contenttype": "text",
-            "content": msg
+            "content": content
         })
-        return msgId
+        return SkypeMsg(self.skype, {
+            "id": msgId,
+            "skypeeditedid": None if msgId == editId else editId,
+            "messagetype": "Text",
+            "content": content
+        })
 
 class SkypeMsg(SkypeObj):
+    """
+    A message either sent or received in a conversation.
+
+    Edits are represented by the original message, followed by subsequent messages that reference the original by editId.
+    """
     attrs = ["id", "type", "content"]
     def __init__(self, skype, raw):
         super(SkypeMsg, self).__init__(skype, raw)
         self.id = raw.get("id")
-        self.oldMsgId = raw.get("skypeeditedid")
-        self.time = datetime.datetime.strptime(raw.get("originalarrivaltime"), "%Y-%m-%dT%H:%M:%S.%fZ")
+        self.editId = raw.get("skypeeditedid")
+        self.time = datetime.datetime.strptime(raw.get("originalarrivaltime"), "%Y-%m-%dT%H:%M:%S.%fZ") if raw.get("originalarrivaltime") else datetime.datetime.now()
         self.type = raw.get("messagetype")
         self.content = raw.get("content")

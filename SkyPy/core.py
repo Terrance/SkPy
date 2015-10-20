@@ -12,11 +12,19 @@ class Skype(object):
     @property
     @lazyLoad
     def user(self):
+        """
+        Lazy: retrieve the current user.
+        """
         json = self.conn("GET", "https://api.skype.com/users/self/profile", auth=SkypeConnection.Auth.Skype).json()
         return SkypeUser(self, json, True)
     @property
     @lazyLoad
     def contacts(self):
+        """
+        Lazy: retrieve all contacts for the current user.
+
+        The Skype API also provides suggestions within the same list -- these can be filtered by looking for authorised = True.
+        """
         contacts = {}
         for json in self.conn("GET", "https://contacts.skype.com/contacts/v1/users/" + self.user.id + "/contacts", auth=SkypeConnection.Auth.Skype).json().get("contacts", []):
             if not json.get("suggested"):
@@ -25,6 +33,11 @@ class Skype(object):
         return contacts
     @stateLoad
     def getChats(self):
+        """
+        Stateful: retrieve a list of recent conversations.
+
+        Each conversation is only retrieved once, so subsequent calls may exhaust the set and return an empty list.
+        """
         url = self.conn.msgsHost + "/conversations"
         params = {
             "startTime": 0,
@@ -42,6 +55,13 @@ class Skype(object):
         return url, params, fetch, process
     @SkypeConnection.resubscribeOn(404)
     def getEvents(self):
+        """
+        Retrieve a list of events since the last poll.  Multiple calls may be needed to retrieve all events.
+
+        If no events are currently available, the API will block for up to 30 seconds, after which an empty list is returned.
+
+        If any event occurs whilst blocked, it is returned immediately.
+        """
         events = []
         for json in self.conn("POST", self.conn.msgsHost + "/endpoints/SELF/subscriptions/0/poll", auth=SkypeConnection.Auth.Reg).json().get("eventMessages", []):
             resType = json.get("resourceType")
@@ -64,6 +84,9 @@ class Skype(object):
             events.append(ev)
         return events
     def setStatus(self, status):
+        """
+        Set the user's presence.
+        """
         self.conn("PUT", self.conn.msgsHost + "/presenceDocs/messagingService", json={
             "status": status
         })

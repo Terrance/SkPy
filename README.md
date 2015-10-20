@@ -41,7 +41,7 @@ import re
 from SkyPy import SkypeBot, SkypeMessageEvent
 class MyBot(SkypeBot):
     def __init__(self):
-        super(SkypeBot, self).__init__(username, password)
+        super(SkypeBot, self).__init__(username, password, loop=True)
     def onEvent(self, event):
         if isinstance(event, SkypeMessageEvent)
           and not event.sender == self.user.id:

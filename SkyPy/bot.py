@@ -3,17 +3,27 @@ import time
 from .core import Skype
 
 class SkypeBot(Skype):
-    def __init__(self, user, pwd, tokenFile, autoAck=True):
+    """
+    A skeleton class for producting automated Skype bots.
+
+    Implementors should override the onEvent(event) method to react to messages and status changes.
+
+    If loop is set, the bot will immediately start processing events.
+    """
+    def __init__(self, user, pwd, tokenFile, loop=True, autoAck=True):
         super(SkypeBot, self).__init__(user, pwd, tokenFile)
         self.autoAck = autoAck
         self.setStatus("Online")
+        if loop:
+            while True:
+                self.iter()
     def iter(self):
+        """
+        Handle any incoming events.  If autoAck is set, any 'ackrequired' URLs are automatically called.
+        """
         for event in self.getEvents():
             self.onEvent(event)
             if self.autoAck:
                 event.ack()
-    def loop(self):
-        while True:
-            self.iter()
     def onEvent(self, event):
         pass
