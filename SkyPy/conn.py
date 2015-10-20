@@ -2,6 +2,7 @@ import os
 import functools
 import datetime
 import time
+import math
 import hashlib
 
 import bs4
@@ -80,6 +81,9 @@ class SkypeConnection(object):
             "js_time": secs
         })
         loginRespPage = bs4.BeautifulSoup(loginResp.text, "html.parser")
+        errors = loginRespPage.select("div.messageBox.message_error span")
+        if errors:
+            raise SkypeApiException("Error message returned", loginResp, errors[0].text)
         try:
             self.tokens["skype"] = loginRespPage.find("input", {"name": "skypetoken"}).get("value")
             self.tokenExpiry["skype"] = datetime.datetime.fromtimestamp(secs + int(loginRespPage.find("input", {"name": "expires_in"}).get("value")))
@@ -109,6 +113,10 @@ class SkypeConnection(object):
             "template": "raw",
             "channelType": "httpLongPoll"
         })
+    def __str__(self):
+        return "[{0}]".format(self.__class__.__name__)
+    def __repr__(self):
+        return "{0}()".format(self.__class__.__name__)
 
 class SkypeApiException(Exception):
     pass

@@ -5,10 +5,12 @@ from .conn import SkypeConnection
 from .util import SkypeObj
 
 class SkypeUser(SkypeObj):
-    def __init__(self, conn, raw, isMe=False):
-        super(SkypeUser, self).__init__(conn, raw)
+    attrs = ["id", "isMe", "type", "authorised", "blocked", "name", "location", "phones", "avatar"]
+    def __init__(self, skype, raw, isMe=False):
+        super(SkypeUser, self).__init__(skype, raw)
         self.isMe = isMe
         if isMe:
+            self.attrs = ["id", "isMe", "name", "location", "language", "phones", "avatar"]
             self.id = raw.get("username")
             self.name = {
                 "first": raw.get("firstname"),
@@ -34,17 +36,15 @@ class SkypeUser(SkypeObj):
             self.phones = raw.get("phones") or []
         self.avatar = raw.get("avatar_url")
     def getChat(self):
-        return SkypeChat(self.conn, self.conn("GET", self.conn.msgsHost + "/conversations/8:" + self.id, auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json())
-    def __str__(self):
-        attrs = ["location", "language", "phones", "avatar"] if self.isMe else ["type", "authorised", "blocked", "location", "phones", "avatar"]
-        return objToStr(self, "id", "name", *attrs)
+        return SkypeChat(self.skype.conn, self.skype.conn("GET", self.skype.conn.msgsHost + "/conversations/8:" + self.id, auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json())
 
 class SkypeChat(SkypeObj):
-    def __init__(self, conn, raw):
-        super(SkypeChat, self).__init__(conn, raw)
+    attrs = ["id"]
+    def __init__(self, skype, raw):
+        super(SkypeChat, self).__init__(skype, raw)
         self.id = raw.get("id")
     def getMsgs(self):
-        resp = self.conn("GET", self._msgSyncState if hasattr(self, "_msgSyncState") else self.conn.msgsHost + "/conversations/" + self.id + "/messages", auth=SkypeConnection.Auth.Reg, params={
+        resp = self.skype.conn("GET", self._msgSyncState if hasattr(self, "_msgSyncState") else self.skype.conn.msgsHost + "/conversations/" + self.id + "/messages", auth=SkypeConnection.Auth.Reg, params={
             "startTime": 0,
             "view": "msnp24Equivalent",
             "targetType": "Passport|Skype|Lync|Thread"
@@ -52,11 +52,11 @@ class SkypeChat(SkypeObj):
         self._msgSyncState = resp.get("_metadata", {}).get("syncState")
         msgs = []
         for json in resp.get("messages", []):
-            msgs.append(SkypeMsg(self.conn, json))
+            msgs.append(SkypeMsg(self.skype.conn, json))
         return msgs
     def sendMsg(self, msg, edit=None):
         msgId = edit or int(time.time())
-        msgResp = self.conn("POST", self.conn.msgsHost + "/conversations/" + self.id + "/messages", auth=SkypeConnection.Auth.Reg, json={
+        msgResp = self.skype.conn("POST", self.skype.conn.msgsHost + "/conversations/" + self.id + "/messages", auth=SkypeConnection.Auth.Reg, json={
             "skypeeditedid": msgId,
             "messagetype": "RichText",
             "contenttype": "text",
@@ -65,12 +65,11 @@ class SkypeChat(SkypeObj):
         return msgId
 
 class SkypeMsg(SkypeObj):
-    def __init__(self, conn, raw):
-        super(SkypeMsg, self).__init__(conn, raw)
+    attrs = ["id", "type", "content"]
+    def __init__(self, skype, raw):
+        super(SkypeMsg, self).__init__(skype, raw)
         self.id = raw.get("id")
         self.oldMsgId = raw.get("skypeeditedid")
         self.time = datetime.datetime.strptime(raw.get("originalarrivaltime"), "%Y-%m-%dT%H:%M:%S.%fZ")
         self.type = raw.get("messagetype")
         self.content = raw.get("content")
-    def __str__(self):
-        return objToStr(self, "id", "type", "content")

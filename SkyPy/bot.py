@@ -1,8 +1,6 @@
 import time
 
 from .core import Skype
-from .conn import SkypeConnection
-from .event import SkypeMessageEvent
 
 class SkypeBot(Skype):
     def __init__(self, user, pwd, tokenFile, autoAck=True):

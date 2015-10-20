@@ -4,7 +4,6 @@ import datetime
 from .conn import SkypeConnection
 from .chat import SkypeUser, SkypeChat
 from .event import SkypeEvent, SkypePresenceEvent, SkypeTypingEvent, SkypeMessageEvent
-from .util import objToStr
 
 class Skype(object):
     def __init__(self, user=None, pwd=None, tokenFile=None):
@@ -57,5 +56,7 @@ class Skype(object):
         self.conn("PUT", self.conn.msgsHost + "/presenceDocs/messagingService", json={
             "status": status
         })
+    def __str__(self):
+        return "[{0}]\nUser: {1}".format(self.__class__.__name__, str(self.user).replace("\n", "\n" + (" " * 6)))
     def __repr__(self):
-        return "<{0}: {1}>".format(self.__class__.__name__, self.user.id)
+        return "{0}(user={1})".format(self.__class__.__name__, repr(self.user))
