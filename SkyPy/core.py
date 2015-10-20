@@ -3,53 +3,64 @@ import datetime
 
 from .conn import SkypeConnection
 from .chat import SkypeUser, SkypeChat
-from .event import SkypeEvent, SkypePresenceEvent, SkypeTypingEvent, SkypeMessageEvent
+from .event import SkypeEvent, SkypePresenceEvent, SkypeTypingEvent, SkypeNewMessageEvent, SkypeEditMessageEvent
+from .util import lazyLoad, stateLoad
 
 class Skype(object):
     def __init__(self, user=None, pwd=None, tokenFile=None):
         self.conn = SkypeConnection(user, pwd, tokenFile)
-        self.user = self.getUser()
-        self.contacts = self.getContacts()
-        self.chats = self.getChats()
-    def getUser(self):
+    @property
+    @lazyLoad
+    def user(self):
         json = self.conn("GET", "https://api.skype.com/users/self/profile", auth=SkypeConnection.Auth.Skype).json()
-        return SkypeUser(self.conn, json, True)
-    def getContacts(self):
+        return SkypeUser(self, json, True)
+    @property
+    @lazyLoad
+    def contacts(self):
         contacts = {}
         for json in self.conn("GET", "https://contacts.skype.com/contacts/v1/users/" + self.user.id + "/contacts", auth=SkypeConnection.Auth.Skype).json().get("contacts", []):
             if not json.get("suggested"):
-                contacts[json.get("id")] = SkypeUser(self.conn, json)
-        if hasattr(self, "user"):
-            contacts[self.user.id] = self.user
+                contacts[json.get("id")] = SkypeUser(self, json)
+        contacts[self.user.id] = self.user
         return contacts
-    def getChats(self, state=True):
-        resp = self.conn("GET", self._chatSyncState if state and hasattr(self, "_chatSyncState") else self.conn.msgsHost + "/conversations", auth=SkypeConnection.Auth.Reg, params={
+    @stateLoad
+    def getChats(self):
+        url = self.conn.msgsHost + "/conversations"
+        params = {
             "startTime": 0,
             "view": "msnp24Equivalent",
             "targetType": "Passport|Skype|Lync|Thread"
-        }).json()
-        self._chatSyncState = resp.get("_metadata", {}).get("syncState")
-        chats = {}
-        for json in resp.get("conversations", []):
-            chats[json.get("id")] = SkypeChat(self.conn, json)
-        return chats
+        }
+        def fetch(url, params):
+            resp = self.conn("GET", url, auth=SkypeConnection.Auth.Reg, params=params).json()
+            return resp, resp.get("_metadata", {}).get("syncState")
+        def process(resp):
+            chats = {}
+            for json in resp.get("conversations", []):
+                chats[json.get("id")] = SkypeChat(self, json)
+            return chats
+        return url, params, fetch, process
     @SkypeConnection.resubscribeOn(404)
     def getEvents(self):
         events = []
         for json in self.conn("POST", self.conn.msgsHost + "/endpoints/SELF/subscriptions/0/poll", auth=SkypeConnection.Auth.Reg).json().get("eventMessages", []):
             resType = json.get("resourceType")
+            res = json.get("resource", {})
             if resType == "UserPresence":
-                ev = SkypePresenceEvent(json, self)
+                ev = SkypePresenceEvent(self, json)
             elif resType == "NewMessage":
-                msgType = json.get("resource", {}).get("messagetype")
+                msgType = res.get("messagetype")
                 if msgType in ("Control/Typing", "Control/ClearTyping"):
-                    ev = SkypeTypingEvent(json, self)
-                elif msgType == "RichText":
-                    ev = SkypeMessageEvent(json, self)
+                    ev = SkypeTypingEvent(self, json)
+                elif msgType in ("Text", "RichText"):
+                    if res.get("skypeeditedid"):
+                        ev = SkypeEditMessageEvent(self, json)
+                    else:
+                        ev = SkypeNewMessageEvent(self, json)
                 else:
-                    ev = SkypeEvent(json, self)
+                    ev = SkypeEvent(self, json)
             else:
-                ev = SkypeEvent(json, self)
+                ev = SkypeEvent(self, json)
             events.append(ev)
         return events
     def setStatus(self, status):

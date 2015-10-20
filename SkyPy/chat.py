@@ -2,7 +2,7 @@ import time
 import datetime
 
 from .conn import SkypeConnection
-from .util import SkypeObj
+from .util import SkypeObj, lazyLoad, stateLoad
 
 class SkypeUser(SkypeObj):
     attrs = ["id", "isMe", "type", "authorised", "blocked", "name", "location", "phones", "avatar"]
@@ -35,25 +35,33 @@ class SkypeUser(SkypeObj):
             self.location = raw.get("locations")[0] if "locations" in raw else {}
             self.phones = raw.get("phones") or []
         self.avatar = raw.get("avatar_url")
-    def getChat(self):
-        return SkypeChat(self.skype.conn, self.skype.conn("GET", self.skype.conn.msgsHost + "/conversations/8:" + self.id, auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json())
+    @property
+    @lazyLoad
+    def chat(self):
+        return SkypeChat(self.skype, self.skype.conn("GET", self.skype.conn.msgsHost + "/conversations/8:" + self.id, auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json())
 
 class SkypeChat(SkypeObj):
     attrs = ["id"]
     def __init__(self, skype, raw):
         super(SkypeChat, self).__init__(skype, raw)
         self.id = raw.get("id")
+    @stateLoad
     def getMsgs(self):
-        resp = self.skype.conn("GET", self._msgSyncState if hasattr(self, "_msgSyncState") else self.skype.conn.msgsHost + "/conversations/" + self.id + "/messages", auth=SkypeConnection.Auth.Reg, params={
+        url = self.skype.conn.msgsHost + "/conversations/" + self.id + "/messages"
+        params = {
             "startTime": 0,
             "view": "msnp24Equivalent",
             "targetType": "Passport|Skype|Lync|Thread"
-        }).json()
-        self._msgSyncState = resp.get("_metadata", {}).get("syncState")
-        msgs = []
-        for json in resp.get("messages", []):
-            msgs.append(SkypeMsg(self.skype.conn, json))
-        return msgs
+        }
+        def fetch(url, params):
+            resp = self.skype.conn("GET", url, auth=SkypeConnection.Auth.Reg, params=params).json()
+            return resp, resp.get("_metadata", {}).get("syncState")
+        def process(resp):
+            msgs = []
+            for json in resp.get("messages", []):
+                msgs.append(SkypeMsg(self.skype, json))
+            return msgs
+        return url, params, fetch, process
     def sendMsg(self, msg, edit=None):
         msgId = edit or int(time.time())
         msgResp = self.skype.conn("POST", self.skype.conn.msgsHost + "/conversations/" + self.id + "/messages", auth=SkypeConnection.Auth.Reg, json={
