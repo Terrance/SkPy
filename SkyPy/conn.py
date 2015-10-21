@@ -66,6 +66,7 @@ class SkypeConnection(object):
                     f.write(str(int(time.mktime(self.tokenExpiry["skype"].timetuple()))) + "\n")
                     f.write(self.msgsHost + "\n")
         self.getRegToken()
+        self.makeEndpoint()
         self.subscribe()
     def __call__(self, method, url, codes=[200, 201, 207], auth=None, headers={}, params=None, data=None, json=None):
         """
@@ -128,6 +129,23 @@ class SkypeConnection(object):
             self.msgsHost = location
             return self.getRegToken()
         self.tokens["reg"] = regTokenHead
+    def makeEndpoint(self):
+        endResp = self("POST", self.msgsHost + "/endpoints", auth=self.Auth.Reg, json={})
+        self.msgsEndpoint = endResp.headers["Location"]
+        self("PUT", self.msgsEndpoint + "/presenceDocs/messagingService", auth=self.Auth.Reg, json={
+            "id": "messagingService",
+            "privateInfo": {
+                "epname": "skype"
+            },
+            "publicInfo": {
+                "capabilities": "",
+                "nodeInfo": "xx",
+                "skypeNameVersion": "skype.com",
+                "type": 1
+            },
+            "selfLink": "uri",
+            "type": "EndpointPresenceDoc"
+        })
     def subscribe(self):
         """
         Subscribe to contact and conversation events.  These are accessible through Skype.getEvents().
