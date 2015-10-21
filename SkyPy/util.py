@@ -1,9 +1,6 @@
 import re
-import functools
-try:
-    import urllib.parse as urlparse
-except ImportError:
-    import urlparse
+from functools import wraps
+from inspect import getargspec
 
 def userToId(url):
     """
@@ -19,26 +16,53 @@ def chatToId(url):
     match = re.search(r"/v1/users/ME/conversations/([0-9]+:[A-Za-z0-9\.,_-]+(@thread\.skype)?)", url)
     return match.group(1) if match else None
 
-def lazyLoad(fn):
+def cacheResult(fn):
     """
     Decorator: calculate the value on first access, produce the cached value thereafter.
+
+    If the function takes an argument, the cache is a dictionary using that argument as a key.
     """
-    cachedAttr = "{0}Cached".format(fn.__name__)
-    @functools.wraps(fn)
-    def wrapper(self, *args, **kwargs):
-        if not hasattr(self, cachedAttr):
-            setattr(self, cachedAttr, fn(self, *args, **kwargs))
-        return getattr(self, cachedAttr)
+    cacheAttr = "{0}Cache".format(fn.__name__)
+    argSpec = getargspec(fn)
+    argNames = argSpec.args[1:]
+    if len(argNames) > 1:
+        raise RuntimeError("can't cache results if function takes multiple args")
+    argName = argNames[0] if len(argNames) else None
+    if argName:
+        if argSpec.defaults:
+            @wraps(fn)
+            def wrapper(self, arg=argSpec.defaults[0]):
+                if not hasattr(self, cacheAttr):
+                    setattr(self, cacheAttr, {})
+                cache = getattr(self, cacheAttr)
+                if arg not in cache:
+                    cache[arg] = fn(self, arg)
+                return cache[arg]
+        else:
+            @wraps(fn)
+            def wrapper(self, arg):
+                if not hasattr(self, cacheAttr):
+                    setattr(self, cacheAttr, {})
+                cache = getattr(self, cacheAttr)
+                if arg not in cache:
+                    cache[arg] = fn(self, arg)
+                return cache[arg]
+    else:
+        @wraps(fn)
+        def wrapper(self):
+            if not hasattr(self, cacheAttr):
+                setattr(self, cacheAttr, fn(self))
+            return getattr(self, cacheAttr)
     return wrapper
 
-def stateLoad(fn):
+def syncState(fn):
     """
     Decorator: follow state-sync links when provided by an API.
 
     The function being wrapped must return: url, params, fetch(url, params), process(resp)
     """
     stateAttr = "{0}State".format(fn.__name__)
-    @functools.wraps(fn)
+    @wraps(fn)
     def wrapper(self, *args, **kwargs):
         url, params, fetch, process = fn(self, *args, **kwargs)
         if hasattr(self, stateAttr):

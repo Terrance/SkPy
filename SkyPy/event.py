@@ -2,7 +2,7 @@ import datetime
 import re
 
 from .conn import SkypeConnection
-from .util import SkypeObj, userToId, chatToId, lazyLoad
+from .util import SkypeObj, userToId, chatToId, cacheResult
 
 class SkypeEvent(SkypeObj):
     """
@@ -34,10 +34,9 @@ class SkypePresenceEvent(SkypeEvent):
         self.userId = userToId(raw.get("resourceLink", ""))
         self.status = res.get("status")
     @property
-    @lazyLoad
     def user(self):
         """
-        Lazy: retrieve the user referred to in the event.
+        Retrieve the user referred to in the event.
         """
         return self.skype.getContact(self.userId)
 
@@ -53,17 +52,15 @@ class SkypeTypingEvent(SkypeEvent):
         self.chatId = chatToId(res.get("conversationLink", ""))
         self.active = (res.get("messagetype") == "Control/Typing")
     @property
-    @lazyLoad
     def user(self):
         """
-        Lazy: retrieve the user referred to in the event.
+        Retrieve the user referred to in the event.
         """
         return self.skype.getContact(self.userId)
     @property
-    @lazyLoad
     def chat(self):
         """
-        Lazy: retrieve the conversation referred to in the event.
+        Retrieve the conversation referred to in the event.
         """
         return self.skype.getChat(self.chatId)
 
@@ -79,17 +76,15 @@ class SkypeMessageEvent(SkypeEvent):
         self.userId = userToId(res.get("from", ""))
         self.chatId = chatToId(res.get("conversationLink", ""))
     @property
-    @lazyLoad
     def user(self):
         """
-        Lazy: retrieve the user referred to in the event.
+        Retrieve the user referred to in the event.
         """
         return self.skype.getContact(self.userId)
     @property
-    @lazyLoad
     def chat(self):
         """
-        Lazy: retrieve the conversation referred to in the event.
+        Retrieve the conversation referred to in the event.
         """
         return self.skype.getChat(self.chatId)
 

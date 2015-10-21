@@ -2,7 +2,7 @@ import time
 import datetime
 
 from .conn import SkypeConnection
-from .util import SkypeObj, lazyLoad, stateLoad
+from .util import SkypeObj, cacheResult, syncState
 
 class SkypeUser(SkypeObj):
     """
@@ -38,10 +38,10 @@ class SkypeUser(SkypeObj):
         self.avatar = raw.get("avatar_url")
         self.mood = raw.get("mood", raw.get("richMood"))
     @property
-    @lazyLoad
+    @cacheResult
     def chat(self):
         """
-        Lazy: return the conversation object for this user.
+        Return the conversation object for this user.
         """
         return SkypeChat(self.skype, self.skype.conn("GET", self.skype.conn.msgsHost + "/conversations/8:" + self.id, auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json())
 
@@ -55,10 +55,10 @@ class SkypeChat(SkypeObj):
     def __init__(self, skype, raw):
         super(SkypeChat, self).__init__(skype, raw)
         self.id = raw.get("id")
-    @stateLoad
+    @syncState
     def getMsgs(self):
         """
-        Stateful: retrieve any new messages in the conversation.
+        Retrieve any new messages in the conversation.
 
         On first access, this method should be repeatedly called to retrieve older messages.
         """

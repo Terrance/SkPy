@@ -4,24 +4,24 @@ import datetime
 from .conn import SkypeConnection
 from .chat import SkypeUser, SkypeChat
 from .event import SkypeEvent, SkypePresenceEvent, SkypeTypingEvent, SkypeNewMessageEvent, SkypeEditMessageEvent
-from .util import lazyLoad, stateLoad
+from .util import cacheResult, syncState
 
 class Skype(object):
     def __init__(self, user=None, pwd=None, tokenFile=None):
         self.conn = SkypeConnection(user, pwd, tokenFile)
     @property
-    @lazyLoad
+    @cacheResult
     def me(self):
         """
-        Lazy: retrieve the current user.
+        Retrieve the current user.
         """
         json = self.conn("GET", "https://api.skype.com/users/self/profile", auth=SkypeConnection.Auth.Skype).json()
         return SkypeUser(self, json, True)
     @property
-    @lazyLoad
+    @cacheResult
     def contacts(self):
         """
-        Lazy: retrieve all contacts for the current user.
+        Retrieve all contacts for the current user.
 
         The Skype API also provides suggestions within the same list -- these can be filtered by looking for authorised = True.
         """
@@ -31,6 +31,7 @@ class Skype(object):
                 contacts[json.get("id")] = SkypeUser(self, json)
         contacts[self.me.id] = self.me
         return contacts
+    @cacheResult
     def getContact(self, id):
         """
         Get information about a contact.  Use the contacts list if already cached.
@@ -39,6 +40,7 @@ class Skype(object):
             return self.contactsCached.get(id)
         json = self.conn("GET", self.conn.API_USER + "/users/" + id + "/profile", auth=SkypeConnection.Auth.Skype).json()
         return SkypeUser(self, json)
+    @cacheResult
     def searchUsers(self, query):
         """
         Search the Skype Directory for a user.
@@ -53,16 +55,17 @@ class Skype(object):
             res["Location"] = obj.get("ContactCards", {}).get("CurrentLocation")
             results.append(res)
         return results
+    @cacheResult
     def getUser(self, id):
         """
         Get information about a user, without them being a contact.
         """
         json = self.conn("POST", self.conn.API_USER + "/users/self/contacts/profiles", auth=SkypeConnection.Auth.Skype, data={"contacts[]": id}).json()
         return SkypeUser(self, json[0])
-    @stateLoad
+    @syncState
     def getChats(self):
         """
-        Stateful: retrieve a list of recent conversations.
+        Retrieve a list of recent conversations.
 
         Each conversation is only retrieved once, so subsequent calls may exhaust the set and return an empty list.
         """
@@ -81,6 +84,7 @@ class Skype(object):
                 chats[json.get("id")] = SkypeChat(self, json)
             return chats
         return url, params, fetch, process
+    @cacheResult
     def getChat(self, id):
         """
         Get a single conversation by identifier.
