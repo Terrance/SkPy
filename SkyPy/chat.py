@@ -86,17 +86,17 @@ class SkypeChat(SkypeObj):
 
         If edit is specified, perform an edit of the message with that identifier.
         """
-        msgId = int(time.time())
-        editId = edit or msgId
+        timeId = int(time.time())
+        msgId = edit or timeId
         self.skype.conn("POST", self.skype.conn.msgsHost + "/conversations/" + self.id + "/messages", auth=SkypeConnection.Auth.Reg, json={
-            "skypeeditedid": editId,
+            ("skypeeditedid" if edit else "cilientmessageid"): msgId,
             "messagetype": "Text",
             "contenttype": "text",
             "content": content
         })
         return SkypeMsg(self.skype, {
-            "id": msgId,
-            "skypeeditedid": None if msgId == editId else editId,
+            "id": timeId,
+            "skypeeditedid": msgId if edit else None,
             "messagetype": "Text",
             "content": content
         })
@@ -107,7 +107,7 @@ class SkypeMsg(SkypeObj):
 
     Edits are represented by the original message, followed by subsequent messages that reference the original by editId.
     """
-    attrs = ["id", "type", "content"]
+    attrs = ["id", "editId", "time", "type", "content"]
     def __init__(self, skype, raw):
         super(SkypeMsg, self).__init__(skype, raw)
         self.id = raw.get("id")
