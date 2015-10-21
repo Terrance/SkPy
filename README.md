@@ -41,12 +41,12 @@ import re
 from SkyPy import SkypeBot, SkypeMessageEvent
 class MyBot(SkypeBot):
     def __init__(self):
-        super(SkypeBot, self).__init__(username, password, loop=True)
+        super(SkypeBot, self).__init__(username, password)
     def onEvent(self, event):
         if isinstance(event, SkypeMessageEvent)
-          and not event.sender == self.user.id:
-            if re.search("ping", event.body, re.IGNORECASE):
-                self.sendMsg(event.chat, "Pong!")
+          and not event.userId == self.me.id:
+            if re.search("ping", event.content, re.IGNORECASE):
+                event.chat.sendMsg("Pong!")
 ```
 
-The bot will immediately start processing events, though you can set `loop=False` to disable this (in which case call `loop()` when ready).
+The bot will immediately start processing events, though you can set `loop=False` in the super `__init__` to disable this (in which case call `loop()` when ready).
