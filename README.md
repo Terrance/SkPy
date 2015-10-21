@@ -16,7 +16,7 @@ This code is liable to fall apart if any part of the upstream API changes.  You 
 ```python
 from SkyPy import Skype
 sk = Skype(username, password) # connect to Skype
-sk.user # you
+sk.me # you
 sk.contacts # your contacts
 sk.getChats() # recent conversations
 sk.getEvents() # presences, new messages etc.
@@ -49,4 +49,4 @@ class MyBot(SkypeBot):
                 self.sendMsg(event.chat, "Pong!")
 ```
 
-To run a `SkypeBot`, call its `loop()` method.
+The bot will immediately start processing events, though you can set `loop=False` to disable this (in which case call `loop()` when ready).

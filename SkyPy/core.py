@@ -11,7 +11,7 @@ class Skype(object):
         self.conn = SkypeConnection(user, pwd, tokenFile)
     @property
     @lazyLoad
-    def user(self):
+    def me(self):
         """
         Lazy: retrieve the current user.
         """
@@ -26,11 +26,36 @@ class Skype(object):
         The Skype API also provides suggestions within the same list -- these can be filtered by looking for authorised = True.
         """
         contacts = {}
-        for json in self.conn("GET", "https://contacts.skype.com/contacts/v1/users/" + self.user.id + "/contacts", auth=SkypeConnection.Auth.Skype).json().get("contacts", []):
+        for json in self.conn("GET", self.conn.API_CONTACTS + "/users/" + self.me.id + "/contacts", auth=SkypeConnection.Auth.Skype).json().get("contacts", []):
             if not json.get("suggested"):
                 contacts[json.get("id")] = SkypeUser(self, json)
-        contacts[self.user.id] = self.user
+        contacts[self.me.id] = self.me
         return contacts
+    def getUser(self, id):
+        """
+        Get information about a user, without them being a contact.
+        """
+        json = self.conn("POST", self.conn.API_USER + "/users/self/contacts/profiles", auth=SkypeConnection.Auth.Skype, data={"contacts[]": id}).json()
+    def searchUsers(self, query):
+        """
+        Search the Skype Directory for a user.
+        """
+        json = self.conn("GET", self.conn.API_USER + "/search/users/any", auth=SkypeConnection.Auth.Skype, params={
+            "keyWord": query,
+            "contactTypes[]": "skype"
+        }).json()
+        results = []
+        for obj in json:
+            res = obj["ContactCards"]["Skype"]
+            res["Location"] = obj["ContactCards"]["CurrentLocation"]
+            results.append(res)
+        return results
+    def getUser(self, id):
+        """
+        Get information about a user, without them being a contact.
+        """
+        json = self.conn("POST", self.conn.API_USER + "/users/self/contacts/profiles", auth=SkypeConnection.Auth.Skype, data={"contacts[]": id}).json()
+        return SkypeUser(self, json[0])
     @stateLoad
     def getChats(self):
         """
@@ -83,14 +108,14 @@ class Skype(object):
                 ev = SkypeEvent(self, json)
             events.append(ev)
         return events
-    def setStatus(self, status):
+    def setPresence(self, online=True):
         """
-        Set the user's presence.
+        Set the user's presence (either Online or Hidden).
         """
-        self.conn("PUT", self.conn.msgsHost + "/presenceDocs/messagingService", json={
-            "status": status
+        self.conn("PUT", self.conn.msgsHost + "/presenceDocs/messagingService", auth=SkypeConnection.Auth.Reg, json={
+            "status": "Online" if online else "Hidden"
         })
     def __str__(self):
-        return "[{0}]\nUser: {1}".format(self.__class__.__name__, str(self.user).replace("\n", "\n" + (" " * 6)))
+        return "[{0}]\nUser: {1}".format(self.__class__.__name__, str(self.me).replace("\n", "\n" + (" " * 6)))
     def __repr__(self):
-        return "{0}(user={1})".format(self.__class__.__name__, repr(self.user))
+        return "{0}(user={1})".format(self.__class__.__name__, repr(self.me))

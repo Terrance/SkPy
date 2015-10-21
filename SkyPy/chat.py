@@ -9,37 +9,34 @@ class SkypeUser(SkypeObj):
     A user on Skype -- either the current user, or a contact.
 
     Properties differ slightly between the current user and others (current has language, others have authorised and blocked).
+
+    Searches different possible attributes for each property.  Also deconstructs a merged first name field.
     """
-    attrs = ["id", "isMe", "type", "authorised", "blocked", "name", "location", "phones", "avatar"]
+    attrs = ["id", "type", "authorised", "blocked", "name", "location", "language", "phones", "avatar", "mood"]
     def __init__(self, skype, raw, isMe=False):
         super(SkypeUser, self).__init__(skype, raw)
-        self.isMe = isMe
-        if isMe:
-            self.attrs = ["id", "isMe", "name", "location", "language", "phones", "avatar"]
-            self.id = raw.get("username")
-            self.name = {
-                "first": raw.get("firstname"),
-                "last": raw.get("lastname")
-            }
-            self.location = {
-                "city": raw.get("city"),
-                "state": raw.get("province"),
-                "country": raw.get("country")
-            }
-            self.language = raw.get("language")
-            self.phones = []
-            for k in ("Home", "Mobile", "Office"):
-                if raw.get("phone" + k):
-                    self.phones.append(raw.get("phone" + k))
-        else:
-            self.id = raw.get("id")
-            self.type = raw.get("type")
-            self.authorised = raw.get("authorized")
-            self.blocked = raw.get("blocked")
-            self.name = raw.get("name")
-            self.location = raw.get("locations")[0] if "locations" in raw else {}
-            self.phones = raw.get("phones") or []
+        self.id = raw.get("id", raw.get("username"))
+        self.type = raw.get("type")
+        self.authorised = raw.get("authorized")
+        self.blocked = raw.get("blocked")
+        self.name = {
+            "first": raw.get("firstname", raw.get("name", {}).get("first")),
+            "last": raw.get("lastname", raw.get("name", {}).get("surname"))
+        }
+        if not self.name["last"] and self.name["first"] and " " in self.name["first"]:
+            self.name["first"], self.name["last"] = self.name["first"].rsplit(" ", 1)
+        self.location = raw.get("locations")[0] if "locations" in raw else {
+            "city": raw.get("city"),
+            "state": raw.get("province"),
+            "country": raw.get("country")
+        }
+        self.language = raw.get("language")
+        self.phones = raw.get("phones", [])
+        for k in ("Home", "Mobile", "Office"):
+            if raw.get("phone" + k):
+                self.phones.append(raw.get("phone" + k))
         self.avatar = raw.get("avatar_url")
+        self.mood = raw.get("mood", raw.get("richMood"))
     @property
     @lazyLoad
     def chat(self):

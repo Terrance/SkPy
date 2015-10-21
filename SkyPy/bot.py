@@ -13,17 +13,17 @@ class SkypeBot(Skype):
     def __init__(self, user, pwd, tokenFile, loop=True, autoAck=True):
         super(SkypeBot, self).__init__(user, pwd, tokenFile)
         self.autoAck = autoAck
-        self.setStatus("Online")
+        self.setPresence()
         if loop:
-            while True:
-                self.iter()
-    def iter(self):
+            self.loop()
+    def loop(self):
         """
         Handle any incoming events.  If autoAck is set, any 'ackrequired' URLs are automatically called.
         """
-        for event in self.getEvents():
-            self.onEvent(event)
-            if self.autoAck:
-                event.ack()
+        while True:
+            for event in self.getEvents():
+                self.onEvent(event)
+                if self.autoAck:
+                    event.ack()
     def onEvent(self, event):
         pass
