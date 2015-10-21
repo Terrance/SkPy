@@ -120,7 +120,6 @@ class SkypeConnection(object):
         secs = int(time.time())
         endpointResp = self("POST", self.msgsHost + "/endpoints", codes=[201, 301], headers={
             "LockAndKey": "appId=msmsgs@msnmsgr.com; time=" + str(secs) + "; lockAndKeyResponse=" + getMac256Hash(str(secs), "msmsgs@msnmsgr.com", "Q1P7W2E4J9R8U3S5"),
-            "ClientInfo": "os=Windows; osVer=10; proc=Win64; lcid=en-us; deviceType=1; country=n/a; clientName=swx-skype.com; clientVer=908/1.7.251",
             "Authentication": "skypetoken=" + self.tokens["skype"]
         }, json={})
         location = endpointResp.headers["Location"].rsplit("/", 2)[0]

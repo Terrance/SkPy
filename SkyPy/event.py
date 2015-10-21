@@ -13,14 +13,15 @@ class SkypeEvent(SkypeObj):
         self.skype = skype
         self.raw = raw
         self.id = raw.get("id")
-        self.time = datetime.datetime.strptime(raw["time"], "%Y-%m-%dT%H:%M:%SZ")
+        self.time = datetime.datetime.strptime(raw.get("time"), "%Y-%m-%dT%H:%M:%SZ") if "time" in raw else None
         self.type = raw.get("resourceType")
     def ack(self):
         """
         Acknowledge receipt of an event, if a response is required.
         """
-        if "ackrequired" in self.raw.get("resource"):
-            self.skype.conn("POST", self.res.get("ackrequired"), auth=SkypeConnection.Auth.Reg)
+        url = self.raw.get("resource", {}).get("ackrequired")
+        if url:
+            self.skype.conn("POST", url, auth=SkypeConnection.Auth.Reg)
 
 class SkypePresenceEvent(SkypeEvent):
     """
@@ -30,7 +31,7 @@ class SkypePresenceEvent(SkypeEvent):
     def __init__(self, skype, raw):
         super(SkypePresenceEvent, self).__init__(skype, raw)
         res = raw.get("resource", {})
-        self.userId = userToId(raw.get("resourceLink"))
+        self.userId = userToId(raw.get("resourceLink", ""))
         self.status = res.get("status")
     @property
     @lazyLoad
@@ -38,7 +39,7 @@ class SkypePresenceEvent(SkypeEvent):
         """
         Lazy: retrieve the user referred to in the event.
         """
-        return self.skype.contacts.get(self.userId)
+        return self.skype.getContact(self.userId)
 
 class SkypeTypingEvent(SkypeEvent):
     """
@@ -48,8 +49,8 @@ class SkypeTypingEvent(SkypeEvent):
     def __init__(self, skype, raw):
         super(SkypeTypingEvent, self).__init__(skype, raw)
         res = raw.get("resource", {})
-        self.userId = userToId(res.get("from"))
-        self.chatId = chatToId(res.get("conversationLink"))
+        self.userId = userToId(res.get("from", ""))
+        self.chatId = chatToId(res.get("conversationLink", ""))
         self.active = (res.get("messagetype") == "Control/Typing")
     @property
     @lazyLoad
@@ -57,14 +58,14 @@ class SkypeTypingEvent(SkypeEvent):
         """
         Lazy: retrieve the user referred to in the event.
         """
-        return self.skype.contacts.get(self.userId)
+        return self.skype.getContact(self.userId)
     @property
     @lazyLoad
     def chat(self):
         """
         Lazy: retrieve the conversation referred to in the event.
         """
-        return self.skype.chats.get(self.chatId)
+        return self.skype.getChat(self.chatId)
 
 class SkypeMessageEvent(SkypeEvent):
     """
@@ -74,23 +75,23 @@ class SkypeMessageEvent(SkypeEvent):
     def __init__(self, skype, raw):
         super(SkypeMessageEvent, self).__init__(skype, raw)
         res = raw.get("resource", {})
-        self.msgId = int(res.get("id"))
-        self.userId = userToId(res.get("from"))
-        self.chatId = chatToId(res.get("conversationLink"))
+        self.msgId = int(res.get("id")) if "id" in res else None
+        self.userId = userToId(res.get("from", ""))
+        self.chatId = chatToId(res.get("conversationLink", ""))
     @property
     @lazyLoad
     def user(self):
         """
         Lazy: retrieve the user referred to in the event.
         """
-        return self.skype.contacts.get(self.userId)
+        return self.skype.getContact(self.userId)
     @property
     @lazyLoad
     def chat(self):
         """
         Lazy: retrieve the conversation referred to in the event.
         """
-        return self.skype.chats.get(self.chatId)
+        return self.skype.getChat(self.chatId)
 
 class SkypeNewMessageEvent(SkypeMessageEvent):
     """
@@ -99,7 +100,7 @@ class SkypeNewMessageEvent(SkypeMessageEvent):
     def __init__(self, skype, raw):
         super(SkypeNewMessageEvent, self).__init__(skype, raw)
         res = raw.get("resource", {})
-        self.content = res.get("content")
+        self.content = res.get("content").encode("utf-8")
 
 class SkypeEditMessageEvent(SkypeMessageEvent):
     """
@@ -110,4 +111,4 @@ class SkypeEditMessageEvent(SkypeMessageEvent):
         super(SkypeEditMessageEvent, self).__init__(skype, raw)
         res = raw.get("resource", {})
         self.editId = int(res.get("skypeeditedid"))
-        self.content = res.get("content")
+        self.content = res.get("content").encode("utf-8")

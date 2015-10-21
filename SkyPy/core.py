@@ -33,8 +33,10 @@ class Skype(object):
         return contacts
     def getContact(self, id):
         """
-        Get information about a contact.
+        Get information about a contact.  Use the contacts list if already cached.
         """
+        if hasattr(self, "contactsCached") and id in self.contactsCached:
+            return self.contactsCached.get(id)
         json = self.conn("GET", self.conn.API_USER + "/users/" + id + "/profile", auth=SkypeConnection.Auth.Skype).json()
         return SkypeUser(self, json)
     def searchUsers(self, query):
@@ -47,8 +49,8 @@ class Skype(object):
         }).json()
         results = []
         for obj in json:
-            res = obj["ContactCards"]["Skype"]
-            res["Location"] = obj["ContactCards"]["CurrentLocation"]
+            res = obj.get("ContactCards", {}).get("Skype")
+            res["Location"] = obj.get("ContactCards", {}).get("CurrentLocation")
             results.append(res)
         return results
     def getUser(self, id):
@@ -79,6 +81,12 @@ class Skype(object):
                 chats[json.get("id")] = SkypeChat(self, json)
             return chats
         return url, params, fetch, process
+    def getChat(self, id):
+        """
+        Get a single conversation by identifier.
+        """
+        json = self.conn("GET", self.conn.msgsHost + "/conversations/" + id, auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
+        return SkypeChat(self, json)
     @SkypeConnection.resubscribeOn(404)
     def getEvents(self):
         """
