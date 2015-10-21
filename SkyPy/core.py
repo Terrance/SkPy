@@ -31,11 +31,12 @@ class Skype(object):
                 contacts[json.get("id")] = SkypeUser(self, json)
         contacts[self.me.id] = self.me
         return contacts
-    def getUser(self, id):
+    def getContact(self, id):
         """
-        Get information about a user, without them being a contact.
+        Get information about a contact.
         """
-        json = self.conn("POST", self.conn.API_USER + "/users/self/contacts/profiles", auth=SkypeConnection.Auth.Skype, data={"contacts[]": id}).json()
+        json = self.conn("GET", self.conn.API_USER + "/users/" + id + "/profile", auth=SkypeConnection.Auth.Skype).json()
+        return SkypeUser(self, json)
     def searchUsers(self, query):
         """
         Search the Skype Directory for a user.
