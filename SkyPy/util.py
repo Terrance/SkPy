@@ -1,3 +1,5 @@
+from __future__ import unicode_literals
+
 import re
 from functools import wraps
 from inspect import getargspec
@@ -92,7 +94,8 @@ class SkypeObj(object):
         """
         out = "[{0}]".format(self.__class__.__name__)
         for attr in self.attrs:
-            out += "\n{0}: {1}".format(attr[0].upper() + attr[1:], str(getattr(self, attr)).replace("\n", "\n  " + (" " * len(attr))))
+            value = "{0}".format(getattr(self, attr)).replace("\n", "\n  " + (" " * len(attr)))
+            out += "\n{0}{1}: {2}".format(attr[0].upper(), attr[1:], value)
         return out
     def __repr__(self):
         """

@@ -95,7 +95,7 @@ class SkypeNewMessageEvent(SkypeMessageEvent):
     def __init__(self, skype, raw):
         super(SkypeNewMessageEvent, self).__init__(skype, raw)
         res = raw.get("resource", {})
-        self.content = res.get("content").encode("utf-8")
+        self.content = res.get("content")
 
 class SkypeEditMessageEvent(SkypeMessageEvent):
     """
@@ -106,4 +106,4 @@ class SkypeEditMessageEvent(SkypeMessageEvent):
         super(SkypeEditMessageEvent, self).__init__(skype, raw)
         res = raw.get("resource", {})
         self.editId = int(res.get("skypeeditedid"))
-        self.content = res.get("content").encode("utf-8")
+        self.content = res.get("content")
