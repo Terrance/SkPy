@@ -76,23 +76,37 @@ class SkypeChat(SkypeObj):
                 msgs.append(SkypeMsg(self.skype, json))
             return msgs
         return url, params, fetch, process
-    def sendMsg(self, content, edit=None):
+    def sendMsg(self, content, me=False, rich=False, edit=None):
         """
-        Send a message to the conversation.
+        Send a message to the conversation.  Use the SkypeMsg static helper methods for rich components.
+
+        If me is specified, the message is sent as an action (similar to "/me ...", where /me becomes your name).
 
         If edit is specified, perform an edit of the message with that identifier.
         """
         timeId = int(time.time())
         msgId = edit or timeId
-        self.skype.conn("POST", "{0}/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, json={
+        msgRaw = {
             ("skypeeditedid" if edit else "cilientmessageid"): msgId,
-            "messagetype": "Text",
+            "messagetype": "RichText" if rich else "Text",
             "contenttype": "text",
             "content": content
-        })
+        }
+        if me:
+            name = self.skype.me.name["first"]
+            msgRaw.update({
+                "messagetype": "Text",
+                "content": "{0} {1}".format(name, content),
+                "imdisplayname": name,
+                "skypeemoteoffset": len(name) + 1
+            })
+        self.skype.conn("POST", "{0}/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, json=msgRaw)
         return SkypeMsg(self.skype, {
             "id": timeId,
             "skypeeditedid": msgId if edit else None,
+            "time": datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ"),
+            "from": self.skype.me.id,
+            "conversationLink": self.id,
             "messagetype": "Text",
             "content": content
         })
@@ -114,3 +128,16 @@ class SkypeMsg(SkypeObj):
         self.chatId = chatToId(raw.get("conversationLink", ""))
         self.type = raw.get("messagetype")
         self.content = raw.get("content")
+    class Rich(object):
+        """
+        Helper methods for creating rich messages.
+        """
+        @staticmethod
+        def bold(s):
+            return '<b raw_pre="*" raw_post="*">{0}</b>'.format(s)
+        @staticmethod
+        def italic(s):
+            return '<i raw_pre="_" raw_post="_">{0}</i>'.format(s)
+        @staticmethod
+        def monospace(s):
+            return '<pre raw_pre="!! ">{0}</pre>'.format(s)
