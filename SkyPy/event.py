@@ -2,6 +2,7 @@ import datetime
 import re
 
 from .conn import SkypeConnection
+from .chat import SkypeMsg
 from .util import SkypeObj, userToId, chatToId, cacheResult
 
 class SkypeEvent(SkypeObj):
@@ -27,7 +28,7 @@ class SkypePresenceEvent(SkypeEvent):
     """
     An event for contacts changing status.
     """
-    attrs = SkypeEvent.attrs + ["userId", "status"]
+    attrs = SkypeEvent.attrs + ["user", "status"]
     def __init__(self, skype, raw):
         super(SkypePresenceEvent, self).__init__(skype, raw)
         res = raw.get("resource", {})
@@ -68,25 +69,12 @@ class SkypeMessageEvent(SkypeEvent):
     """
     The base message event, when a message is received in a conversation.
     """
-    attrs = SkypeEvent.attrs + ["msgId", "user", "chat", "content"]
+    attrs = SkypeEvent.attrs + ["msg"]
     def __init__(self, skype, raw):
         super(SkypeMessageEvent, self).__init__(skype, raw)
         res = raw.get("resource", {})
         self.msgId = int(res.get("id")) if "id" in res else None
-        self.userId = userToId(res.get("from", ""))
-        self.chatId = chatToId(res.get("conversationLink", ""))
-    @property
-    def user(self):
-        """
-        Retrieve the user referred to in the event.
-        """
-        return self.skype.getContact(self.userId)
-    @property
-    def chat(self):
-        """
-        Retrieve the conversation referred to in the event.
-        """
-        return self.skype.getChat(self.chatId)
+        self.msg = SkypeMsg(self.skype, self.raw.get("resource"))
 
 class SkypeNewMessageEvent(SkypeMessageEvent):
     """
@@ -94,16 +82,10 @@ class SkypeNewMessageEvent(SkypeMessageEvent):
     """
     def __init__(self, skype, raw):
         super(SkypeNewMessageEvent, self).__init__(skype, raw)
-        res = raw.get("resource", {})
-        self.content = res.get("content")
 
 class SkypeEditMessageEvent(SkypeMessageEvent):
     """
     An event for the update of an existing message in a conversation.
     """
-    attrs = SkypeMessageEvent.attrs + ["editId"]
     def __init__(self, skype, raw):
         super(SkypeEditMessageEvent, self).__init__(skype, raw)
-        res = raw.get("resource", {})
-        self.editId = int(res.get("skypeeditedid"))
-        self.content = res.get("content")

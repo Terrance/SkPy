@@ -2,7 +2,7 @@ import time
 import datetime
 
 from .conn import SkypeConnection
-from .util import SkypeObj, cacheResult, syncState
+from .util import SkypeObj, userToId, chatToId, cacheResult, syncState
 
 class SkypeUser(SkypeObj):
     """
@@ -43,7 +43,7 @@ class SkypeUser(SkypeObj):
         """
         Return the conversation object for this user.
         """
-        return SkypeChat(self.skype, self.skype.conn("GET", self.skype.conn.msgsHost + "/conversations/8:" + self.id, auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json())
+        return self.skype.getChat("8:" + self.id)
 
 class SkypeChat(SkypeObj):
     """
@@ -104,11 +104,25 @@ class SkypeMsg(SkypeObj):
 
     Edits are represented by the original message, followed by subsequent messages that reference the original by editId.
     """
-    attrs = ["id", "editId", "time", "type", "content"]
+    attrs = ["id", "editId", "time", "user", "chat", "type", "content"]
     def __init__(self, skype, raw):
         super(SkypeMsg, self).__init__(skype, raw)
         self.id = raw.get("id")
         self.editId = raw.get("skypeeditedid")
         self.time = datetime.datetime.strptime(raw.get("originalarrivaltime"), "%Y-%m-%dT%H:%M:%S.%fZ") if raw.get("originalarrivaltime") else datetime.datetime.now()
+        self.userId = userToId(raw.get("from", ""))
+        self.chatId = chatToId(raw.get("conversationLink", ""))
         self.type = raw.get("messagetype")
         self.content = raw.get("content")
+    @property
+    def user(self):
+        """
+        Retrieve the user referred to in the event.
+        """
+        return self.skype.getContact(self.userId)
+    @property
+    def chat(self):
+        """
+        Retrieve the conversation referred to in the event.
+        """
+        return self.skype.getChat(self.chatId)
