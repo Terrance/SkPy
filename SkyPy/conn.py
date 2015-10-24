@@ -118,7 +118,7 @@ class SkypeConnection(object):
         Acquire a registration token.  See getMac256Hash(...) for the hash generation.
         """
         secs = int(time.time())
-        endpointResp = self("POST", self.msgsHost + "/endpoints", codes=[201, 301], headers={
+        endpointResp = self("POST", "{0}/endpoints".format(self.msgsHost), codes=[201, 301], headers={
             "LockAndKey": "appId=msmsgs@msnmsgr.com; time=" + str(secs) + "; lockAndKeyResponse=" + getMac256Hash(str(secs), "msmsgs@msnmsgr.com", "Q1P7W2E4J9R8U3S5"),
             "Authentication": "skypetoken=" + self.tokens["skype"]
         }, json={})
@@ -129,9 +129,9 @@ class SkypeConnection(object):
             return self.getRegToken()
         self.tokens["reg"] = regTokenHead
     def makeEndpoint(self):
-        endResp = self("POST", self.msgsHost + "/endpoints", auth=self.Auth.Reg, json={})
+        endResp = self("POST", "{0}/endpoints".format(self.msgsHost), auth=self.Auth.Reg, json={})
         self.msgsEndpoint = endResp.headers["Location"]
-        self("PUT", self.msgsEndpoint + "/presenceDocs/messagingService", auth=self.Auth.Reg, json={
+        self("PUT", "{0}/presenceDocs/messagingService".format(self.msgsEndpoint), auth=self.Auth.Reg, json={
             "id": "messagingService",
             "privateInfo": {
                 "epname": "skype"
@@ -149,7 +149,7 @@ class SkypeConnection(object):
         """
         Subscribe to contact and conversation events.  These are accessible through Skype.getEvents().
         """
-        self("POST", self.msgsHost + "/endpoints/SELF/subscriptions", auth=self.Auth.Reg, json={
+        self("POST", "{0}/endpoints/SELF/subscriptions".format(self.msgsHost), auth=self.Auth.Reg, json={
             "interestedResources": [
                 "/v1/threads/ALL",
                 "/v1/users/ME/contacts/ALL",

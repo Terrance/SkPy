@@ -1,8 +1,8 @@
 import time
-import datetime
+from datetime import datetime
 
 from .conn import SkypeConnection
-from .util import SkypeObj, userToId, chatToId, cacheResult, syncState
+from .util import SkypeObj, userToId, chatToId, convertIds, cacheResult, syncState
 
 class SkypeUser(SkypeObj):
     """
@@ -38,7 +38,6 @@ class SkypeUser(SkypeObj):
         self.avatar = raw.get("avatar_url")
         self.mood = raw.get("mood", raw.get("richMood"))
     @property
-    @cacheResult
     def chat(self):
         """
         Return the conversation object for this user.
@@ -62,7 +61,7 @@ class SkypeChat(SkypeObj):
 
         On first access, this method should be repeatedly called to retrieve older messages.
         """
-        url = self.skype.conn.msgsHost + "/conversations/" + self.id + "/messages"
+        url = "{0}/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id)
         params = {
             "startTime": 0,
             "view": "msnp24Equivalent",
@@ -85,7 +84,7 @@ class SkypeChat(SkypeObj):
         """
         timeId = int(time.time())
         msgId = edit or timeId
-        self.skype.conn("POST", self.skype.conn.msgsHost + "/conversations/" + self.id + "/messages", auth=SkypeConnection.Auth.Reg, json={
+        self.skype.conn("POST", "{0}/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, json={
             ("skypeeditedid" if edit else "cilientmessageid"): msgId,
             "messagetype": "Text",
             "contenttype": "text",
@@ -98,6 +97,7 @@ class SkypeChat(SkypeObj):
             "content": content
         })
 
+@convertIds("user", "chat")
 class SkypeMsg(SkypeObj):
     """
     A message either sent or received in a conversation.
@@ -109,20 +109,8 @@ class SkypeMsg(SkypeObj):
         super(SkypeMsg, self).__init__(skype, raw)
         self.id = raw.get("id")
         self.editId = raw.get("skypeeditedid")
-        self.time = datetime.datetime.strptime(raw.get("originalarrivaltime"), "%Y-%m-%dT%H:%M:%S.%fZ") if raw.get("originalarrivaltime") else datetime.datetime.now()
+        self.time = datetime.strptime(raw.get("originalarrivaltime"), "%Y-%m-%dT%H:%M:%S.%fZ") if raw.get("originalarrivaltime") else datetime.now()
         self.userId = userToId(raw.get("from", ""))
         self.chatId = chatToId(raw.get("conversationLink", ""))
         self.type = raw.get("messagetype")
         self.content = raw.get("content")
-    @property
-    def user(self):
-        """
-        Retrieve the user referred to in the event.
-        """
-        return self.skype.getContact(self.userId)
-    @property
-    def chat(self):
-        """
-        Retrieve the conversation referred to in the event.
-        """
-        return self.skype.getChat(self.chatId)

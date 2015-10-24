@@ -18,6 +18,30 @@ def chatToId(url):
     match = re.search(r"/v1/users/ME/conversations/([0-9]+:[A-Za-z0-9\.,_-]+(@thread\.skype)?)", url)
     return match.group(1) if match else None
 
+def convertIds(*types):
+    """
+    Decorator: add helper methods to convert identifier properties into SkypeObjs.
+    """
+    @property
+    def user(self):
+        """
+        Retrieve the user referred to in the event.
+        """
+        return self.skype.getContact(self.userId)
+    @property
+    def chat(self):
+        """
+        Retrieve the conversation referred to in the event.
+        """
+        return self.skype.getChat(self.chatId)
+    def wrapper(cls):
+        if "user" in types:
+            setattr(cls, "user", user)
+        if "chat" in types:
+            setattr(cls, "chat", chat)
+        return cls
+    return wrapper
+
 def cacheResult(fn):
     """
     Decorator: calculate the value on first access, produce the cached value thereafter.
@@ -74,6 +98,23 @@ def syncState(fn):
         setattr(self, stateAttr, state)
         return process(resp)
     return wrapper
+
+def exhaust(fn, init, *args, **kwargs):
+    """
+    Repeatedly call a function, starting with init, until false-y, then combine all sets.
+
+    Use with state-synced functions to retrieve all results.
+    """
+    while True:
+        iterRes = fn(*args, **kwargs)
+        if iterRes:
+            if isinstance(init, dict):
+                init.update(iterRes)
+            else:
+                init += iterRes
+        else:
+            break
+    return init
 
 class SkypeObj(object):
     """

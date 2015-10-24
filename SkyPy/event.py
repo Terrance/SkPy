@@ -3,7 +3,7 @@ import re
 
 from .conn import SkypeConnection
 from .chat import SkypeMsg
-from .util import SkypeObj, userToId, chatToId, cacheResult
+from .util import SkypeObj, userToId, chatToId, convertIds, cacheResult
 
 class SkypeEvent(SkypeObj):
     """
@@ -24,23 +24,7 @@ class SkypeEvent(SkypeObj):
         if url:
             self.skype.conn("POST", url, auth=SkypeConnection.Auth.Reg)
 
-class SkypePresenceEvent(SkypeEvent):
-    """
-    An event for contacts changing status.
-    """
-    attrs = SkypeEvent.attrs + ["user", "status"]
-    def __init__(self, skype, raw):
-        super(SkypePresenceEvent, self).__init__(skype, raw)
-        res = raw.get("resource", {})
-        self.userId = userToId(raw.get("resourceLink", ""))
-        self.status = res.get("status")
-    @property
-    def user(self):
-        """
-        Retrieve the user referred to in the event.
-        """
-        return self.skype.getContact(self.userId)
-
+@convertIds("user", "chat")
 class SkypeTypingEvent(SkypeEvent):
     """
     An event for users starting or stopping typing in a conversation.
@@ -52,18 +36,6 @@ class SkypeTypingEvent(SkypeEvent):
         self.userId = userToId(res.get("from", ""))
         self.chatId = chatToId(res.get("conversationLink", ""))
         self.active = (res.get("messagetype") == "Control/Typing")
-    @property
-    def user(self):
-        """
-        Retrieve the user referred to in the event.
-        """
-        return self.skype.getContact(self.userId)
-    @property
-    def chat(self):
-        """
-        Retrieve the conversation referred to in the event.
-        """
-        return self.skype.getChat(self.chatId)
 
 class SkypeMessageEvent(SkypeEvent):
     """
