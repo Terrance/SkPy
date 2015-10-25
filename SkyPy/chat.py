@@ -1,7 +1,9 @@
+import re
 import time
 from datetime import datetime
 
 from .conn import SkypeConnection
+from .static import emoticons
 from .util import SkypeObj, userToId, chatToId, convertIds, cacheResult, syncState
 
 class SkypeUser(SkypeObj):
@@ -78,9 +80,11 @@ class SkypeChat(SkypeObj):
         return url, params, fetch, process
     def sendMsg(self, content, me=False, rich=False, edit=None):
         """
-        Send a message to the conversation.  Use the SkypeMsg static helper methods for rich components.
+        Send a message to the conversation.
 
         If me is specified, the message is sent as an action (similar to "/me ...", where /me becomes your name).
+
+        Set rich to allow formatting tags -- use the SkypeMsg static helper methods for rich components.
 
         If edit is specified, perform an edit of the message with that identifier.
         """
@@ -141,3 +145,9 @@ class SkypeMsg(SkypeObj):
         @staticmethod
         def monospace(s):
             return '<pre raw_pre="!! ">{0}</pre>'.format(s)
+        @staticmethod
+        def emote(s):
+            for emote in emoticons:
+                if s == emote or s in emoticons[emote]["shortcuts"]:
+                    return '<ss type="{0}">{1}</ss>'.format(emote, emoticons[emote]["shortcuts"][0] if s == emote else s)
+            return s
