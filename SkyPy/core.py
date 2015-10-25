@@ -16,7 +16,7 @@ class Skype(object):
         Retrieve the current user.
         """
         json = self.conn("GET", "{0}/users/self/profile".format(self.conn.API_USER), auth=SkypeConnection.Auth.Skype).json()
-        return SkypeUser(self, json, True)
+        return SkypeUser.fromRaw(self, json)
     @property
     @cacheResult
     def contacts(self):
@@ -28,7 +28,7 @@ class Skype(object):
         contacts = {}
         for json in self.conn("GET", "{0}/users/{1}/contacts".format(self.conn.API_CONTACTS, self.me.id), auth=SkypeConnection.Auth.Skype).json().get("contacts", []):
             if not json.get("suggested"):
-                contacts[json.get("id")] = SkypeUser(self, json)
+                contacts[json.get("id")] = SkypeUser.fromRaw(self, json)
         contacts[self.me.id] = self.me
         return contacts
     @cacheResult
@@ -39,7 +39,7 @@ class Skype(object):
         if hasattr(self, "contactsCached") and id in self.contactsCached:
             return self.contactsCached.get(id)
         json = self.conn("GET", "{0}/users/{1}/profile".format(self.conn.API_USER, id), auth=SkypeConnection.Auth.Skype).json()
-        return SkypeUser(self, json)
+        return SkypeUser.fromRaw(self, json)
     @cacheResult
     def searchUsers(self, query):
         """
@@ -61,7 +61,7 @@ class Skype(object):
         Get information about a user, without them being a contact.
         """
         json = self.conn("POST", "{0}/users/self/contacts/profiles".format(self.conn.API_USER), auth=SkypeConnection.Auth.Skype, data={"contacts[]": id}).json()
-        return SkypeUser(self, json[0])
+        return SkypeUser.fromRaw(self, json[0])
     @syncState
     def getChats(self):
         """
@@ -81,7 +81,7 @@ class Skype(object):
         def process(resp):
             chats = {}
             for json in resp.get("conversations", []):
-                chats[json.get("id")] = SkypeChat(self, json)
+                chats[json.get("id")] = SkypeChat.fromRaw(self, json)
             return chats
         return url, params, fetch, process
     @cacheResult
@@ -90,7 +90,7 @@ class Skype(object):
         Get a single conversation by identifier.
         """
         json = self.conn("GET", "{0}/conversations/{1}".format(self.conn.msgsHost, id), auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
-        return SkypeChat(self, json)
+        return SkypeChat.fromRaw(self, json)
     @SkypeConnection.resubscribeOn(404)
     def getEvents(self):
         """
@@ -107,16 +107,16 @@ class Skype(object):
             if resType == "NewMessage":
                 msgType = res.get("messagetype")
                 if msgType in ("Control/Typing", "Control/ClearTyping"):
-                    ev = SkypeTypingEvent(self, json)
+                    ev = SkypeTypingEvent.fromRaw(self, json)
                 elif msgType in ("Text", "RichText"):
                     if res.get("skypeeditedid"):
-                        ev = SkypeEditMessageEvent(self, json)
+                        ev = SkypeEditMessageEvent.fromRaw(self, json)
                     else:
-                        ev = SkypeNewMessageEvent(self, json)
+                        ev = SkypeNewMessageEvent.fromRaw(self, json)
                 else:
-                    ev = SkypeEvent(self, json)
+                    ev = SkypeEvent.fromRaw(self, json)
             else:
-                ev = SkypeEvent(self, json)
+                ev = SkypeEvent.fromRaw(self, json)
             events.append(ev)
         return events
     def setPresence(self, online=True):
