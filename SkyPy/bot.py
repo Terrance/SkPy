@@ -13,7 +13,6 @@ class SkypeBot(Skype):
     def __init__(self, user, pwd, tokenFile, loop=True, autoAck=True):
         super(SkypeBot, self).__init__(user, pwd, tokenFile)
         self.autoAck = autoAck
-        self.setPresence()
         if loop:
             self.loop()
     def loop(self):

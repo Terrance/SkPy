@@ -1,7 +1,7 @@
 import time
 import datetime
 
-from .conn import SkypeConnection
+from .conn import SkypeConnection, resubscribeOn
 from .chat import SkypeUser, SkypeChat
 from .event import SkypeEvent, SkypeTypingEvent, SkypeNewMessageEvent, SkypeEditMessageEvent
 from .util import cacheResult, syncState
@@ -91,7 +91,7 @@ class Skype(object):
         """
         json = self.conn("GET", "{0}/conversations/{1}".format(self.conn.msgsHost, id), auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
         return SkypeChat.fromRaw(self, json)
-    @SkypeConnection.resubscribeOn(404)
+    @resubscribeOn(404)
     def getEvents(self):
         """
         Retrieve a list of events since the last poll.  Multiple calls may be needed to retrieve all events.

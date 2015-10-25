@@ -1,12 +1,37 @@
 import os
-import functools
-import datetime
+import re
+from functools import wraps
+from datetime import datetime
 import time
 import math
 import hashlib
 
-import bs4
+from bs4 import BeautifulSoup
 import requests
+
+def resubscribeOn(*codes):
+    """
+    Decorator: if a given status code is received, try resubscribing to avoid the error.
+    """
+    def decorator(fn):
+        def resub(self, *args, **kwargs):
+            conn = self if isinstance(self, SkypeConnection) else self.conn
+            conn.getRegToken()
+            conn.subscribe()
+            return fn(self, *args, **kwargs)
+        @wraps(fn)
+        def wrapper(self, *args, **kwargs):
+            try:
+                return fn(self, *args, **kwargs)
+            except SkypeApiException as e:
+                if len(e.args) >= 2 and isinstance(e.args[1], requests.Response) and e.args[1].status_code in codes:
+                    return resub(self, *args, **kwargs)
+                else:
+                    raise e
+            except requests.exceptions.ConnectionError:
+                return resub(self, *args, **kwargs)
+        return wrapper
+    return decorator
 
 class SkypeConnection(object):
     """
@@ -23,52 +48,33 @@ class SkypeConnection(object):
     API_USER = "https://api.skype.com"
     API_CONTACTS = "https://contacts.skype.com/contacts/v1"
     API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1/users/ME"
-    @staticmethod
-    def resubscribeOn(*codes):
-        """
-        Decorator: if a given status code is received, try resubscribing to avoid the error.
-        """
-        def decorator(func):
-            @functools.wraps(func)
-            def wrapper(self, *args, **kwargs):
-                try:
-                    return func(self, *args, **kwargs)
-                except SkypeApiException as e:
-                    if len(e.args) >= 2 and isinstance(e.args[1], requests.Response) and e.args[1].status_code in codes:
-                        self.conn.getRegToken()
-                        self.conn.subscribe()
-                        return func(self, *args, **kwargs)
-                    else:
-                        raise e
-                except requests.exceptions.ConnectionError:
-                    self.conn.getRegToken()
-                    self.conn.subscribe()
-                    return func(self, *args, **kwargs)
-            return wrapper
-        return decorator
     def __init__(self, user=None, pwd=None, tokenFile=None):
         self.tokens = {}
         self.tokenExpiry = {}
         if tokenFile and os.path.isfile(tokenFile):
             with open(tokenFile, "r") as f:
-                skypeToken, skypeExpiry, msgsHost = f.read().splitlines()
-                skypeExpiry = datetime.datetime.fromtimestamp(int(skypeExpiry))
-                if datetime.datetime.now() < skypeExpiry:
+                skypeToken, skypeExpiry, regToken, regExpiry, msgsHost = f.read().splitlines()
+                skypeExpiry = datetime.fromtimestamp(int(skypeExpiry))
+                regExpiry = datetime.fromtimestamp(int(regExpiry))
+                if datetime.now() < skypeExpiry:
                     self.tokens["skype"] = skypeToken
                     self.tokenExpiry["skype"] = skypeExpiry
+                    self.tokens["reg"] = regToken
+                    self.tokenExpiry["reg"] = regExpiry
                     self.msgsHost = msgsHost
         if not self.tokens:
             self.login(user, pwd)
             self.msgsHost = self.API_MSGSHOST
+            self.getRegToken()
+            self.subscribe()
             if tokenFile:
                 with open(tokenFile, "w") as f:
                     f.write(self.tokens["skype"] + "\n")
                     f.write(str(int(time.mktime(self.tokenExpiry["skype"].timetuple()))) + "\n")
+                    f.write(self.tokens["reg"] + "\n")
+                    f.write(str(int(time.mktime(self.tokenExpiry["reg"].timetuple()))) + "\n")
                     f.write(self.msgsHost + "\n")
-        self.getRegToken()
-        self.makeEndpoint()
-        self.subscribe()
-    def __call__(self, method, url, codes=[200, 201, 207], auth=None, headers={}, params=None, data=None, json=None):
+    def __call__(self, method, url, codes=[200, 201, 207], auth=None, headers={}, **kwargs):
         """
         Make an API call.  Most parameters are passed directly to requests.
 
@@ -80,15 +86,17 @@ class SkypeConnection(object):
             headers["X-SkypeToken"] = self.tokens["skype"]
         elif auth == self.Auth.Reg:
             headers["RegistrationToken"] = self.tokens["reg"]
-        resp = requests.request(method, url, headers=headers, params=params, data=data, json=json)
+        resp = requests.request(method, url, headers=headers, **kwargs)
         if resp.status_code not in codes:
+            if resp.status_code == 429:
+                raise SkypeApiException("Auth rate limit exceeded", resp)
             raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
         return resp
     def login(self, user, pwd):
         """
         Scrape the Skype Web login page, and perform a login with the given username and password.
         """
-        loginPage = bs4.BeautifulSoup(self("GET", self.API_LOGIN).text, "html.parser")
+        loginPage = BeautifulSoup(self("GET", self.API_LOGIN).text, "html.parser")
         if loginPage.find(id="recaptcha_response_field"):
             raise SkypeApiException("Captcha required")
         pie = loginPage.find(id="pie").get("value")
@@ -104,15 +112,16 @@ class SkypeConnection(object):
             "timezone_field": timezone,
             "js_time": secs
         })
-        loginRespPage = bs4.BeautifulSoup(loginResp.text, "html.parser")
+        loginRespPage = BeautifulSoup(loginResp.text, "html.parser")
         errors = loginRespPage.select("div.messageBox.message_error span")
         if errors:
             raise SkypeApiException("Error message returned", loginResp, errors[0].text)
         try:
             self.tokens["skype"] = loginRespPage.find("input", {"name": "skypetoken"}).get("value")
-            self.tokenExpiry["skype"] = datetime.datetime.fromtimestamp(secs + int(loginRespPage.find("input", {"name": "expires_in"}).get("value")))
+            self.tokenExpiry["skype"] = datetime.fromtimestamp(secs + int(loginRespPage.find("input", {"name": "expires_in"}).get("value")))
         except AttributeError as e:
             raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
+    @resubscribeOn(404)
     def getRegToken(self):
         """
         Acquire a registration token.  See getMac256Hash(...) for the hash generation.
@@ -128,6 +137,8 @@ class SkypeConnection(object):
             self.msgsHost = location
             return self.getRegToken()
         self.tokens["reg"] = regTokenHead
+        self.tokenExpiry["reg"] = datetime.fromtimestamp(int(re.search("expires=([0-9]+)", self.tokens["reg"]).group(1)))
+    @resubscribeOn(404)
     def makeEndpoint(self):
         endResp = self("POST", "{0}/endpoints".format(self.msgsHost), auth=self.Auth.Reg, json={})
         self.msgsEndpoint = endResp.headers["Location"]
