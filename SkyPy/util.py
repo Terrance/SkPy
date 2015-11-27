@@ -25,18 +25,26 @@ def convertIds(*types):
     @property
     def user(self):
         """
-        Retrieve the user referred to in the event.
+        Retrieve the user referred to in the object.
         """
         return self.skype.getContact(self.userId)
     @property
+    def users(self):
+        """
+        Retrieve all users referred to in the object.
+        """
+        return [self.skype.getContact(id) for id in self.userIds]
+    @property
     def chat(self):
         """
-        Retrieve the conversation referred to in the event.
+        Retrieve the conversation referred to in the object.
         """
         return self.skype.getChat(self.chatId)
     def wrapper(cls):
         if "user" in types:
             setattr(cls, "user", user)
+        if "users" in types:
+            setattr(cls, "users", users)
         if "chat" in types:
             setattr(cls, "chat", chat)
         return cls

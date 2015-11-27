@@ -69,7 +69,7 @@ class Skype(object):
 
         Each conversation is only retrieved once, so subsequent calls may exhaust the set and return an empty list.
         """
-        url = "{0}/conversations".format(self.conn.msgsHost)
+        url = "{0}/users/ME/conversations".format(self.conn.msgsHost)
         params = {
             "startTime": 0,
             "view": "msnp24Equivalent",
@@ -89,7 +89,7 @@ class Skype(object):
         """
         Get a single conversation by identifier.
         """
-        json = self.conn("GET", "{0}/conversations/{1}".format(self.conn.msgsHost, id), auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
+        json = self.conn("GET", "{0}/users/ME/conversations/{1}".format(self.conn.msgsHost, id), auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
         return SkypeChat.fromRaw(self, json)
     @resubscribeOn(404)
     def getEvents(self):
@@ -101,7 +101,7 @@ class Skype(object):
         If any event occurs whilst blocked, it is returned immediately.
         """
         events = []
-        for json in self.conn("POST", "{0}/endpoints/SELF/subscriptions/0/poll".format(self.conn.msgsHost), auth=SkypeConnection.Auth.Reg).json().get("eventMessages", []):
+        for json in self.conn("POST", "{0}/users/ME/endpoints/SELF/subscriptions/0/poll".format(self.conn.msgsHost), auth=SkypeConnection.Auth.Reg).json().get("eventMessages", []):
             resType = json.get("resourceType")
             res = json.get("resource", {})
             if resType == "NewMessage":
@@ -123,7 +123,7 @@ class Skype(object):
         """
         Set the user's presence (either Online or Hidden).
         """
-        self.conn("PUT", "{0}/presenceDocs/messagingService".format(self.conn.msgsHost), auth=SkypeConnection.Auth.Reg, json={
+        self.conn("PUT", "{0}/users/ME/presenceDocs/messagingService".format(self.conn.msgsHost), auth=SkypeConnection.Auth.Reg, json={
             "status": "Online" if online else "Hidden"
         })
     def __str__(self):

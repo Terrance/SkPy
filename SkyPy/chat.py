@@ -64,6 +64,7 @@ class SkypeUser(SkypeObj):
         return self.skype.getChat("8:" + self.id)
 
 @initAttrs
+@convertIds("users")
 class SkypeChat(SkypeObj):
     """
     A conversation within Skype.
@@ -76,6 +77,17 @@ class SkypeChat(SkypeObj):
         return {
             "id": raw.get("id")
         }
+    @property
+    @cacheResult
+    def userIds(self):
+        if re.match(r"^[0-9]+:[A-Za-z0-9\.,_-]+@thread\.skype$", self.id):
+            info = self.skype.conn("GET", "{0}/threads/{1}?view=msnp24Equivalent".format(self.skype.conn.msgsHost, self.id)).json()
+            userIds = []
+            for obj in info["members"]:
+                userIds.append(obj["id"].split(":", 1)[1])
+            return userIds
+        else:
+            return [self.id.split(":", 1)[1]]
     @syncState
     def getMsgs(self):
         """
@@ -83,7 +95,7 @@ class SkypeChat(SkypeObj):
 
         On first access, this method should be repeatedly called to retrieve older messages.
         """
-        url = "{0}/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id)
+        url = "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id)
         params = {
             "startTime": 0,
             "view": "msnp24Equivalent",
@@ -125,7 +137,7 @@ class SkypeChat(SkypeObj):
                 "imdisplayname": name,
                 "skypeemoteoffset": len(name) + 1
             })
-        self.skype.conn("POST", "{0}/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, json=msgRaw)
+        self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, json=msgRaw)
         timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
         editId = msgId if edit else None
         return SkypeMsg(self.skype, id=timeId, type=msgType, time=timeStr, editId=editId, userId=self.skype.me.id, chatId=self.id, content=content)

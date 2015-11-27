@@ -47,7 +47,7 @@ class SkypeConnection(object):
     API_LOGIN = "https://login.skype.com/login?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com"
     API_USER = "https://api.skype.com"
     API_CONTACTS = "https://contacts.skype.com/contacts/v1"
-    API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1/users/ME"
+    API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1"
     def __init__(self, user=None, pwd=None, tokenFile=None):
         self.tokens = {}
         self.tokenExpiry = {}
@@ -127,20 +127,20 @@ class SkypeConnection(object):
         Acquire a registration token.  See getMac256Hash(...) for the hash generation.
         """
         secs = int(time.time())
-        endpointResp = self("POST", "{0}/endpoints".format(self.msgsHost), codes=[201, 301], headers={
+        endpointResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), codes=[201, 301], headers={
             "LockAndKey": "appId=msmsgs@msnmsgr.com; time=" + str(secs) + "; lockAndKeyResponse=" + getMac256Hash(str(secs), "msmsgs@msnmsgr.com", "Q1P7W2E4J9R8U3S5"),
             "Authentication": "skypetoken=" + self.tokens["skype"]
         }, json={})
         location = endpointResp.headers["Location"].rsplit("/", 2)[0]
         regTokenHead = endpointResp.headers["Set-RegistrationToken"]
-        if not location == self.msgsHost:
-            self.msgsHost = location
+        if not location[:-9] == self.msgsHost:
+            self.msgsHost = location[:-9]
             return self.getRegToken()
         self.tokens["reg"] = regTokenHead
         self.tokenExpiry["reg"] = datetime.fromtimestamp(int(re.search("expires=([0-9]+)", self.tokens["reg"]).group(1)))
     @resubscribeOn(404)
     def makeEndpoint(self):
-        endResp = self("POST", "{0}/endpoints".format(self.msgsHost), auth=self.Auth.Reg, json={})
+        endResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), auth=self.Auth.Reg, json={})
         self.msgsEndpoint = endResp.headers["Location"]
         self("PUT", "{0}/presenceDocs/messagingService".format(self.msgsEndpoint), auth=self.Auth.Reg, json={
             "id": "messagingService",
@@ -160,7 +160,7 @@ class SkypeConnection(object):
         """
         Subscribe to contact and conversation events.  These are accessible through Skype.getEvents().
         """
-        self("POST", "{0}/endpoints/SELF/subscriptions".format(self.msgsHost), auth=self.Auth.Reg, json={
+        self("POST", "{0}/users/ME/endpoints/SELF/subscriptions".format(self.msgsHost), auth=self.Auth.Reg, json={
             "interestedResources": [
                 "/v1/threads/ALL",
                 "/v1/users/ME/contacts/ALL",
