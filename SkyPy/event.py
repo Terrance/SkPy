@@ -54,9 +54,7 @@ class SkypeMessageEvent(SkypeEvent):
     def rawToFields(cls, raw={}):
         fields = super(SkypeMessageEvent, cls).rawToFields(raw)
         res = raw.get("resource", {})
-        fields.update({
-            "msgId": int(res.get("id")) if "id" in res else None
-        })
+        fields["msgId"] = int(res.get("id")) if "id" in res else None
         return fields
     @property
     def msg(self):

@@ -18,18 +18,20 @@ class SkypeUser(SkypeObj):
     @initAttrs
     class Name(SkypeObj):
         attrs = ("first", "last")
-        @property
-        def display(self):
-            return self.first + " {0}".format(self.last) if self.last else ""
+        def __str__(self):
+            return " ".join(filter(None, (self.first, self.last)))
     @initAttrs
     class Location(SkypeObj):
         attrs = ("city", "region", "country")
+        def __str__(self):
+            return ", ".join(filter(None, (self.city, self.region, self.country)))
     attrs = ("id", "type", "authorised", "blocked", "name", "location", "language", "phones", "avatar", "mood")
     defaults = {"name": Name(), "location": Location(), "phones": []}
     @classmethod
     def rawToFields(cls, raw={}):
         firstName = raw.get("firstname", raw.get("name", {}).get("first"))
         lastName = raw.get("lastname", raw.get("name", {}).get("surname"))
+        # Some clients stores the whole name in the user's first name field.
         if not lastName and firstName and " " in firstName:
             firstName, lastName = firstName.rsplit(" ", 1)
         name = SkypeUser.Name(first=firstName, last=lastName)
@@ -38,7 +40,7 @@ class SkypeUser(SkypeObj):
             "region": raw.get("province"),
             "country": raw.get("country")
         }
-        location = SkypeUser.Location(city=locationParts.get("city"), region=locationParts.get("region"), country=locationParts.get("country"))
+        location = SkypeUser.Location(city=locationParts.get("city"), region=locationParts.get("region"), country=locationParts.get("country").upper())
         phones = raw.get("phones", [])
         for k in ("Home", "Mobile", "Office"):
             if raw.get("phone" + k):
@@ -51,7 +53,7 @@ class SkypeUser(SkypeObj):
             "blocked": raw.get("blocked"),
             "name": name,
             "location": location,
-            "language": raw.get("language"),
+            "language": raw.get("language").upper(),
             "phones": phones,
             "avatar": raw.get("avatar_url", raw.get("avatarUrl")),
             "mood": raw.get("mood", raw.get("richMood"))
