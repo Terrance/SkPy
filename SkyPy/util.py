@@ -93,12 +93,14 @@ def cacheResult(fn):
     """
     Decorator: calculate the value on first access, produce the cached value thereafter.
 
-    If the function takes an argument, the cache is a dictionary using that argument as a key.
+    If the function takes a single argument, the cache is a dictionary using that argument as a key.
     """
     cacheAttr = "{0}Cache".format(fn.__name__)
-    # Inspect the function for a list of argument names, skipping the self argument.
+    # Check the number of arguments, ignoring self.
     argSpec = getargspec(fn)
-    if len(argSpec.args) > 1:
+    if len(argSpec.args) > 2:
+        raise RuntimeError("can't cache results if function takes multiple args")
+    elif len(argSpec.args) == 2:
         if argSpec.defaults:
             # The argument has a default value, make it optional in the wrapper.
             @wraps(fn)
