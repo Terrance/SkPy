@@ -4,7 +4,7 @@ from datetime import datetime
 
 from .conn import SkypeConnection
 from .static import emoticons
-from .util import SkypeObj, upper, userToId, chatToId, convertIds, initAttrs, cacheResult, syncState
+from .util import SkypeObj, upper, noPrefix, userToId, chatToId, convertIds, initAttrs, cacheResult, syncState
 
 @initAttrs
 class SkypeUser(SkypeObj):
@@ -79,17 +79,6 @@ class SkypeChat(SkypeObj):
         return {
             "id": raw.get("id")
         }
-    @property
-    @cacheResult
-    def userIds(self):
-        if re.match(r"^[0-9]+:[A-Za-z0-9\.,_-]+@thread\.skype$", self.id):
-            info = self.skype.conn("GET", "{0}/threads/{1}?view=msnp24Equivalent".format(self.skype.conn.msgsHost, self.id)).json()
-            userIds = []
-            for obj in info["members"]:
-                userIds.append(obj["id"].split(":", 1)[1])
-            return userIds
-        else:
-            return [self.id.split(":", 1)[1]]
     @syncState
     def getMsgs(self):
         """
@@ -109,7 +98,7 @@ class SkypeChat(SkypeObj):
         def process(resp):
             msgs = []
             for json in resp.get("messages", []):
-                msgs.append(SkypeMsg(self.skype, json))
+                msgs.append(SkypeMsg.fromRaw(self.skype, json))
             return msgs
         return url, params, fetch, process
     def sendMsg(self, content, me=False, rich=False, edit=None):
@@ -143,6 +132,43 @@ class SkypeChat(SkypeObj):
         timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
         editId = msgId if edit else None
         return SkypeMsg(self.skype, id=timeId, type=msgType, time=timeStr, editId=editId, userId=self.skype.me.id, chatId=self.id, content=content)
+
+@initAttrs
+@convertIds("user")
+class SkypeSingleChat(SkypeChat):
+    """
+    A one-to-one conversation within Skype.  Has an associated user for the other participant.
+    """
+    attrs = SkypeChat.attrs + ("userId",)
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeSingleChat, cls).rawToFields(raw)
+        fields["userId"] = noPrefix(fields.get("id"))
+        return fields
+
+@initAttrs
+@convertIds("creator", "users")
+class SkypeGroupChat(SkypeChat):
+    """
+    A group conversation within Skype.  Compared to single chats, groups have a topic and participant list.
+    """
+    attrs = SkypeChat.attrs + ("topic", "creatorId", "userIds", "open", "history", "picture")
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeGroupChat, cls).rawToFields(raw)
+        props = raw.get("properties", {})
+        userIds = []
+        for obj in raw.get("members"):
+            userIds.append(noPrefix(obj.get("id")))
+        fields.update({
+            "topic": raw.get("threadProperties", {}).get("topic"),
+            "creatorId": noPrefix(props.get("creator")),
+            "userIds": userIds,
+            "open": props.get("joiningenabled", "") == "true",
+            "history": props.get("historydisclosed", "") == "true",
+            "picture": props.get("picture", "")[4:] or None
+        })
+        return fields
 
 @initAttrs
 @convertIds("user", "chat")

@@ -2,7 +2,7 @@ import time
 import datetime
 
 from .conn import SkypeConnection, resubscribeOn
-from .chat import SkypeUser, SkypeChat
+from .chat import SkypeUser, SkypeSingleChat, SkypeGroupChat
 from .event import SkypeEvent, SkypeTypingEvent, SkypeNewMessageEvent, SkypeEditMessageEvent
 from .util import cacheResult, syncState
 
@@ -36,8 +36,6 @@ class Skype(object):
         """
         Get information about a contact.  Use the contacts list if already cached.
         """
-        if hasattr(self, "contactsCached") and id in self.contactsCached:
-            return self.contactsCached.get(id)
         json = self.conn("GET", "{0}/users/{1}/profile".format(self.conn.API_USER, id), auth=SkypeConnection.Auth.Skype).json()
         return SkypeUser.fromRaw(self, json)
     @cacheResult
@@ -52,6 +50,7 @@ class Skype(object):
         results = []
         for obj in json:
             res = obj.get("ContactCards", {}).get("Skype")
+            # Make result data nesting a bit cleaner.
             res["Location"] = obj.get("ContactCards", {}).get("CurrentLocation")
             results.append(res)
         return results
@@ -81,16 +80,21 @@ class Skype(object):
         def process(resp):
             chats = {}
             for json in resp.get("conversations", []):
-                chats[json.get("id")] = SkypeChat.fromRaw(self, json)
+                chats[json.get("id")] = self.getChat(json.get("id"), json)
             return chats
         return url, params, fetch, process
-    @cacheResult
-    def getChat(self, id):
+    def getChat(self, id, json=None):
         """
-        Get a single conversation by identifier.
+        Get a single conversation by identifier.  If the first API call has already been made (e.g. getChats(), use raw and skip it here.
         """
-        json = self.conn("GET", "{0}/users/ME/conversations/{1}".format(self.conn.msgsHost, id), auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
-        return SkypeChat.fromRaw(self, json)
+        if not json:
+            json = self.conn("GET", "{0}/users/ME/conversations/{1}".format(self.conn.msgsHost, id), auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
+        if "threadProperties" in json:
+            info = self.conn("GET", "{0}/threads/{1}?view=msnp24Equivalent".format(self.conn.msgsHost, json.get("id"))).json()
+            json.update(info)
+            return SkypeGroupChat.fromRaw(self, json)
+        else:
+            return SkypeSingleChat.fromRaw(self, json)
     @resubscribeOn(404)
     def getEvents(self):
         """

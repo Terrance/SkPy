@@ -10,6 +10,12 @@ def upper(s):
     """
     return s if s == None else s.upper()
 
+def noPrefix(s):
+    """
+    Remove the type prefix from a chat identifier.
+    """
+    return s if s == None else s.split(":", 1)[1]
+
 def userToId(url):
     """
     Extract the username from a contact URL.
@@ -35,11 +41,17 @@ def convertIds(*types):
         """
         return self.skype.getContact(self.userId)
     @property
+    def creator(self):
+        """
+        Retrieve the creator user referred to in the object.
+        """
+        return self.skype.getContact(self.creatorId)
+    @property
     def users(self):
         """
         Retrieve all users referred to in the object.
         """
-        return [self.skype.getContact(id) for id in self.userIds]
+        return (self.skype.getUser(id) for id in self.userIds)
     @property
     def chat(self):
         """
@@ -49,6 +61,8 @@ def convertIds(*types):
     def wrapper(cls):
         if "user" in types:
             setattr(cls, "user", user)
+        if "creator" in types:
+            setattr(cls, "creator", creator)
         if "users" in types:
             setattr(cls, "users", users)
         if "chat" in types:
@@ -84,11 +98,7 @@ def cacheResult(fn):
     cacheAttr = "{0}Cache".format(fn.__name__)
     # Inspect the function for a list of argument names, skipping the self argument.
     argSpec = getargspec(fn)
-    argNames = argSpec.args[1:]
-    if len(argNames) > 1:
-        raise RuntimeError("can't cache results if function takes multiple args")
-    argName = argNames[0] if len(argNames) else None
-    if argName:
+    if len(argSpec.args) > 1:
         if argSpec.defaults:
             # The argument has a default value, make it optional in the wrapper.
             @wraps(fn)
@@ -197,8 +207,9 @@ class SkypeObj(object):
         """
         out = "[{0}]".format(self.__class__.__name__)
         for attr in self.attrs:
-            value = "{0}".format(getattr(self, attr)).replace("\n", "\n  " + (" " * len(attr)))
-            out += "\n{0}{1}: {2}".format(attr[0].upper(), attr[1:], value)
+            value = getattr(self, attr)
+            valStr = ("\n".join(str(i) for i in value) if isinstance(value, list) else str(value))
+            out += "\n{0}{1}: {2}".format(attr[0].upper(), attr[1:], valStr.replace("\n", "\n  " + (" " * len(attr))))
         return out
     def __repr__(self):
         """
