@@ -4,6 +4,12 @@ import re
 from functools import wraps
 from inspect import getargspec
 
+def upper(s):
+    """
+    Shorthand to uppercase a string, and leave None as None.
+    """
+    return s if s == None else s.upper()
+
 def userToId(url):
     """
     Extract the username from a contact URL.

@@ -4,7 +4,7 @@ from datetime import datetime
 
 from .conn import SkypeConnection
 from .static import emoticons
-from .util import SkypeObj, userToId, chatToId, convertIds, initAttrs, cacheResult, syncState
+from .util import SkypeObj, upper, userToId, chatToId, convertIds, initAttrs, cacheResult, syncState
 
 @initAttrs
 class SkypeUser(SkypeObj):
@@ -40,7 +40,7 @@ class SkypeUser(SkypeObj):
             "region": raw.get("province"),
             "country": raw.get("country")
         }
-        location = SkypeUser.Location(city=locationParts.get("city"), region=locationParts.get("region"), country=locationParts.get("country").upper())
+        location = SkypeUser.Location(city=locationParts.get("city"), region=locationParts.get("region"), country=upper(locationParts.get("country")))
         phones = raw.get("phones", [])
         for k in ("Home", "Mobile", "Office"):
             if raw.get("phone" + k):
@@ -53,7 +53,7 @@ class SkypeUser(SkypeObj):
             "blocked": raw.get("blocked"),
             "name": name,
             "location": location,
-            "language": raw.get("language").upper(),
+            "language": upper(raw.get("language", "")),
             "phones": phones,
             "avatar": raw.get("avatar_url", raw.get("avatarUrl")),
             "mood": raw.get("mood", raw.get("richMood"))
