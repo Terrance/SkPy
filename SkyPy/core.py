@@ -8,10 +8,11 @@ from .util import cacheResult, syncState
 
 class Skype(object):
     def __init__(self, user=None, pwd=None, tokenFile=None):
+        self.userId = user
         self.conn = SkypeConnection(user, pwd, tokenFile)
     @property
     @cacheResult
-    def me(self):
+    def user(self):
         """
         Retrieve the current user.
         """
@@ -24,10 +25,10 @@ class Skype(object):
         Retrieve all contacts for the current user.  Note that full details on each contact are not provided, this requires a further call to getContact().
         """
         contacts = {}
-        for json in self.conn("GET", "{0}/users/{1}/contacts".format(SkypeConnection.API_CONTACTS, self.me.id), auth=SkypeConnection.Auth.Skype).json().get("contacts", []):
+        for json in self.conn("GET", "{0}/users/{1}/contacts".format(SkypeConnection.API_CONTACTS, self.userId), auth=SkypeConnection.Auth.Skype).json().get("contacts", []):
             if not json.get("suggested"):
                 contacts[json.get("id")] = SkypeContact.fromRaw(self, json)
-        contacts[self.me.id] = self.me
+        contacts[self.userId] = self.user
         return contacts
     @cacheResult
     def getContact(self, id):
@@ -139,6 +140,6 @@ class Skype(object):
             "status": "Online" if online else "Hidden"
         })
     def __str__(self):
-        return "[{0}]\nUser: {1}".format(self.__class__.__name__, str(self.me).replace("\n", "\n" + (" " * 6)))
+        return "[{0}]\nUserId: {1}".format(self.__class__.__name__, str(self.userId).replace("\n", "\n" + (" " * 6)))
     def __repr__(self):
-        return "{0}(user={1})".format(self.__class__.__name__, repr(self.me))
+        return "{0}(userId={1})".format(self.__class__.__name__, repr(self.userId))

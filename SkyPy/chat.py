@@ -198,7 +198,7 @@ class SkypeChat(SkypeObj):
             "content": content
         }
         if me:
-            name = self.skype.me.name["first"]
+            name = str(self.skype.user.name)
             msgRaw.update({
                 "messagetype": "Text",
                 "content": "{0} {1}".format(name, content),
@@ -208,7 +208,7 @@ class SkypeChat(SkypeObj):
         self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, json=msgRaw)
         timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
         editId = msgId if edit else None
-        return SkypeMsg(self.skype, id=timeId, type=msgType, time=timeStr, editId=editId, userId=self.skype.me.id, chatId=self.id, content=content)
+        return SkypeMsg(self.skype, id=timeId, type=msgType, time=timeStr, editId=editId, userId=self.skype.user.id, chatId=self.id, content=content)
 
 @initAttrs
 @convertIds("user")

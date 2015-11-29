@@ -16,7 +16,7 @@ This code is liable to fall apart if any part of the upstream API changes.  You 
 ```python
 from SkyPy import Skype
 sk = Skype(username, password) # connect to Skype
-sk.me # you
+sk.user # you
 sk.contacts # your contacts
 sk.getChats() # recent conversations
 sk.getEvents() # presences, new messages etc.
@@ -44,7 +44,7 @@ class MyBot(SkypeBot):
         super(SkypeBot, self).__init__(username, password)
     def onEvent(self, event):
         if isinstance(event, SkypeMessageEvent)
-          and not event.userId == self.me.id:
+          and not event.userId == self.userId:
             if re.search("ping", event.content, re.IGNORECASE):
                 event.chat.sendMsg("Pong!")
 ```
