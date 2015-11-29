@@ -70,6 +70,11 @@ class SkypeUser(SkypeObj):
         Return the conversation object for this user.
         """
         return self.skype.getChat("8:" + self.id)
+    def invite(self, greeting=None):
+        """
+        Send the user a contact request.
+        """
+        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}".format(SkypeConnection.API_USER, self.id), json={"greeting": greeting})
 
 @initAttrs
 class SkypeContact(SkypeUser):
@@ -119,6 +124,24 @@ class SkypeContact(SkypeUser):
             "blocked": raw.get("blocked")
         })
         return fields
+
+@initAttrs
+@convertIds("user")
+class SkypeRequest(SkypeObj):
+    """
+    A contact request.  Use accept() or reject() to act on it.
+    """
+    attrs = ("userId", "greeting")
+    @classmethod
+    def rawToFields(cls, raw={}):
+        return {
+            "userId": raw.get("sender"),
+            "greeting": raw.get("greeting")
+        }
+    def accept(self):
+        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/accept".format(SkypeConnection.API_USER, self.userId), auth=SkypeConnection.Auth.Skype).json()
+    def reject(self):
+        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/decline".format(SkypeConnection.API_USER, self.userId), auth=SkypeConnection.Auth.Skype).json()
 
 @initAttrs
 class SkypeChat(SkypeObj):

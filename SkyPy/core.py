@@ -2,7 +2,7 @@ import time
 import datetime
 
 from .conn import SkypeConnection, resubscribeOn
-from .chat import SkypeUser, SkypeContact, SkypeSingleChat, SkypeGroupChat
+from .chat import SkypeUser, SkypeContact, SkypeRequest, SkypeSingleChat, SkypeGroupChat
 from .event import SkypeEvent, SkypeTypingEvent, SkypeNewMessageEvent, SkypeEditMessageEvent
 from .util import cacheResult, syncState
 
@@ -94,6 +94,15 @@ class Skype(object):
             return SkypeGroupChat.fromRaw(self, json)
         else:
             return SkypeSingleChat.fromRaw(self, json)
+    def getRequests(self):
+        """
+        Retrieve a list of pending contact requests.
+        """
+        json = self.conn("GET", "{0}/users/self/contacts/auth-request".format(SkypeConnection.API_USER), auth=SkypeConnection.Auth.Skype).json()
+        requests = []
+        for obj in json:
+            requests.append(SkypeRequest.fromRaw(self, obj))
+        return requests
     @resubscribeOn(404)
     def getEvents(self):
         """
