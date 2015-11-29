@@ -9,24 +9,38 @@ from .util import SkypeObj, upper, noPrefix, userToId, chatToId, convertIds, ini
 @initAttrs
 class SkypeUser(SkypeObj):
     """
-    A user on Skype -- either the current user, or a contact.
+    A user on Skype -- the current one, a contact, or someone else.
 
-    Properties differ slightly between the current user and others (current has language, others have authorised and blocked).
+    Properties differ slightly between the current user and others.  Only public properties are available here.
 
     Searches different possible attributes for each property.  Also deconstructs a merged first name field.
     """
     @initAttrs
     class Name(SkypeObj):
+        """
+        The name of a user or contact.
+        """
         attrs = ("first", "last")
         def __str__(self):
             return " ".join(filter(None, (self.first, self.last)))
     @initAttrs
     class Location(SkypeObj):
+        """
+        The location of a user or contact.
+        """
         attrs = ("city", "region", "country")
         def __str__(self):
             return ", ".join(filter(None, (self.city, self.region, self.country)))
-    attrs = ("id", "type", "authorised", "blocked", "name", "location", "language", "phones", "avatar", "mood")
-    defaults = {"name": Name(), "location": Location(), "phones": []}
+    @initAttrs
+    class Mood(SkypeObj):
+        """
+        The mood message set by a user or contact.
+        """
+        attrs = ("plain", "rich")
+        def __str__(self):
+            return self.plain or ""
+    attrs = ("id", "name", "location", "avatar", "mood")
+    defaults = dict(name=Name(), location=Location())
     @classmethod
     def rawToFields(cls, raw={}):
         firstName = raw.get("firstname", raw.get("name", {}).get("first"))
@@ -41,22 +55,14 @@ class SkypeUser(SkypeObj):
             "country": raw.get("country")
         }
         location = SkypeUser.Location(city=locationParts.get("city"), region=locationParts.get("region"), country=upper(locationParts.get("country")))
-        phones = raw.get("phones", [])
-        for k in ("Home", "Mobile", "Office"):
-            if raw.get("phone" + k):
-                phones.append(raw.get("phone" + k))
         avatar = raw.get("avatar_url", raw.get("avatarUrl"))
+        mood = SkypeUser.Mood(plain=raw.get("mood"), rich=raw.get("richMood")) if raw.get("mood") or raw.get("richMood") else None
         return {
             "id": raw.get("id", raw.get("username")),
-            "type": raw.get("type"),
-            "authorised": raw.get("authorized"),
-            "blocked": raw.get("blocked"),
             "name": name,
             "location": location,
-            "language": upper(raw.get("language", "")),
-            "phones": phones,
-            "avatar": raw.get("avatar_url", raw.get("avatarUrl")),
-            "mood": raw.get("mood", raw.get("richMood"))
+            "avatar": avatar,
+            "mood": mood
         }
     @property
     def chat(self):
@@ -66,7 +72,55 @@ class SkypeUser(SkypeObj):
         return self.skype.getChat("8:" + self.id)
 
 @initAttrs
-@convertIds("users")
+class SkypeContact(SkypeUser):
+    """
+    A user on Skype that the logged-in account is a contact of.  Allows access to contacts-only properties.
+    """
+    @initAttrs
+    class Phone(SkypeObj):
+        """
+        The phone number of a contact.
+        """
+        class Type:
+            """
+            Enum: types of phone number.
+            """
+            Home, Work, Mobile = range(3)
+        attrs = ("type", "number")
+        def __str__(self):
+            return self.number or ""
+    attrs = SkypeUser.attrs + ("language", "phones", "birthday", "authorised", "blocked")
+    defaults = dict(SkypeUser.defaults, phones=[])
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeContact, cls).rawToFields(raw)
+        phonesMap = {
+            "Home": SkypeContact.Phone.Type.Home,
+            "Office": SkypeContact.Phone.Type.Work,
+            "Mobile": SkypeContact.Phone.Type.Mobile
+        }
+        phonesParts = raw.get("phones", [])
+        for k in phonesMap:
+            if raw.get("phone" + k):
+                phonesParts.append({
+                    "type": phonesMap[k],
+                    "number": raw.get("phone" + k)
+                })
+        phones = [SkypeContact.Phone(type=p["type"], number=p["number"]) for p in phonesParts]
+        try:
+            birthday = datetime.strptime(raw.get("birthday") or "", "%Y-%m-%d").date()
+        except ValueError:
+            birthday = None
+        fields.update({
+            "language": upper(raw.get("language")),
+            "phones": phones,
+            "birthday": birthday,
+            "authorised": raw.get("authorized"),
+            "blocked": raw.get("blocked")
+        })
+        return fields
+
+@initAttrs
 class SkypeChat(SkypeObj):
     """
     A conversation within Skype.

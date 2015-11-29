@@ -41,7 +41,7 @@ class SkypeConnection(object):
     """
     class Auth:
         """
-        Enum for authentication types.  Skype uses X-SkypeToken, whereas Reg includes RegistrationToken.
+        Enum: authentication types.  Skype uses X-SkypeToken, whereas Reg includes RegistrationToken.
         """
         Skype, Reg = range(2)
     API_LOGIN = "https://login.skype.com/login?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com"

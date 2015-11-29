@@ -2,7 +2,7 @@ import time
 import datetime
 
 from .conn import SkypeConnection, resubscribeOn
-from .chat import SkypeUser, SkypeSingleChat, SkypeGroupChat
+from .chat import SkypeUser, SkypeContact, SkypeSingleChat, SkypeGroupChat
 from .event import SkypeEvent, SkypeTypingEvent, SkypeNewMessageEvent, SkypeEditMessageEvent
 from .util import cacheResult, syncState
 
@@ -15,35 +15,33 @@ class Skype(object):
         """
         Retrieve the current user.
         """
-        json = self.conn("GET", "{0}/users/self/profile".format(self.conn.API_USER), auth=SkypeConnection.Auth.Skype).json()
-        return SkypeUser.fromRaw(self, json)
+        json = self.conn("GET", "{0}/users/self/profile".format(SkypeConnection.API_USER), auth=SkypeConnection.Auth.Skype).json()
+        return SkypeContact.fromRaw(self, json)
     @property
     @cacheResult
     def contacts(self):
         """
-        Retrieve all contacts for the current user.
-
-        The Skype API also provides suggestions within the same list -- these can be filtered by looking for authorised = True.
+        Retrieve all contacts for the current user.  Note that full details on each contact are not provided, this requires a further call to getContact().
         """
         contacts = {}
-        for json in self.conn("GET", "{0}/users/{1}/contacts".format(self.conn.API_CONTACTS, self.me.id), auth=SkypeConnection.Auth.Skype).json().get("contacts", []):
+        for json in self.conn("GET", "{0}/users/{1}/contacts".format(SkypeConnection.API_CONTACTS, self.me.id), auth=SkypeConnection.Auth.Skype).json().get("contacts", []):
             if not json.get("suggested"):
-                contacts[json.get("id")] = SkypeUser.fromRaw(self, json)
+                contacts[json.get("id")] = SkypeContact.fromRaw(self, json)
         contacts[self.me.id] = self.me
         return contacts
     @cacheResult
     def getContact(self, id):
         """
-        Get information about a contact.  Use the contacts list if already cached.
+        Get full information about a contact.
         """
-        json = self.conn("GET", "{0}/users/{1}/profile".format(self.conn.API_USER, id), auth=SkypeConnection.Auth.Skype).json()
-        return SkypeUser.fromRaw(self, json)
+        json = self.conn("GET", "{0}/users/{1}/profile".format(SkypeConnection.API_USER, id), auth=SkypeConnection.Auth.Skype).json()
+        return SkypeContact.fromRaw(self, json)
     @cacheResult
     def searchUsers(self, query):
         """
         Search the Skype Directory for a user.
         """
-        json = self.conn("GET", "{0}/search/users/any".format(self.conn.API_USER), auth=SkypeConnection.Auth.Skype, params={
+        json = self.conn("GET", "{0}/search/users/any".format(SkypeConnection.API_USER), auth=SkypeConnection.Auth.Skype, params={
             "keyWord": query,
             "contactTypes[]": "skype"
         }).json()
@@ -59,7 +57,7 @@ class Skype(object):
         """
         Get information about a user, without them being a contact.
         """
-        json = self.conn("POST", "{0}/users/self/contacts/profiles".format(self.conn.API_USER), auth=SkypeConnection.Auth.Skype, data={"contacts[]": id}).json()
+        json = self.conn("POST", "{0}/users/self/contacts/profiles".format(SkypeConnection.API_USER), auth=SkypeConnection.Auth.Skype, data={"contacts[]": id}).json()
         return SkypeUser.fromRaw(self, json[0])
     @syncState
     def getChats(self):
@@ -90,7 +88,8 @@ class Skype(object):
         if not json:
             json = self.conn("GET", "{0}/users/ME/conversations/{1}".format(self.conn.msgsHost, id), auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
         if "threadProperties" in json:
-            info = self.conn("GET", "{0}/threads/{1}?view=msnp24Equivalent".format(self.conn.msgsHost, json.get("id"))).json()
+            # ...this doesn't need authentication?
+            info = self.conn("GET", "{0}/threads/{1}".format(self.conn.msgsHost, json.get("id")), params={"view": "msnp24Equivalent"}).json()
             json.update(info)
             return SkypeGroupChat.fromRaw(self, json)
         else:
