@@ -107,19 +107,19 @@ def syncState(fn):
 
     The function being wrapped must return: url, params, fetch(url, params), process(resp)
     """
-    stateAttr = "{0}State".format(fn.__name__)
     @wraps(fn)
     def wrapper(self, *args, **kwargs):
         # The wrapped function should be defined to return these.
         url, params, fetch, process = fn(self, *args, **kwargs)
-        if hasattr(self, stateAttr):
+        if wrapper.state:
             # We have a state link, use that instead of the default URL.
-            url = getattr(self, stateAttr)
+            url = wrapper.state
             params = {}
-        resp, state = fetch(url, params)
         # Store the new state link.
-        setattr(self, stateAttr, state)
+        resp, wrapper.state = fetch(url, params)
         return process(resp)
+    # Make state link accessible externally.
+    setattr(wrapper, "state", None)
     return wrapper
 
 def exhaust(fn, init, *args, **kwargs):
