@@ -251,6 +251,13 @@ class SkypeGroupChat(SkypeChat):
             "picture": props.get("picture", "")[4:] or None
         })
         return fields
+    @property
+    @cacheResult
+    def joinUrl(self):
+        return self.skype.conn("POST", "{0}/threads".format(SkypeConnection.API_SCHEDULE), auth=SkypeConnection.Auth.Skype, json={
+            "baseDomain": "https://join.skype.com/launch/",
+            "threadId": self.id
+        }).json()["JoinUrl"]
     def setTopic(self, topic):
         """
         Update the topic message.  An empty string clears the topic.
