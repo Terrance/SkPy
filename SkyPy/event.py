@@ -57,6 +57,7 @@ class SkypeMessageEvent(SkypeEvent):
         fields["msgId"] = int(res.get("id")) if "id" in res else None
         return fields
     @property
+    @cacheResult
     def msg(self):
         return SkypeMsg.fromRaw(self.skype, self.raw.get("resource", {}))
 

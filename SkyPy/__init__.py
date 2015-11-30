@@ -1,5 +1,7 @@
 from SkyPy.core import Skype
-from SkyPy.conn import SkypeConnection, SkypeApiException
-from SkyPy.chat import SkypeUser, SkypeContact, SkypeRequest, SkypeChat, SkypeSingleChat, SkypeGroupChat, SkypeMsg
+from SkyPy.conn import SkypeConnection
+from SkyPy.user import SkypeUser, SkypeContact, SkypeRequest
+from SkyPy.chat import SkypeChat, SkypeSingleChat, SkypeGroupChat, SkypeMsg
 from SkyPy.event import SkypeEvent, SkypeTypingEvent, SkypeMessageEvent, SkypeNewMessageEvent, SkypeEditMessageEvent
 from SkyPy.bot import SkypeBot
+from SkyPy.util import SkypeException, SkypeApiException

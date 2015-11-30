@@ -2,9 +2,10 @@ import time
 import datetime
 
 from .conn import SkypeConnection, resubscribeOn
-from .chat import SkypeUser, SkypeContact, SkypeRequest, SkypeSingleChat, SkypeGroupChat
+from .user import SkypeUser, SkypeContact, SkypeRequest
+from .chat import SkypeSingleChat, SkypeGroupChat
 from .event import SkypeEvent, SkypeTypingEvent, SkypeNewMessageEvent, SkypeEditMessageEvent
-from .util import cacheResult, syncState
+from .util import SkypeApiException, cacheResult, syncState
 
 class Skype(object):
     def __init__(self, user=None, pwd=None, tokenFile=None):
@@ -31,12 +32,23 @@ class Skype(object):
         contacts[self.userId] = self.user
         return contacts
     @cacheResult
-    def getContact(self, id):
+    def getContact(self, id, full=False):
         """
-        Get full information about a contact.
+        Retrieve a specific contact.  Data from contacts is used if possible, or unless full is set.
+
+        Full details requires an extra API call, and includes fields such as birthday and mood.
+
+        Returns None if the identifier represents a user not in the contact list.
         """
-        json = self.conn("GET", "{0}/users/{1}/profile".format(SkypeConnection.API_USER, id), auth=SkypeConnection.Auth.Skype).json()
-        return SkypeContact.fromRaw(self, json)
+        if not full and id in self.contacts:
+            return self.contacts.get(id)
+        try:
+            json = self.conn("GET", "{0}/users/{1}/profile".format(SkypeConnection.API_USER, id), auth=SkypeConnection.Auth.Skype).json()
+            return SkypeContact.fromRaw(self, json)
+        except SkypeApiException as e:
+            if e.args[1].status_code == 403:
+                return
+            raise
     @cacheResult
     def searchUsers(self, query):
         """
@@ -57,6 +69,10 @@ class Skype(object):
     def getUser(self, id):
         """
         Get information about a user, without them being a contact.
+
+        Note that it is not possible to distinguish if a contacts exists or not.
+
+        An unregistered identifier produces a profile with only the identifier populated.
         """
         json = self.conn("POST", "{0}/users/self/contacts/profiles".format(SkypeConnection.API_USER), auth=SkypeConnection.Auth.Skype, data={"contacts[]": id}).json()
         return SkypeUser.fromRaw(self, json[0])
@@ -82,6 +98,7 @@ class Skype(object):
                 chats[json.get("id")] = self.getChat(json.get("id"), json)
             return chats
         return url, params, fetch, process
+    @cacheResult
     def getChat(self, id, json=None):
         """
         Get a single conversation by identifier.  If the first API call has already been made (e.g. getChats(), use raw and skip it here.

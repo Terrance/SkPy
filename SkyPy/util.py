@@ -1,8 +1,8 @@
 from __future__ import unicode_literals
 
 import re
-from functools import wraps
-from inspect import getargspec
+from collections import Hashable
+from functools import partial, wraps
 
 def upper(s):
     """
@@ -34,25 +34,18 @@ def convertIds(*types):
     """
     Class decorator: add helper methods to convert identifier properties into SkypeObjs.
     """
-    @property
-    def user(self):
+    def user(self, value=None, field=None):
         """
         Retrieve the user referred to in the object.
         """
-        return self.skype.getContact(self.userId)
-    @property
-    def creator(self):
-        """
-        Retrieve the creator user referred to in the object.
-        """
-        return self.skype.getContact(self.creatorId)
+        userId = value or getattr(self, field)
+        return self.skype.contacts.get(userId, self.skype.getContact(userId) or self.skype.getUser(userId))
     @property
     def users(self):
         """
         Retrieve all users referred to in the object.
         """
-        return (self.skype.getUser(id) for id in self.userIds)
-    @property
+        return (user(self, value=id) for id in self.userIds)
     def chat(self):
         """
         Retrieve the conversation referred to in the object.
@@ -60,9 +53,9 @@ def convertIds(*types):
         return self.skype.getChat(self.chatId)
     def wrapper(cls):
         if "user" in types:
-            setattr(cls, "user", user)
+            setattr(cls, "user", property(partial(user, field="userId")))
         if "creator" in types:
-            setattr(cls, "creator", creator)
+            setattr(cls, "user", property(partial(user, field="creatorId")))
         if "users" in types:
             setattr(cls, "users", users)
         if "chat" in types:
@@ -81,9 +74,8 @@ def initAttrs(cls):
         # Merge args into kwargs based on cls.attrs.
         for i in range(len(args)):
             kwargs[cls.attrs[i]] = args[i]
-        # We're popping from the end, so reverse the order.
+        # Set each attribute from kwargs, or use the default if not specified.
         for k in cls.attrs:
-            # Set each attribute from kwargs, or use the default if not specified.
             setattr(self, k, kwargs.get(k, cls.defaults.get(k)))
     # Add the init method to the class.
     setattr(cls, "__init__", __init__)
@@ -93,43 +85,20 @@ def cacheResult(fn):
     """
     Decorator: calculate the value on first access, produce the cached value thereafter.
 
-    If the function takes a single argument, the cache is a dictionary using that argument as a key.
+    If the function takes an argument, the cache is a dictionary using the first argument as a key.
     """
-    cacheAttr = "{0}Cache".format(fn.__name__)
-    # Check the number of arguments, ignoring self.
-    argSpec = getargspec(fn)
-    if len(argSpec.args) > 2:
-        raise RuntimeError("can't cache results if function takes multiple args")
-    elif len(argSpec.args) == 2:
-        if argSpec.defaults:
-            # The argument has a default value, make it optional in the wrapper.
-            @wraps(fn)
-            def wrapper(self, arg=argSpec.defaults[0]):
-                # Use a dict to store return values based on the input.
-                if not hasattr(self, cacheAttr):
-                    setattr(self, cacheAttr, {})
-                cache = getattr(self, cacheAttr)
-                if arg not in cache:
-                    # Not cached, make the function call and store the result.
-                    cache[arg] = fn(self, arg)
-                return cache[arg]
-        else:
-            # No default for the argument.
-            @wraps(fn)
-            def wrapper(self, arg):
-                if not hasattr(self, cacheAttr):
-                    setattr(self, cacheAttr, {})
-                cache = getattr(self, cacheAttr)
-                if arg not in cache:
-                    cache[arg] = fn(self, arg)
-                return cache[arg]
-    else:
-        # No argument, just store the single result produced by this method.
-        @wraps(fn)
-        def wrapper(self):
-            if not hasattr(self, cacheAttr):
-                setattr(self, cacheAttr, fn(self))
-            return getattr(self, cacheAttr)
+    cache = {}
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        key = args + (str(kwargs),)
+        if not all(isinstance(x, Hashable) for x in key):
+            # Can't cache with non-hashable args (e.g. a list).
+            return fn(*args, **kwargs)
+        if key not in cache:
+            cache[key] = fn(*args, **kwargs)
+        return cache[key]
+    # Make cache accessible externally.
+    setattr(wrapper, "cache", cache)
     return wrapper
 
 def syncState(fn):
@@ -169,6 +138,20 @@ def exhaust(fn, init, *args, **kwargs):
         else:
             break
     return init
+
+class SkypeException(Exception):
+    """
+    A generic Skype-related exception.
+    """
+    pass
+
+class SkypeApiException(SkypeException):
+    """
+    An exception thrown for errors specific to external API calls.
+
+    Args will usually be of the form (message, response).
+    """
+    pass
 
 class SkypeObj(object):
     """

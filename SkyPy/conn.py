@@ -9,6 +9,8 @@ import hashlib
 from bs4 import BeautifulSoup
 import requests
 
+from .util import SkypeApiException
+
 def resubscribeOn(*codes):
     """
     Decorator: if a given status code is received, try resubscribing to avoid the error.
@@ -24,7 +26,7 @@ def resubscribeOn(*codes):
             try:
                 return fn(self, *args, **kwargs)
             except SkypeApiException as e:
-                if len(e.args) >= 2 and isinstance(e.args[1], requests.Response) and e.args[1].status_code in codes:
+                if isinstance(e.args[1], requests.Response) and e.args[1].status_code in codes:
                     return resub(self, *args, **kwargs)
                 else:
                     raise e
@@ -116,7 +118,7 @@ class SkypeConnection(object):
         loginRespPage = BeautifulSoup(loginResp.text, "html.parser")
         errors = loginRespPage.select("div.messageBox.message_error span")
         if errors:
-            raise SkypeApiException("Error message returned", loginResp, errors[0].text)
+            raise SkypeApiException(errors[0].text, loginResp)
         try:
             self.tokens["skype"] = loginRespPage.find("input", {"name": "skypetoken"}).get("value")
             self.tokenExpiry["skype"] = datetime.fromtimestamp(secs + int(loginRespPage.find("input", {"name": "expires_in"}).get("value")))
@@ -175,12 +177,6 @@ class SkypeConnection(object):
         return "[{0}]".format(self.__class__.__name__)
     def __repr__(self):
         return "{0}()".format(self.__class__.__name__)
-
-class SkypeApiException(Exception):
-    """
-    A generic Skype-related exception.
-    """
-    pass
 
 def getMac256Hash(challenge, appId, key):
     def int32ToHexString(n):
