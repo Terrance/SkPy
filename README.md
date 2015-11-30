@@ -1,6 +1,6 @@
 # SkyPy
 
-A highly unofficial Python library for interacting with the Skype HTTP API.  Adapted from [ShyykoSerhiy's skyweb API for node.js](https://github.com/ShyykoSerhiy/skyweb).
+An unofficial Python library for interacting with the Skype HTTP API.
 
 ## Here be dragons
 
@@ -15,22 +15,29 @@ This code is liable to fall apart if any part of the upstream API changes.  You 
 
 ```python
 from SkyPy import Skype
-sk = Skype(username, password) # connect to Skype
+sk = Skype(username, password, tokenFile) # connect to Skype
+
 sk.user # you
 sk.contacts # your contacts
 sk.getChats() # recent conversations
+sk.getRequests() # contact requests
 sk.getEvents() # presences, new messages etc.
+
+buddychat = sk.contacts[buddyname].chat # 1-to-1 conversation
+groupchat = sk.createChat() # new group conversation
 ```
+
+A full class reference can be found [in the wiki](https://github.com/OllieTerrance/SkyPy/wiki/Classes).
 
 ## State-synced methods
 
-Some APIs, such as conversations or messages within them, include a state URL for the next query -- this avoids resending any duplicate data.  Wrapper methods for APIs that support state syncing (e.g. `Skype.getChats()`) automatically handle this for you.
+Some APIs, such as recent conversations or messages, include a state URL for the next query -- this allows you to fetch the next chunk of data without resending any duplicates.  Wrapper methods for APIs that support state syncing (e.g. `Skype.getChats()`) automatically handle this for you.
 
 ## Rate limiting and session reuse
 
 If you make too many authentication attempts, the Skype API may temporarily rate limit you, or require a captcha to continue.  For the latter, you will need to complete this in a browser with a matching IP address.
 
-To avoid this, you should reuse the Skype token where possible.  A token _usually_ lasts 24 hours (the actual expiry is stored in `sk.tokenExpiry`).  Pass a filename as the third argument to the `Skype()` constructor to read and write session information to that file.
+To avoid this, you should reuse the Skype token where possible.  A token only appears to last 24 hours (web.skype.com forces re-authentication after that time), though you can check the expiry with `sk.tokenExpiry`.  Pass a filename as the third argument to the `Skype()` constructor to read and write session information to that file.
 
 ## Writing a bot
 
