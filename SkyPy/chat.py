@@ -138,6 +138,16 @@ class SkypeGroupChat(SkypeChat):
         """
         self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, params={"name": "historydisclosed"}, json={"historydisclosed": history})
         self.history = history
+    def invite(self, id):
+        """
+        Add a user to the conversation.
+        """
+        self.skype.conn("PUT", "{0}/threads/{1}/members/8:{2}".format(self.skype.conn.msgsHost, self.id, id), auth=SkypeConnection.Auth.Reg, json={"role": "User"})
+    def kick(self, id):
+        """
+        Remove a user from the conversation.
+        """
+        self.skype.conn("DELETE", "{0}/threads/{1}/members/8:{2}".format(self.skype.conn.msgsHost, self.id, id), auth=SkypeConnection.Auth.Reg)
     def leave(self):
         """
         Leave the conversation.  You will lose any admin rights.
