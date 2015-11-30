@@ -156,6 +156,24 @@ class SkypeChat(SkypeObj):
         return {
             "id": raw.get("id")
         }
+    def setTopic(self, topic):
+        """
+        Update the topic message.  An empty string clears the topic.
+        """
+        self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, params={"name": "topic"}, json={"topic": topic})
+        self.topic = topic
+    def setOpen(self, open):
+        """
+        Enable or disable public join links.
+        """
+        self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, params={"name": "joiningenabled"}, json={"joiningenabled": open})
+        self.open = open
+    def setHistory(self, history):
+        """
+        Enable or disable conversation history.
+        """
+        self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, params={"name": "historydisclosed"}, json={"historydisclosed": history})
+        self.history = history
     @syncState
     def getMsgs(self):
         """
@@ -209,6 +227,18 @@ class SkypeChat(SkypeObj):
         timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
         editId = msgId if edit else None
         return SkypeMsg(self.skype, id=timeId, type=msgType, time=timeStr, editId=editId, userId=self.skype.user.id, chatId=self.id, content=content)
+    def leave(self):
+        """
+        Leave the conversation.  You will lose any admin rights.
+
+        If public joining is disabled, you may need to be re-invited in order to return.
+        """
+        self.skype.conn("DELETE", "{0}/threads/{1}/members/8:{2}".format(self.skype.conn.msgsHost, self.id, self.skype.userId), auth=SkypeConnection.Auth.Reg)
+    def delete(self):
+        """
+        Delete the conversation and all message history.
+        """
+        self.skype.conn("DELETE", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg)
 
 @initAttrs
 @convertIds("user")

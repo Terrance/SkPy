@@ -95,6 +95,21 @@ class Skype(object):
             return SkypeGroupChat.fromRaw(self, json)
         else:
             return SkypeSingleChat.fromRaw(self, json)
+    def createChat(self, ids=[]):
+        """
+        Create a new group chat with the given users.
+        """
+        members = [{
+            "id": "8:{0}".format(self.userId),
+            "role": "Admin"
+        }]
+        for id in ids:
+            members.append({
+                "id": "8:{0}".format(id),
+                "role": "User"
+            })
+        resp = self.conn("POST", "{0}/threads".format(self.conn.msgsHost), auth=SkypeConnection.Auth.Reg, json={"members": members})
+        return self.getChat(resp.headers["Location"].rsplit("/", 1)[1])
     def getRequests(self):
         """
         Retrieve a list of pending contact requests.
@@ -104,7 +119,7 @@ class Skype(object):
         for obj in json:
             requests.append(SkypeRequest.fromRaw(self, obj))
         return requests
-    @resubscribeOn(404)
+    @resubscribeOn(400, 404)
     def getEvents(self):
         """
         Retrieve a list of events since the last poll.  Multiple calls may be needed to retrieve all events.
