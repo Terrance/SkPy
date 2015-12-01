@@ -98,7 +98,7 @@ def cacheResult(fn):
             cache[key] = fn(*args, **kwargs)
         return cache[key]
     # Make cache accessible externally.
-    setattr(wrapper, "cache", cache)
+    wrapper.cache = cache
     return wrapper
 
 def syncState(fn):
@@ -113,13 +113,14 @@ def syncState(fn):
         url, params, fetch, process = fn(self, *args, **kwargs)
         if wrapper.state:
             # We have a state link, use that instead of the default URL.
-            url = wrapper.state
+            url = wrapper.state[-1]
             params = {}
         # Store the new state link.
-        resp, wrapper.state = fetch(url, params)
+        resp, state = fetch(url, params)
+        wrapper.state.append(state)
         return process(resp)
-    # Make state link accessible externally.
-    setattr(wrapper, "state", None)
+    # Make state links accessible externally.
+    wrapper.state = []
     return wrapper
 
 def exhaust(fn, init, *args, **kwargs):
