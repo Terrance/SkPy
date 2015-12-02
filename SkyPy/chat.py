@@ -169,12 +169,12 @@ class SkypeGroupChat(SkypeChat):
         """
         self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, params={"name": "historydisclosed"}, json={"historydisclosed": history})
         self.history = history
-    def invite(self, id):
+    def addMember(self, id, admin=False):
         """
-        Add a user to the conversation.
+        Add a user to the conversation, or update their user/admin status.
         """
-        self.skype.conn("PUT", "{0}/threads/{1}/members/8:{2}".format(self.skype.conn.msgsHost, self.id, id), auth=SkypeConnection.Auth.Reg, json={"role": "User"})
-    def kick(self, id):
+        self.skype.conn("PUT", "{0}/threads/{1}/members/8:{2}".format(self.skype.conn.msgsHost, self.id, id), auth=SkypeConnection.Auth.Reg, json={"role": "Admin" if admin else "User"})
+    def removeMember(self, id):
         """
         Remove a user from the conversation.
         """
@@ -185,7 +185,7 @@ class SkypeGroupChat(SkypeChat):
 
         If public joining is disabled, you may need to be re-invited in order to return.
         """
-        self.skype.conn("DELETE", "{0}/threads/{1}/members/8:{2}".format(self.skype.conn.msgsHost, self.id, self.skype.userId), auth=SkypeConnection.Auth.Reg)
+        self.removeMember(self.skype.userId)
 
 @initAttrs
 @convertIds("user", "chat")

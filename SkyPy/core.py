@@ -106,13 +106,12 @@ class Skype(object):
         if not json:
             json = self.conn("GET", "{0}/users/ME/conversations/{1}".format(self.conn.msgsHost, id), auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
         if "threadProperties" in json:
-            # ...this doesn't need authentication?
-            info = self.conn("GET", "{0}/threads/{1}".format(self.conn.msgsHost, json.get("id")), params={"view": "msnp24Equivalent"}).json()
+            info = self.conn("GET", "{0}/threads/{1}".format(self.conn.msgsHost, json.get("id")), auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
             json.update(info)
             return SkypeGroupChat.fromRaw(self, json)
         else:
             return SkypeSingleChat.fromRaw(self, json)
-    def createChat(self, ids=[]):
+    def createChat(self, *ids, admins=[]):
         """
         Create a new group chat with the given users.
         """
@@ -123,7 +122,7 @@ class Skype(object):
         for id in ids:
             members.append({
                 "id": "8:{0}".format(id),
-                "role": "User"
+                "role": "Admin" if id in admins else "User"
             })
         resp = self.conn("POST", "{0}/threads".format(self.conn.msgsHost), auth=SkypeConnection.Auth.Reg, json={"members": members})
         return self.getChat(resp.headers["Location"].rsplit("/", 1)[1])
