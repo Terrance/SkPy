@@ -170,6 +170,11 @@ class Skype(object):
         self.conn("PUT", "{0}/users/ME/presenceDocs/messagingService".format(self.conn.msgsHost), auth=SkypeConnection.Auth.Reg, json={
             "status": "Online" if online else "Hidden"
         })
+    def setAvatar(self, file):
+        """
+        Update the profile picture for the current user.
+        """
+        self.conn("PUT", "{0}/users/{1}/profile/avatar".format(SkypeConnection.API_USER, self.userId), auth=SkypeConnection.Auth.Skype, data=file.read())
     def __str__(self):
         return "[{0}]\nUserId: {1}".format(self.__class__.__name__, str(self.userId).replace("\n", "\n" + (" " * 6)))
     def __repr__(self):
