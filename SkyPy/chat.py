@@ -54,7 +54,7 @@ class SkypeChat(SkypeObj):
         msgId = edit or timeId
         msgType = "RichText" if rich else "Text"
         msgRaw = {
-            ("skypeeditedid" if edit else "cilientmessageid"): msgId,
+            ("skypeeditedid" if edit else "clientmessageid"): msgId,
             "messagetype": msgType,
             "contenttype": "text",
             "content": content
@@ -71,11 +71,6 @@ class SkypeChat(SkypeObj):
         timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
         editId = msgId if edit else None
         return SkypeMsg(self.skype, id=timeId, type=msgType, time=timeStr, editId=editId, userId=self.skype.user.id, chatId=self.id, content=content)
-    def delete(self):
-        """
-        Delete the conversation and all message history.
-        """
-        self.skype.conn("DELETE", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg)
     def sendFile(self, content, name, image=False):
         """
         Upload a file to the conversation.  Content should be an ASCII or binary file-like object.
@@ -101,6 +96,22 @@ class SkypeChat(SkypeObj):
             "content": content
         }
         self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, json=msg)
+    def sendContact(self, contact):
+        """
+        Share a contact with the conversation.
+        """
+        msg = {
+            "clientmessageid": int(time()),
+            "messagetype": "RichText/Contacts",
+            "contenttype": "text",
+            "content": """<contacts><c t="s" s="{0}" f="{1}"/></contacts>""".format(contact.id, contact.name)
+        }
+        self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, json=msg)
+    def delete(self):
+        """
+        Delete the conversation and all message history.
+        """
+        self.skype.conn("DELETE", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg)
 
 @initAttrs
 @convertIds("user", "users")
