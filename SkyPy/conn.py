@@ -45,7 +45,7 @@ class SkypeConnection(object):
         """
         Enum: authentication types.  Skype uses X-SkypeToken, whereas Reg includes RegistrationToken.
         """
-        Skype, Reg = range(2)
+        Skype, Authorize, Reg = range(3)
     API_LOGIN = "https://login.skype.com/login?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com"
     API_USER = "https://api.skype.com"
     API_SCHEDULE = "https://api.scheduler.skype.com"
@@ -77,7 +77,7 @@ class SkypeConnection(object):
                     f.write(self.tokens["reg"] + "\n")
                     f.write(str(int(time.mktime(self.tokenExpiry["reg"].timetuple()))) + "\n")
                     f.write(self.msgsHost + "\n")
-    def __call__(self, method, url, codes=[200, 201, 207], auth=None, headers={}, **kwargs):
+    def __call__(self, method, url, codes=[200, 201, 207], auth=None, headers=None, **kwargs):
         """
         Make an API call.  Most parameters are passed directly to requests.
 
@@ -85,8 +85,12 @@ class SkypeConnection(object):
 
         If authentication is required, set auth to one of the SkypeConnection.Auth constants.
         """
+        if not headers:
+            headers = {}
         if auth == self.Auth.Skype:
             headers["X-SkypeToken"] = self.tokens["skype"]
+        elif auth == self.Auth.Authorize:
+            headers["Authorization"] = "skype_token {0}".format(self.tokens["skype"])
         elif auth == self.Auth.Reg:
             headers["RegistrationToken"] = self.tokens["reg"]
         resp = requests.request(method, url, headers=headers, **kwargs)

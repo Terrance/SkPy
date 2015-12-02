@@ -76,9 +76,34 @@ class SkypeChat(SkypeObj):
         Delete the conversation and all message history.
         """
         self.skype.conn("DELETE", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg)
+    def sendFile(self, content, name, image=False):
+        """
+        Upload a file to the conversation.  Content should be an ASCII or binary file-like object.
+
+        If an image, Skype will generate a thumbnail and link to the full image.
+        """
+        meta = {
+            "type": "pish/image" if image else "sharing/file",
+            "permissions": {"8:{0}".format(id): ["read"] for id in self.userIds}
+        }
+        if not image:
+            meta["filename"] = name
+        objId = self.skype.conn("POST", "https://api.asm.skype.com/v1/objects", auth=SkypeConnection.Auth.Authorize, json=meta).json()["id"]
+        self.skype.conn("PUT", "https://api.asm.skype.com/v1/objects/{0}/content/{1}".format(objId, "imgpsh" if image else "original"), auth=SkypeConnection.Auth.Authorize, data=content.read())
+        if image:
+            content = """<URIObject type="Picture.1" uri="https://api.asm.skype.com/v1/objects/{0}" url_thumbnail="https://api.asm.skype.com/v1/objects/{0}/views/imgt1">MyLegacy pish <a href="https://api.asm.skype.com/s/i?{0}">https://api.asm.skype.com/s/i?{0}</a><Title/><Description/><OriginalName v="{1}"/><meta type="photo" originalName="{1}"/></URIObject>""".format(objId, name)
+        else:
+            content = """<URIObject type="File.1" uri="https://api.asm.skype.com/v1/objects/{0}" url_thumbnail="https://api.asm.skype.com/v1/objects/{0}/views/thumbnail"><Title>Title: {1}</Title><Description> Description: {1}</Description><a href="https://login.skype.com/login/sso?go=webclient.xmm&amp;docid={0}"> https://login.skype.com/login/sso?go=webclient.xmm&amp;docid={0}</a><OriginalName v="{1}"/><FileSize v="{2}"/></URIObject>""".format(objId, name, content.tell())
+        msg = {
+            "clientmessageid": int(time()),
+            "contenttype": "text",
+            "messagetype": "RichText/{0}".format("UriObject" if image else "Media_GenericFile"),
+            "content": content
+        }
+        self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, json=msg)
 
 @initAttrs
-@convertIds("user")
+@convertIds("user", "users")
 class SkypeSingleChat(SkypeChat):
     """
     A one-to-one conversation within Skype.  Has an associated user for the other participant.
@@ -89,6 +114,12 @@ class SkypeSingleChat(SkypeChat):
         fields = super(SkypeSingleChat, cls).rawToFields(raw)
         fields["userId"] = noPrefix(fields.get("id"))
         return fields
+    @property
+    def userIds(self):
+        """
+        Convenience method to treat and single and group chats alike.
+        """
+        return [self.userId]
 
 @initAttrs
 @convertIds("creator", "users")
