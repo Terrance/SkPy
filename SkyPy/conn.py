@@ -69,7 +69,6 @@ class SkypeConnection(object):
             self.login(user, pwd)
             self.msgsHost = self.API_MSGSHOST
             self.getRegToken()
-            self.subscribe()
             if tokenFile:
                 with open(tokenFile, "w") as f:
                     f.write(self.tokens["skype"] + "\n")
@@ -128,7 +127,6 @@ class SkypeConnection(object):
             self.tokenExpiry["skype"] = datetime.fromtimestamp(secs + int(loginRespPage.find("input", {"name": "expires_in"}).get("value")))
         except AttributeError as e:
             raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
-    @resubscribeOn(404)
     def getRegToken(self):
         """
         Acquire a registration token.  See getMac256Hash(...) for the hash generation.
@@ -143,8 +141,8 @@ class SkypeConnection(object):
         if not location[:-9] == self.msgsHost:
             self.msgsHost = location[:-9]
             return self.getRegToken()
-        self.tokens["reg"] = regTokenHead
-        self.tokenExpiry["reg"] = datetime.fromtimestamp(int(re.search("expires=([0-9]+)", self.tokens["reg"]).group(1)))
+        self.tokens["reg"] = re.search(r"(registrationToken=[a-z0-9\+/=]+)", regTokenHead, re.I).group(1)
+        self.tokenExpiry["reg"] = datetime.fromtimestamp(int(re.search(r"expires=(\d+)", regTokenHead).group(1)))
     @resubscribeOn(404)
     def makeEndpoint(self):
         endResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), auth=self.Auth.Reg, json={})
