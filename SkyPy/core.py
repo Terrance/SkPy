@@ -111,19 +111,20 @@ class Skype(object):
             return SkypeGroupChat.fromRaw(self, json)
         else:
             return SkypeSingleChat.fromRaw(self, json)
-    def createChat(self, *ids, admins=[]):
+    def createChat(self, members=[], admins=[]):
         """
         Create a new group chat with the given users.
         """
         members = [{
             "id": "8:{0}".format(self.userId),
             "role": "Admin"
-        }]
-        for id in ids:
-            members.append({
-                "id": "8:{0}".format(id),
-                "role": "Admin" if id in admins else "User"
-            })
+        }] + [{
+            "id": "8:{0}".format(id),
+            "role": "User"
+        } for id in members if id not in admins] + [{
+            "id": "8:{0}".format(id),
+            "role": "Admin"
+        } for id in admins]
         resp = self.conn("POST", "{0}/threads".format(self.conn.msgsHost), auth=SkypeConnection.Auth.Reg, json={"members": members})
         return self.getChat(resp.headers["Location"].rsplit("/", 1)[1])
     def getRequests(self):
