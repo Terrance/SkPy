@@ -46,6 +46,7 @@ def convertIds(*types):
         Retrieve all users referred to in the object.
         """
         return (user(self, value=id) for id in self.userIds)
+    @property
     def chat(self):
         """
         Retrieve the conversation referred to in the object.

@@ -237,4 +237,4 @@ class SkypeMsg(SkypeObj):
         """
         Send an edit of this message.  Follows the same arguments as SkypeChat.sendMsg().
         """
-        self.chat.sendMsg(content, me, rich, self.editId or self.msgId)
+        self.chat.sendMsg(content, me, rich, self.editId or self.id)
