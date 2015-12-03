@@ -208,18 +208,21 @@ class SkypeMsg(SkypeObj):
     """
     @staticmethod
     def bold(s):
-        return '<b raw_pre="*" raw_post="*">{0}</b>'.format(s)
+        return """<b raw_pre="*" raw_post="*">{0}</b>""".format(s)
     @staticmethod
     def italic(s):
-        return '<i raw_pre="_" raw_post="_">{0}</i>'.format(s)
+        return """<i raw_pre="_" raw_post="_">{0}</i>""".format(s)
     @staticmethod
-    def monospace(s):
-        return '<pre raw_pre="!! ">{0}</pre>'.format(s)
+    def strike(s):
+        return """<s raw_pre="~" raw_post="~">{0}</i>""".format(s)
+    @staticmethod
+    def mono(s):
+        return """<pre raw_pre="{code}" raw_post="{code}">{0}</pre>""".format(s)
     @staticmethod
     def emote(s):
         for emote in emoticons:
             if s == emote or s in emoticons[emote]["shortcuts"]:
-                return '<ss type="{0}">{1}</ss>'.format(emote, emoticons[emote]["shortcuts"][0] if s == emote else s)
+                return """<ss type="{0}">{1}</ss>""".format(emote, emoticons[emote]["shortcuts"][0] if s == emote else s)
         return s
     attrs = ("id", "type", "time", "editId", "userId", "chatId", "content")
     @classmethod
