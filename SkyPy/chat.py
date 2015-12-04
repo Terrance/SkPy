@@ -1,3 +1,4 @@
+import re
 from time import time
 from datetime import datetime
 
@@ -217,7 +218,7 @@ class SkypeMsg(SkypeObj):
         return """<s raw_pre="~" raw_post="~">{0}</i>""".format(s)
     @staticmethod
     def mono(s):
-        return """<pre raw_pre="{code}" raw_post="{code}">{0}</pre>""".format(s)
+        return """<pre raw_pre="{{code}}" raw_post="{{code}}">{0}</pre>""".format(s)
     @staticmethod
     def emote(s):
         for emote in emoticons:
@@ -236,6 +237,24 @@ class SkypeMsg(SkypeObj):
             "chatId": chatToId(raw.get("conversationLink", "")),
             "content": raw.get("content")
         }
+    def plain(self, entities=False):
+        """
+        Attempt to convert the message to plain text.
+
+        With entities, formatting is converted to plain equivalents (e.g. *bold*).
+        """
+        if self.type == "RichText":
+            text = self.content.replace("&quot;", "\"")
+            text = re.sub(r"<e.*?/>", "", text)
+            text = re.sub(r"""<a.*?href="(.*?)">.*?</a>""", r"\1", text)
+            text = re.sub(r"</?b.*?>", "*" if entities else "", text)
+            text = re.sub(r"</?i.*?>", "_" if entities else "", text)
+            text = re.sub(r"</?s.*?>", "~" if entities else "", text)
+            text = re.sub(r"</?pre.*?>", "{code}" if entities else "", text)
+            return text
+        else:
+            # It's already plain, or it's something we can't handle.
+            return self.content
     def edit(self, content, me=False, rich=False):
         """
         Send an edit of this message.  Follows the same arguments as SkypeChat.sendMsg().
