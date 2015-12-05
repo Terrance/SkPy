@@ -2,6 +2,8 @@ import re
 from time import time
 from datetime import datetime
 
+from bs4 import BeautifulSoup
+
 from .conn import SkypeConnection
 from .static import emoticons
 from .util import SkypeObj, noPrefix, userToId, chatToId, initAttrs, convertIds, cacheResult, syncState
@@ -237,6 +239,18 @@ class SkypeMsg(SkypeObj):
             "chatId": chatToId(raw.get("conversationLink", "")),
             "content": raw.get("content")
         }
+    @classmethod
+    def fromRaw(cls, skype=None, raw={}):
+        """
+        Return a subclass instance of SkypeMsg if appropriate.
+        """
+        msgType = raw.get("messagetype")
+        msgCls = cls
+        if msgType == "RichText/Contacts":
+            msgCls = SkypeContactMsg
+        elif msgType == "RichText/UriObject":
+            msgCls = SkypeImageMsg
+        return msgCls(skype, raw, **msgCls.rawToFields(raw))
     def plain(self, entities=False):
         """
         Attempt to convert the message to plain text.
@@ -260,3 +274,41 @@ class SkypeMsg(SkypeObj):
         Send an edit of this message.  Follows the same arguments as SkypeChat.sendMsg().
         """
         self.chat.sendMsg(content, me, rich, self.editId or self.id)
+
+@initAttrs
+@convertIds(user=("contact",))
+class SkypeContactMsg(SkypeMsg):
+    """
+    A message containing a shared contact.
+    """
+    attrs = SkypeMsg.attrs + ("contactId", "contactName")
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeContactMsg, cls).rawToFields(raw)
+        contact = BeautifulSoup(raw.get("content")).find("c")
+        if contact:
+            fields.update({
+                "contactId": contact.get("s"),
+                "contactName": contact.get("f")
+            })
+        return fields
+
+@initAttrs
+class SkypeImageMsg(SkypeMsg):
+    """
+    An event for a picture shared in a conversation.
+    """
+    attrs = SkypeMsg.attrs + ("name", "full", "thumbnail", "viewUrl")
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeImageMsg, cls).rawToFields(raw)
+        # BeautifulSoup converts tag names to lower case, and find() is case-sensitive.
+        image = BeautifulSoup(raw.get("content")).find("uriobject")
+        if image:
+            fields.update({
+                "name": image.get("v"),
+                "full": image.get("uri"),
+                "thumbnail": image.get("url_thumbnail"),
+                "viewUrl": (image.find("a") or {}).get("href")
+            })
+        return fields

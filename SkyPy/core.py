@@ -153,7 +153,7 @@ class Skype(object):
                 msgType = res.get("messagetype")
                 if msgType in ("Control/Typing", "Control/ClearTyping"):
                     ev = SkypeTypingEvent.fromRaw(self, json)
-                elif msgType in ("Text", "RichText"):
+                elif msgType in ("Text", "RichText", "RichText/Contacts", "RichText/UriObject"):
                     if res.get("skypeeditedid"):
                         ev = SkypeEditMessageEvent.fromRaw(self, json)
                     else:
