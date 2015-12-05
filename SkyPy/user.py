@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from .conn import SkypeConnection
-from .util import SkypeObj, upper, convertIds, initAttrs, cacheResult
+from .util import SkypeObj, upper, initAttrs, convertIds, cacheResult
 
 @initAttrs
 class SkypeUser(SkypeObj):

@@ -4,7 +4,7 @@ from datetime import datetime
 
 from .conn import SkypeConnection
 from .static import emoticons
-from .util import SkypeObj, noPrefix, userToId, chatToId, convertIds, initAttrs, cacheResult, syncState
+from .util import SkypeObj, noPrefix, userToId, chatToId, initAttrs, convertIds, cacheResult, syncState
 
 @initAttrs
 class SkypeChat(SkypeObj):
@@ -134,7 +134,7 @@ class SkypeSingleChat(SkypeChat):
         return [self.userId]
 
 @initAttrs
-@convertIds("creator", "users")
+@convertIds("users", user=("creator",))
 class SkypeGroupChat(SkypeChat):
     """
     A group conversation within Skype.  Compared to single chats, groups have a topic and participant list.

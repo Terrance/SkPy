@@ -30,40 +30,6 @@ def chatToId(url):
     match = re.search(r"/v1/users/ME/conversations/([0-9]+:[A-Za-z0-9\.,_-]+(@thread\.skype)?)", url)
     return match.group(1) if match else None
 
-def convertIds(*types):
-    """
-    Class decorator: add helper methods to convert identifier properties into SkypeObjs.
-    """
-    def user(self, value=None, field=None):
-        """
-        Retrieve the user referred to in the object.
-        """
-        userId = value or getattr(self, field)
-        return self.skype.contacts.get(userId, self.skype.getContact(userId) or self.skype.getUser(userId))
-    @property
-    def users(self):
-        """
-        Retrieve all users referred to in the object.
-        """
-        return (user(self, value=id) for id in self.userIds)
-    @property
-    def chat(self):
-        """
-        Retrieve the conversation referred to in the object.
-        """
-        return self.skype.getChat(self.chatId)
-    def wrapper(cls):
-        if "user" in types:
-            setattr(cls, "user", property(partial(user, field="userId")))
-        if "creator" in types:
-            setattr(cls, "user", property(partial(user, field="creatorId")))
-        if "users" in types:
-            setattr(cls, "users", users)
-        if "chat" in types:
-            setattr(cls, "chat", chat)
-        return cls
-    return wrapper
-
 def initAttrs(cls):
     """
     Class decorator: automatically generate an __init__ method that expects args from cls.attrs and stores them.
@@ -81,6 +47,51 @@ def initAttrs(cls):
     # Add the init method to the class.
     setattr(cls, "__init__", __init__)
     return cls
+
+def convertIds(*types, user=(), users=(), chat=()):
+    """
+    Class decorator: add helper methods to convert identifier properties into SkypeObjs.
+    """
+    def userObj(self, field):
+        """
+        Retrieve the user referred to in the object.
+        """
+        userId = getattr(self, field)
+        return self.skype.getContact(userId) or self.skype.getUser(userId)
+    def userObjs(self, field):
+        """
+        Retrieve all users referred to in the object.
+        """
+        userIds = getattr(self, field)
+        return ((self.skype.getContact(id) or self.skype.getUser(id)) for id in userIds)
+    def chatObj(self, field):
+        """
+        Retrieve the user referred to in the object.
+        """
+        return self.skype.getChat(getattr(self, field))
+    def attach(cls, method, field, idField):
+        """
+        Generate the property object and attach it to the class.
+        """
+        setattr(cls, field, property(partial(method, field=idField)))
+    def wrapper(cls):
+        # Shorthand identifiers, e.g. @convertIds("user", "chat").
+        for type in types:
+            if type == "user":
+                attach(cls, userObj, "user", "userId")
+            elif type == "users":
+                attach(cls, userObjs, "users", "userIds")
+            elif type == "chat":
+                attach(cls, chatObj, "chat", "chatId")
+        # Custom field names, e.g. @convertIds(user=["creator"]).
+        for field in user:
+            attach(cls, userObj, field, "{0}Id".format(field))
+        for field in users:
+            attach(cls, userObjs, "{0}s.".format(field), "{0}Ids".format(field))
+        for field in chat:
+            attach(cls, chatObj, field, "{0}Id".format(field))
+        return cls
+    return wrapper
 
 def cacheResult(fn):
     """

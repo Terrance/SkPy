@@ -3,7 +3,7 @@ import re
 
 from .conn import SkypeConnection
 from .chat import SkypeMsg
-from .util import SkypeObj, userToId, chatToId, convertIds, initAttrs, cacheResult
+from .util import SkypeObj, userToId, chatToId, initAttrs, convertIds, cacheResult
 
 @initAttrs
 class SkypeEvent(SkypeObj):
