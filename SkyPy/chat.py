@@ -86,7 +86,7 @@ class SkypeChat(SkypeObj):
         """
         meta = {
             "type": "pish/image" if image else "sharing/file",
-            "permissions": {"8:{0}".format(id): ["read"] for id in self.userIds}
+            "permissions": dict(("8:{0}".format(id), ["read"]) for id in self.userIds)
         }
         if not image:
             meta["filename"] = name

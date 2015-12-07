@@ -8,6 +8,7 @@ This code is liable to fall apart if any part of the upstream API changes.  You 
 
 ## Requirements
 
+* Python 2.6+ (includes 3.x)
 * [BeautifulSoup](http://www.crummy.com/software/BeautifulSoup/)
 * [Requests](http://www.python-requests.org/en/latest/)
 
