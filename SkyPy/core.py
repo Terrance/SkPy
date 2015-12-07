@@ -17,16 +17,20 @@ class Skype(object):
         """
         Retrieve the current user.
         """
-        json = self.conn("GET", "{0}/users/self/profile".format(SkypeConnection.API_USER), auth=SkypeConnection.Auth.Skype).json()
+        json = self.conn("GET", "{0}/users/self/profile".format(SkypeConnection.API_USER),
+                         auth=SkypeConnection.Auth.Skype).json()
         return SkypeContact.fromRaw(self, json)
     @property
     @cacheResult
     def contacts(self):
         """
-        Retrieve all contacts for the current user.  Note that full details on each contact are not provided, this requires a further call to getContact().
+        Retrieve all contacts for the current user.
+
+        Note that full details on each contact are not provided, this requires a further call to getContact().
         """
         contacts = {}
-        for json in self.conn("GET", "{0}/users/{1}/contacts".format(SkypeConnection.API_CONTACTS, self.userId), auth=SkypeConnection.Auth.Skype).json().get("contacts", []):
+        for json in self.conn("GET", "{0}/users/{1}/contacts".format(SkypeConnection.API_CONTACTS, self.userId),
+                              auth=SkypeConnection.Auth.Skype).json().get("contacts", []):
             if not json.get("suggested"):
                 contacts[json.get("id")] = SkypeContact.fromRaw(self, json)
         contacts[self.userId] = self.user
@@ -43,7 +47,8 @@ class Skype(object):
         if not full and id in self.contacts:
             return self.contacts.get(id)
         try:
-            json = self.conn("GET", "{0}/users/{1}/profile".format(SkypeConnection.API_USER, id), auth=SkypeConnection.Auth.Skype).json()
+            json = self.conn("GET", "{0}/users/{1}/profile".format(SkypeConnection.API_USER, id),
+                             auth=SkypeConnection.Auth.Skype).json()
             return SkypeContact.fromRaw(self, json)
         except SkypeApiException as e:
             if e.args[1].status_code == 403:
@@ -54,10 +59,12 @@ class Skype(object):
         """
         Search the Skype Directory for a user.
         """
-        json = self.conn("GET", "{0}/search/users/any".format(SkypeConnection.API_USER), auth=SkypeConnection.Auth.Skype, params={
+        search = {
             "keyWord": query,
             "contactTypes[]": "skype"
-        }).json()
+        }
+        json = self.conn("GET", "{0}/search/users/any".format(SkypeConnection.API_USER),
+                         auth=SkypeConnection.Auth.Skype, params=search).json()
         results = []
         for obj in json:
             res = obj.get("ContactCards", {}).get("Skype")
@@ -74,7 +81,8 @@ class Skype(object):
 
         An unregistered identifier produces a profile with only the identifier populated.
         """
-        json = self.conn("POST", "{0}/users/self/contacts/profiles".format(SkypeConnection.API_USER), auth=SkypeConnection.Auth.Skype, data={"contacts[]": id}).json()
+        json = self.conn("POST", "{0}/users/self/contacts/profiles".format(SkypeConnection.API_USER),
+                         auth=SkypeConnection.Auth.Skype, data={"contacts[]": id}).json()
         return SkypeUser.fromRaw(self, json[0])
     @syncState
     def getChats(self):
@@ -101,12 +109,16 @@ class Skype(object):
     @cacheResult
     def getChat(self, id, json=None):
         """
-        Get a single conversation by identifier.  If the first API call has already been made (e.g. getChats(), use raw and skip it here.
+        Get a single conversation by identifier.
+
+        If the first API call has already been made (e.g. getChats(), use raw and skip it here.
         """
         if not json:
-            json = self.conn("GET", "{0}/users/ME/conversations/{1}".format(self.conn.msgsHost, id), auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
+            json = self.conn("GET", "{0}/users/ME/conversations/{1}".format(self.conn.msgsHost, id),
+                             auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
         if "threadProperties" in json:
-            info = self.conn("GET", "{0}/threads/{1}".format(self.conn.msgsHost, json.get("id")), auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
+            info = self.conn("GET", "{0}/threads/{1}".format(self.conn.msgsHost, json.get("id")),
+                             auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
             json.update(info)
             return SkypeGroupChat.fromRaw(self, json)
         else:
@@ -125,13 +137,15 @@ class Skype(object):
             "id": "8:{0}".format(id),
             "role": "Admin"
         } for id in admins]
-        resp = self.conn("POST", "{0}/threads".format(self.conn.msgsHost), auth=SkypeConnection.Auth.Reg, json={"members": members})
+        resp = self.conn("POST", "{0}/threads".format(self.conn.msgsHost),
+                         auth=SkypeConnection.Auth.Reg, json={"members": members})
         return self.getChat(resp.headers["Location"].rsplit("/", 1)[1])
     def getRequests(self):
         """
         Retrieve a list of pending contact requests.
         """
-        json = self.conn("GET", "{0}/users/self/contacts/auth-request".format(SkypeConnection.API_USER), auth=SkypeConnection.Auth.Skype).json()
+        json = self.conn("GET", "{0}/users/self/contacts/auth-request".format(SkypeConnection.API_USER),
+                         auth=SkypeConnection.Auth.Skype).json()
         requests = []
         for obj in json:
             requests.append(SkypeRequest.fromRaw(self, obj))
@@ -141,12 +155,13 @@ class Skype(object):
         """
         Retrieve a list of events since the last poll.  Multiple calls may be needed to retrieve all events.
 
-        If no events are currently available, the API will block for up to 30 seconds, after which an empty list is returned.
+        If no events occur, the API will block for up to 30 seconds, after which an empty list is returned.
 
         If any event occurs whilst blocked, it is returned immediately.
         """
         events = []
-        for json in self.conn("POST", "{0}/users/ME/endpoints/SELF/subscriptions/0/poll".format(self.conn.msgsHost), auth=SkypeConnection.Auth.Reg).json().get("eventMessages", []):
+        for json in self.conn("POST", "{0}/users/ME/endpoints/SELF/subscriptions/0/poll".format(self.conn.msgsHost),
+                              auth=SkypeConnection.Auth.Reg).json().get("eventMessages", []):
             resType = json.get("resourceType")
             res = json.get("resource", {})
             if resType == "NewMessage":
@@ -168,14 +183,14 @@ class Skype(object):
         """
         Set the user's presence (either Online or Hidden).
         """
-        self.conn("PUT", "{0}/users/ME/presenceDocs/messagingService".format(self.conn.msgsHost), auth=SkypeConnection.Auth.Reg, json={
-            "status": "Online" if online else "Hidden"
-        })
+        self.conn("PUT", "{0}/users/ME/presenceDocs/messagingService".format(self.conn.msgsHost),
+                  auth=SkypeConnection.Auth.Reg, json={"status": "Online" if online else "Hidden"})
     def setAvatar(self, file):
         """
         Update the profile picture for the current user.
         """
-        self.conn("PUT", "{0}/users/{1}/profile/avatar".format(SkypeConnection.API_USER, self.userId), auth=SkypeConnection.Auth.Skype, data=file.read())
+        self.conn("PUT", "{0}/users/{1}/profile/avatar".format(SkypeConnection.API_USER, self.userId),
+                  auth=SkypeConnection.Auth.Skype, data=file.read())
     def __str__(self):
         return "[{0}]\nUserId: {1}".format(self.__class__.__name__, str(self.userId).replace("\n", "\n" + (" " * 6)))
     def __repr__(self):

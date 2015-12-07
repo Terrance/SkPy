@@ -13,7 +13,9 @@ class SkypeChat(SkypeObj):
     """
     A conversation within Skype.
 
-    Can be either one-to-one (identifiers of the form <type>:<username>) or a cloud group (<type>:<identifier>@thread.skype).
+    One-to-one chats have identifiers of the form <type>:<username>.
+
+    Cloud group chat identifiers are of the form <type>:<identifier>@thread.skype.
     """
     attrs = ("id",)
     @classmethod
@@ -51,7 +53,7 @@ class SkypeChat(SkypeObj):
 
         Set rich to allow formatting tags -- use the SkypeMsg static helper methods for rich components.
 
-        If edit is specified, perform an edit of the message with that identifier.  Set content to the empty string to delete.
+        If edit is specified, perform an edit (or delete if content is empty) of the message with that identifier.
         """
         timeId = int(time())
         msgId = edit or timeId
@@ -70,10 +72,12 @@ class SkypeChat(SkypeObj):
                 "imdisplayname": name,
                 "skypeemoteoffset": len(name) + 1
             })
-        self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, json=msgRaw)
+        self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
+                        auth=SkypeConnection.Auth.Reg, json=msgRaw)
         timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
         editId = msgId if edit else None
-        return SkypeMsg(self.skype, id=timeId, type=msgType, time=timeStr, editId=editId, userId=self.skype.user.id, chatId=self.id, content=content)
+        return SkypeMsg(self.skype, id=timeId, type=msgType, time=timeStr, editId=editId,
+                        userId=self.skype.user.id, chatId=self.id, content=content)
     def sendFile(self, content, name, image=False):
         """
         Upload a file to the conversation.  Content should be an ASCII or binary file-like object.
@@ -86,24 +90,42 @@ class SkypeChat(SkypeObj):
         }
         if not image:
             meta["filename"] = name
-        objId = self.skype.conn("POST", "https://api.asm.skype.com/v1/objects", auth=SkypeConnection.Auth.Authorize, json=meta).json()["id"]
-        self.skype.conn("PUT", "https://api.asm.skype.com/v1/objects/{0}/content/{1}".format(objId, "imgpsh" if image else "original"), auth=SkypeConnection.Auth.Authorize, data=content.read())
+        objId = self.skype.conn("POST", "https://api.asm.skype.com/v1/objects",
+                                auth=SkypeConnection.Auth.Authorize, json=meta).json()["id"]
+        objType = "imgpsh" if image else "original"
+        self.skype.conn("PUT", "https://api.asm.skype.com/v1/objects/{0}/content/{1}".format(objId, objType),
+                        auth=SkypeConnection.Auth.Authorize, data=content.read())
         if image:
-            content = """<URIObject type="Picture.1" uri="https://api.asm.skype.com/v1/objects/{0}" url_thumbnail="https://api.asm.skype.com/v1/objects/{0}/views/imgt1">MyLegacy pish <a href="https://api.asm.skype.com/s/i?{0}">https://api.asm.skype.com/s/i?{0}</a><Title/><Description/><OriginalName v="{1}"/><meta type="photo" originalName="{1}"/></URIObject>""".format(objId, name)
+            content = """<URIObject type="Picture.1" uri="https://api.asm.skype.com/v1/objects/{0}" """ \
+                      """url_thumbnail="https://api.asm.skype.com/v1/objects/{0}/views/imgt1">MyLegacy pish """ \
+                      """<a href="https://api.asm.skype.com/s/i?{0}">https://api.asm.skype.com/s/i?{0}</a>""" \
+                      """<Title/><Description/><OriginalName v="{1}"/>""" \
+                      """<meta type="photo" originalName="{1}"/></URIObject>""".format(objId, name)
         else:
-            content = """<URIObject type="File.1" uri="https://api.asm.skype.com/v1/objects/{0}" url_thumbnail="https://api.asm.skype.com/v1/objects/{0}/views/thumbnail"><Title>Title: {1}</Title><Description> Description: {1}</Description><a href="https://login.skype.com/login/sso?go=webclient.xmm&amp;docid={0}"> https://login.skype.com/login/sso?go=webclient.xmm&amp;docid={0}</a><OriginalName v="{1}"/><FileSize v="{2}"/></URIObject>""".format(objId, name, content.tell())
+            content = """<URIObject type="File.1" uri="https://api.asm.skype.com/v1/objects/{0}" """ \
+                      """url_thumbnail="https://api.asm.skype.com/v1/objects/{0}/views/thumbnail">""" \
+                      """<Title>Title: {1}</Title><Description> Description: {1}</Description>""" \
+                      """<a href="https://login.skype.com/login/sso?go=webclient.xmm&amp;docid={0}"> """ \
+                      """https://login.skype.com/login/sso?go=webclient.xmm&amp;docid={0}</a>""" \
+                      """<OriginalName v="{1}"/><FileSize v="{2}"/></URIObject>""".format(objId, name, content.tell())
         msg = {
             "clientmessageid": int(time()),
             "contenttype": "text",
             "messagetype": "RichText/{0}".format("UriObject" if image else "Media_GenericFile"),
             "content": content
         }
-        self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, json=msg)
+        self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
+                        auth=SkypeConnection.Auth.Reg, json=msg)
         timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
         if image:
-            return SkypeImageMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr, userId=self.skype.user.id, chatId=self.id, content=msg["content"], name=name, full="https://api.asm.skype.com/v1/objects/{0}".format(objId), thumbnail="https://api.asm.skype.com/v1/objects/{0}/views/imgtl".format(objId), viewUrl="https://api.asm.skype.com/s/i?{0}".format(objId))
+            return SkypeImageMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr,
+                                 userId=self.skype.user.id, chatId=self.id, content=msg["content"], name=name,
+                                 full="https://api.asm.skype.com/v1/objects/{0}".format(objId),
+                                 thumbnail="https://api.asm.skype.com/v1/objects/{0}/views/imgtl".format(objId),
+                                 viewUrl="https://api.asm.skype.com/s/i?{0}".format(objId))
         else:
-            return SkypeMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr, userId=self.skype.user.id, chatId=self.id, content=msg["content"])
+            return SkypeMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr,
+                            userId=self.skype.user.id, chatId=self.id, content=msg["content"])
     def sendContact(self, contact):
         """
         Share a contact with the conversation.
@@ -114,14 +136,18 @@ class SkypeChat(SkypeObj):
             "contenttype": "text",
             "content": """<contacts><c t="s" s="{0}" f="{1}"/></contacts>""".format(contact.id, contact.name)
         }
-        self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, json=msg)
+        self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
+                        auth=SkypeConnection.Auth.Reg, json=msg)
         timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
-        return SkypeContactMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr, userId=self.skype.user.id, chatId=self.id, content=msg["content"], contactId=contact.id, contactName="{0}".format(contact.name))
+        return SkypeContactMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"],
+                               time=timeStr, userId=self.skype.user.id, chatId=self.id,
+                               content=msg["content"], contactId=contact.id, contactName="{0}".format(contact.name))
     def delete(self):
         """
         Delete the conversation and all message history.
         """
-        self.skype.conn("DELETE", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg)
+        self.skype.conn("DELETE", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
+                        auth=SkypeConnection.Auth.Reg)
 
 @initAttrs
 @convertIds("user", "users")
@@ -168,38 +194,47 @@ class SkypeGroupChat(SkypeChat):
     @property
     @cacheResult
     def joinUrl(self):
-        return self.skype.conn("POST", "{0}/threads".format(SkypeConnection.API_SCHEDULE), auth=SkypeConnection.Auth.Skype, json={
+        query = {
             "baseDomain": "https://join.skype.com/launch/",
             "threadId": self.id
-        }).json()["JoinUrl"]
+        }
+        return self.skype.conn("POST", "{0}/threads".format(SkypeConnection.API_SCHEDULE),
+                               auth=SkypeConnection.Auth.Skype, json=query).json()["JoinUrl"]
     def setTopic(self, topic):
         """
         Update the topic message.  An empty string clears the topic.
         """
-        self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, params={"name": "topic"}, json={"topic": topic})
+        self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id),
+                        auth=SkypeConnection.Auth.Reg, params={"name": "topic"}, json={"topic": topic})
         self.topic = topic
     def setOpen(self, open):
         """
         Enable or disable public join links.
         """
-        self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, params={"name": "joiningenabled"}, json={"joiningenabled": open})
+        self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id),
+                        auth=SkypeConnection.Auth.Reg, params={"name": "joiningenabled"},
+                        json={"joiningenabled": open})
         self.open = open
     def setHistory(self, history):
         """
         Enable or disable conversation history.
         """
-        self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, params={"name": "historydisclosed"}, json={"historydisclosed": history})
+        self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id),
+                        auth=SkypeConnection.Auth.Reg, params={"name": "historydisclosed"},
+                        json={"historydisclosed": history})
         self.history = history
     def addMember(self, id, admin=False):
         """
         Add a user to the conversation, or update their user/admin status.
         """
-        self.skype.conn("PUT", "{0}/threads/{1}/members/8:{2}".format(self.skype.conn.msgsHost, self.id, id), auth=SkypeConnection.Auth.Reg, json={"role": "Admin" if admin else "User"})
+        self.skype.conn("PUT", "{0}/threads/{1}/members/8:{2}".format(self.skype.conn.msgsHost, self.id, id),
+                        auth=SkypeConnection.Auth.Reg, json={"role": "Admin" if admin else "User"})
     def removeMember(self, id):
         """
         Remove a user from the conversation.
         """
-        self.skype.conn("DELETE", "{0}/threads/{1}/members/8:{2}".format(self.skype.conn.msgsHost, self.id, id), auth=SkypeConnection.Auth.Reg)
+        self.skype.conn("DELETE", "{0}/threads/{1}/members/8:{2}".format(self.skype.conn.msgsHost, self.id, id),
+                        auth=SkypeConnection.Auth.Reg)
     def leave(self):
         """
         Leave the conversation.  You will lose any admin rights.
@@ -214,7 +249,7 @@ class SkypeMsg(SkypeObj):
     """
     A message either sent or received in a conversation.
 
-    Edits are represented by the original message, followed by subsequent messages that reference the original by editId.
+    Edits are represented by a follow-up messages that reference the original by editId.
     """
     @staticmethod
     def bold(s):
@@ -235,15 +270,20 @@ class SkypeMsg(SkypeObj):
     def emote(s):
         for emote in emoticons:
             if s == emote or s in emoticons[emote]["shortcuts"]:
-                return """<ss type="{0}">{1}</ss>""".format(emote, emoticons[emote]["shortcuts"][0] if s == emote else s)
+                name = emoticons[emote]["shortcuts"][0] if s == emote else s
+                return """<ss type="{0}">{1}</ss>""".format(emote, name)
         return s
     attrs = ("id", "type", "time", "editId", "userId", "chatId", "content")
     @classmethod
     def rawToFields(cls, raw={}):
+        try:
+            msgTime = datetime.strptime(raw.get("originalarrivaltime", ""), "%Y-%m-%dT%H:%M:%S.%fZ")
+        except ValueError:
+            msgTime = datetime.now()
         return {
             "id": raw.get("id"),
             "type": raw.get("messagetype"),
-            "time": datetime.strptime(raw.get("originalarrivaltime"), "%Y-%m-%dT%H:%M:%S.%fZ") if raw.get("originalarrivaltime") else datetime.now(),
+            "time": msgTime,
             "editId": raw.get("skypeeditedid"),
             "userId": userToId(raw.get("from", "")),
             "chatId": chatToId(raw.get("conversationLink", "")),

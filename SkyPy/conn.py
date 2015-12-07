@@ -39,7 +39,9 @@ class SkypeConnection(object):
     """
     The main connection class -- handles all requests to API resources.
 
-    An instance of this class is callable, and performs an API request.  Arguments are similar to the underlying requests library.
+    An instance of this class is callable, and performs an API request.
+
+    Arguments are similar to the underlying requests library.
     """
     class Auth:
         """
@@ -124,7 +126,8 @@ class SkypeConnection(object):
             raise SkypeApiException(errors[0].text, loginResp)
         try:
             self.tokens["skype"] = loginRespPage.find("input", {"name": "skypetoken"}).get("value")
-            self.tokenExpiry["skype"] = datetime.fromtimestamp(secs + int(loginRespPage.find("input", {"name": "expires_in"}).get("value")))
+            length = int(loginRespPage.find("input", {"name": "expires_in"}).get("value"))
+            self.tokenExpiry["skype"] = datetime.fromtimestamp(secs + length)
         except AttributeError as e:
             raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
     def getRegToken(self):
@@ -132,8 +135,9 @@ class SkypeConnection(object):
         Acquire a registration token.  See getMac256Hash(...) for the hash generation.
         """
         secs = int(time.time())
+        hash = getMac256Hash(str(secs), "msmsgs@msnmsgr.com", "Q1P7W2E4J9R8U3S5")
         endpointResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), codes=[201, 301], headers={
-            "LockAndKey": "appId=msmsgs@msnmsgr.com; time=" + str(secs) + "; lockAndKeyResponse=" + getMac256Hash(str(secs), "msmsgs@msnmsgr.com", "Q1P7W2E4J9R8U3S5"),
+            "LockAndKey": "appId=msmsgs@msnmsgr.com; time={0}; lockAndKeyResponse={1}".format(secs, hash),
             "Authentication": "skypetoken=" + self.tokens["skype"]
         }, json={})
         location = endpointResp.headers["Location"].rsplit("/", 2)[0]

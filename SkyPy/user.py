@@ -51,9 +51,12 @@ class SkypeUser(SkypeObj):
             "region": raw.get("province"),
             "country": raw.get("country")
         }
-        location = SkypeUser.Location(city=locationParts.get("city"), region=locationParts.get("region"), country=upper(locationParts.get("country")))
+        location = SkypeUser.Location(city=locationParts.get("city"), region=locationParts.get("region"),
+                                      country=upper(locationParts.get("country")))
         avatar = raw.get("avatar_url", raw.get("avatarUrl"))
-        mood = SkypeUser.Mood(plain=raw.get("mood"), rich=raw.get("richMood")) if raw.get("mood") or raw.get("richMood") else None
+        mood = None
+        if raw.get("mood", raw.get("richMood")):
+            mood = SkypeUser.Mood(plain=raw.get("mood"), rich=raw.get("richMood"))
         return {
             "id": raw.get("id", raw.get("username")),
             "name": name,
@@ -72,7 +75,8 @@ class SkypeUser(SkypeObj):
         """
         Send the user a contact request.
         """
-        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}".format(SkypeConnection.API_USER, self.id), json={"greeting": greeting})
+        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}".format(SkypeConnection.API_USER, self.id),
+                        json={"greeting": greeting})
 
 @initAttrs
 class SkypeContact(SkypeUser):
@@ -137,6 +141,8 @@ class SkypeRequest(SkypeObj):
             "greeting": raw.get("greeting")
         }
     def accept(self):
-        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/accept".format(SkypeConnection.API_USER, self.userId), auth=SkypeConnection.Auth.Skype).json()
+        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/accept".format(SkypeConnection.API_USER, self.userId),
+                        auth=SkypeConnection.Auth.Skype).json()
     def reject(self):
-        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/decline".format(SkypeConnection.API_USER, self.userId), auth=SkypeConnection.Auth.Skype).json()
+        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/decline".format(SkypeConnection.API_USER, self.userId),
+                        auth=SkypeConnection.Auth.Skype).json()

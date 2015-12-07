@@ -13,10 +13,14 @@ class SkypeEvent(SkypeObj):
     attrs = ("id", "type", "time")
     @classmethod
     def rawToFields(cls, raw={}):
+        try:
+            evtTime = datetime.strptime(raw.get("time", ""), "%Y-%m-%dT%H:%M:%SZ")
+        except ValueError:
+            evtTime = datetime.now()
         return {
             "id": raw.get("id"),
             "type": raw.get("resourceType"),
-            "time": datetime.strptime(raw.get("time"), "%Y-%m-%dT%H:%M:%SZ") if "time" in raw else None
+            "time": evtTime
         }
     def ack(self):
         """

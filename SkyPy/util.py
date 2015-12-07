@@ -170,7 +170,9 @@ class SkypeObj(object):
     """
     A basic Skype-related object.  Holds references to the parent Skype instance, and the raw dict from the API.
 
-    The attrs property should be set to the named attributes for that class, with defaults to override None for certain attributes.
+    The attrs property should be set to the named attributes for that class.
+
+    Use defaults to override None for certain attributes.
     """
     attrs = ()
     defaults = {}
@@ -215,4 +217,5 @@ class SkypeObj(object):
 
         The resulting string is an expression that should evaluate to a similar object, minus Skype connection.
         """
-        return "{0}({1})".format(self.__class__.__name__, ", ".join("{0}={1}".format(k, repr(getattr(self, k))) for k in self.attrs))
+        reprs = ", ".join("{0}={1}".format(k, repr(getattr(self, k))) for k in self.attrs)
+        return "{0}({1})".format(self.__class__.__name__, reprs)
