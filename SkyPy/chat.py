@@ -99,6 +99,11 @@ class SkypeChat(SkypeObj):
             "content": content
         }
         self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, json=msg)
+        timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
+        if image:
+            return SkypeImageMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr, userId=self.skype.user.id, chatId=self.id, content=msg["content"], name=name, full="https://api.asm.skype.com/v1/objects/{0}".format(objId), thumbnail="https://api.asm.skype.com/v1/objects/{0}/views/imgtl".format(objId), viewUrl="https://api.asm.skype.com/s/i?{0}".format(objId))
+        else:
+            return SkypeMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr, userId=self.skype.user.id, chatId=self.id, content=msg["content"])
     def sendContact(self, contact):
         """
         Share a contact with the conversation.
@@ -110,6 +115,8 @@ class SkypeChat(SkypeObj):
             "content": """<contacts><c t="s" s="{0}" f="{1}"/></contacts>""".format(contact.id, contact.name)
         }
         self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id), auth=SkypeConnection.Auth.Reg, json=msg)
+        timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
+        return SkypeContactMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr, userId=self.skype.user.id, chatId=self.id, content=msg["content"], contactId=contact.id, contactName="{0}".format(contact.name))
     def delete(self):
         """
         Delete the conversation and all message history.
@@ -309,7 +316,7 @@ class SkypeImageMsg(SkypeMsg):
         image = BeautifulSoup(raw.get("content")).find("uriobject")
         if image:
             fields.update({
-                "name": image.get("v"),
+                "name": image.get("v") or (image.find("originalname") or {}).get("v"),
                 "full": image.get("uri"),
                 "thumbnail": image.get("url_thumbnail"),
                 "viewUrl": (image.find("a") or {}).get("href")
