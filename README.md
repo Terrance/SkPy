@@ -53,7 +53,7 @@ class MyBot(SkypeBot):
         if isinstance(event, SkypeMessageEvent)
           and not event.msg.userId == self.userId:
             if re.search("ping", event.msg.content, re.IGNORECASE):
-                event.msg.chat().sendMsg("Pong!")
+                event.msg.chat.sendMsg("Pong!")
 ```
 
 The bot will immediately start processing events, though you can set `loop=False` in the super `__init__` to disable this (in which case call `loop()` when ready).
