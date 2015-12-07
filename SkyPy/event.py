@@ -22,6 +22,21 @@ class SkypeEvent(SkypeObj):
             "type": raw.get("resourceType"),
             "time": evtTime
         }
+    @classmethod
+    def fromRaw(cls, skype=None, raw={}):
+        """
+        Return a subclass instance of SkypeEvent if appropriate.
+        """
+        resType = raw.get("resourceType")
+        res = raw.get("resource", {})
+        evtCls = cls
+        if resType == "NewMessage":
+            msgType = res.get("messagetype")
+            if msgType in ("Control/Typing", "Control/ClearTyping"):
+                evtCls = SkypeTypingEvent
+            elif msgType in ("Text", "RichText", "RichText/Contacts", "RichText/UriObject"):
+                evtCls = SkypeEditMessageEvent if res.get("skypeeditedid") else SkypeNewMessageEvent
+        return evtCls(skype, raw, **evtCls.rawToFields(raw))
     def ack(self):
         """
         Acknowledge receipt of an event, if a response is required.

@@ -162,22 +162,7 @@ class Skype(object):
         events = []
         for json in self.conn("POST", "{0}/users/ME/endpoints/SELF/subscriptions/0/poll".format(self.conn.msgsHost),
                               auth=SkypeConnection.Auth.Reg).json().get("eventMessages", []):
-            resType = json.get("resourceType")
-            res = json.get("resource", {})
-            if resType == "NewMessage":
-                msgType = res.get("messagetype")
-                if msgType in ("Control/Typing", "Control/ClearTyping"):
-                    ev = SkypeTypingEvent.fromRaw(self, json)
-                elif msgType in ("Text", "RichText", "RichText/Contacts", "RichText/UriObject"):
-                    if res.get("skypeeditedid"):
-                        ev = SkypeEditMessageEvent.fromRaw(self, json)
-                    else:
-                        ev = SkypeNewMessageEvent.fromRaw(self, json)
-                else:
-                    ev = SkypeEvent.fromRaw(self, json)
-            else:
-                ev = SkypeEvent.fromRaw(self, json)
-            events.append(ev)
+            events.append(SkypeEvent.fromRaw(self, json))
         return events
     def setPresence(self, online=True):
         """
