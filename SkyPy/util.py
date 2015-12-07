@@ -48,10 +48,13 @@ def initAttrs(cls):
     setattr(cls, "__init__", __init__)
     return cls
 
-def convertIds(*types, user=(), users=(), chat=()):
+def convertIds(*types, **kwargs):
     """
     Class decorator: add helper methods to convert identifier properties into SkypeObjs.
     """
+    user = kwargs.get('user', ())
+    users = kwargs.get('users', ())
+    chat = kwargs.get('chat', ())
     def userObj(self, field):
         """
         Retrieve the user referred to in the object.
