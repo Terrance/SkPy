@@ -217,10 +217,13 @@ class SkypeMsg(SkypeObj):
         return """<i raw_pre="_" raw_post="_">{0}</i>""".format(s)
     @staticmethod
     def strike(s):
-        return """<s raw_pre="~" raw_post="~">{0}</i>""".format(s)
+        return """<s raw_pre="~" raw_post="~">{0}</s>""".format(s)
     @staticmethod
     def mono(s):
         return """<pre raw_pre="{{code}}" raw_post="{{code}}">{0}</pre>""".format(s)
+    @staticmethod
+    def link(l, s=None):
+        return """<a href="{0}">{1}</a>""".format(l, s or l)
     @staticmethod
     def emote(s):
         for emote in emoticons:
