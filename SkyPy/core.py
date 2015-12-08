@@ -1,7 +1,9 @@
 import time
 import datetime
 
-from .conn import SkypeConnection, resubscribeOn
+import requests
+
+from .conn import SkypeConnection
 from .user import SkypeUser, SkypeContact, SkypeRequest
 from .chat import SkypeSingleChat, SkypeGroupChat
 from .event import SkypeEvent, SkypeTypingEvent, SkypeNewMessageEvent, SkypeEditMessageEvent
@@ -9,8 +11,8 @@ from .util import SkypeApiException, cacheResult, syncState
 
 class Skype(object):
     def __init__(self, user=None, pwd=None, tokenFile=None):
-        self.userId = user
         self.conn = SkypeConnection(user, pwd, tokenFile)
+        self.userId = self.conn.user
     @property
     @cacheResult
     def user(self):
@@ -51,7 +53,8 @@ class Skype(object):
                              auth=SkypeConnection.Auth.Skype).json()
             return SkypeContact.fromRaw(self, json)
         except SkypeApiException as e:
-            if e.args[1].status_code == 403:
+            if len(e.args) >= 2 and isinstance(e.args[1], requests.Response) and e.args[1].status_code == 403:
+                # Not a contact, so no permission to retrieve information.
                 return
             raise
     @cacheResult
@@ -150,7 +153,7 @@ class Skype(object):
         for obj in json:
             requests.append(SkypeRequest.fromRaw(self, obj))
         return requests
-    @resubscribeOn(400, 404)
+    @SkypeConnection.handle(404, subscribe=True)
     def getEvents(self):
         """
         Retrieve a list of events since the last poll.  Multiple calls may be needed to retrieve all events.
@@ -177,6 +180,6 @@ class Skype(object):
         self.conn("PUT", "{0}/users/{1}/profile/avatar".format(SkypeConnection.API_USER, self.userId),
                   auth=SkypeConnection.Auth.Skype, data=file.read())
     def __str__(self):
-        return "[{0}]\nUserId: {1}".format(self.__class__.__name__, str(self.userId).replace("\n", "\n" + (" " * 6)))
+        return "[{0}]\nUserId: {1}".format(self.__class__.__name__, self.userId)
     def __repr__(self):
         return "{0}(userId={1})".format(self.__class__.__name__, repr(self.userId))

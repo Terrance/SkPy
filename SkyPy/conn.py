@@ -1,6 +1,6 @@
 import os
 import re
-from functools import wraps
+from functools import partial, wraps
 from datetime import datetime
 import time
 import math
@@ -9,31 +9,7 @@ import hashlib
 from bs4 import BeautifulSoup
 import requests
 
-from .util import SkypeApiException
-
-def resubscribeOn(*codes):
-    """
-    Decorator: if a given status code is received, try resubscribing to avoid the error.
-    """
-    def decorator(fn):
-        def resub(self, *args, **kwargs):
-            conn = self if isinstance(self, SkypeConnection) else self.conn
-            conn.getRegToken()
-            conn.subscribe()
-            return fn(self, *args, **kwargs)
-        @wraps(fn)
-        def wrapper(self, *args, **kwargs):
-            try:
-                return fn(self, *args, **kwargs)
-            except SkypeApiException as e:
-                if isinstance(e.args[1], requests.Response) and e.args[1].status_code in codes:
-                    return resub(self, *args, **kwargs)
-                else:
-                    raise e
-            except requests.exceptions.ConnectionError:
-                return resub(self, *args, **kwargs)
-        return wrapper
-    return decorator
+from .util import SkypeException, SkypeApiException
 
 class SkypeConnection(object):
     """
@@ -48,37 +24,79 @@ class SkypeConnection(object):
         Enum: authentication types.  Skype uses X-SkypeToken, whereas Reg includes RegistrationToken.
         """
         Skype, Authorize, Reg = range(3)
+    @staticmethod
+    def handle(*codes, **kwargs):
+        """
+        Decorator: if a given status code is received, reauthenticate and try again.
+        """
+        regToken = kwargs.get("regToken", False)
+        subscribe = kwargs.get("subscribe", False)
+        def decorator(fn):
+            @wraps(fn)
+            def wrapper(self, *args, **kwargs):
+                try:
+                    return fn(self, *args, **kwargs)
+                except SkypeApiException as e:
+                    if isinstance(e.args[1], requests.Response) and e.args[1].status_code in codes:
+                        conn = self if isinstance(self, SkypeConnection) else self.conn
+                        if regToken:
+                            conn.getRegToken()
+                        if subscribe:
+                            conn.subscribe()
+                        return fn(self, *args, **kwargs)
+                    raise
+            return wrapper
+        return decorator
     API_LOGIN = "https://login.skype.com/login?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com"
     API_USER = "https://api.skype.com"
     API_SCHEDULE = "https://api.scheduler.skype.com"
     API_CONTACTS = "https://contacts.skype.com/contacts/v1"
     API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1"
     def __init__(self, user=None, pwd=None, tokenFile=None):
+        """
+        Initialise a new Skype connection.
+
+        If tokenFile is specified, it is searched for valid tokens.  If all is well, no further handshake is required.
+
+        Otherwise, if user and pwd are set, try to interact with login.skype.com and fetch tokens.
+        """
         self.tokens = {}
         self.tokenExpiry = {}
+        self.tokenFile = tokenFile
+        self.msgsHost = self.API_MSGSHOST
+        self.subscribed = False
+        if user and pwd:
+            # Create a method to reauthenticate with login.skype.com (avoids storing the password in an accessible way).
+            self.getSkypeToken = partial(self.login, user, pwd)
         if tokenFile and os.path.isfile(tokenFile):
-            with open(tokenFile, "r") as f:
-                skypeToken, skypeExpiry, regToken, regExpiry, msgsHost = f.read().splitlines()
+            try:
+                with open(tokenFile, "r") as f:
+                    self.user, skypeToken, skypeExpiry, regToken, regExpiry, msgsHost = f.read().splitlines()
                 skypeExpiry = datetime.fromtimestamp(int(skypeExpiry))
                 regExpiry = datetime.fromtimestamp(int(regExpiry))
-                if datetime.now() < skypeExpiry:
-                    self.tokens["skype"] = skypeToken
-                    self.tokenExpiry["skype"] = skypeExpiry
+                if datetime.now() >= skypeExpiry:
+                    # We want to ignore this (see except block).
+                    raise SkypeException("Token file has expired")
+            except:
+                # Expired or otherwise can't read the file, skip to user/pwd authentication.
+                pass
+            else:
+                self.tokens["skype"] = skypeToken
+                self.tokenExpiry["skype"] = skypeExpiry
+                if datetime.now() < regExpiry:
                     self.tokens["reg"] = regToken
                     self.tokenExpiry["reg"] = regExpiry
                     self.msgsHost = msgsHost
+                    # No need to write the token file.
+                    return
+                else:
+                    self.getRegToken()
         if not self.tokens:
-            self.login(user, pwd)
-            self.msgsHost = self.API_MSGSHOST
+            if not hasattr(self, "getSkypeToken"):
+                raise SkypeException("No username or password provided, and no valid token file")
+            self.getSkypeToken()
             self.getRegToken()
-            if tokenFile:
-                with open(tokenFile, "w") as f:
-                    f.write(self.tokens["skype"] + "\n")
-                    f.write(str(int(time.mktime(self.tokenExpiry["skype"].timetuple()))) + "\n")
-                    f.write(self.tokens["reg"] + "\n")
-                    f.write(str(int(time.mktime(self.tokenExpiry["reg"].timetuple()))) + "\n")
-                    f.write(self.msgsHost + "\n")
-    def __call__(self, method, url, codes=[200, 201, 207], auth=None, headers=None, **kwargs):
+    def __call__(self, method, url, codes=(200, 201, 207), auth=None, headers=None, **kwargs):
         """
         Make an API call.  Most parameters are passed directly to requests.
 
@@ -86,6 +104,7 @@ class SkypeConnection(object):
 
         If authentication is required, set auth to one of the SkypeConnection.Auth constants.
         """
+        self.verifyToken(auth)
         if not headers:
             headers = {}
         if auth == self.Auth.Skype:
@@ -105,8 +124,8 @@ class SkypeConnection(object):
         Scrape the Skype Web login page, and perform a login with the given username and password.
         """
         loginPage = BeautifulSoup(self("GET", self.API_LOGIN).text, "html.parser")
-        if loginPage.find(id="recaptcha_response_field"):
-            raise SkypeApiException("Captcha required")
+        if loginPage.find(id="captcha"):
+            raise SkypeApiException("Captcha required", loginPage)
         pie = loginPage.find(id="pie").get("value")
         etm = loginPage.find(id="etm").get("value")
         secs = int(time.time())
@@ -128,12 +147,15 @@ class SkypeConnection(object):
             self.tokens["skype"] = loginRespPage.find("input", {"name": "skypetoken"}).get("value")
             length = int(loginRespPage.find("input", {"name": "expires_in"}).get("value"))
             self.tokenExpiry["skype"] = datetime.fromtimestamp(secs + length)
+            self.user = user
         except AttributeError as e:
             raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
     def getRegToken(self):
         """
         Acquire a registration token.  See getMac256Hash(...) for the hash generation.
         """
+        self.verifyToken(self.Auth.Skype)
+        self.subscribed = False
         secs = int(time.time())
         hash = getMac256Hash(str(secs), "msmsgs@msnmsgr.com", "Q1P7W2E4J9R8U3S5")
         endpointResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), codes=[201, 301], headers={
@@ -147,11 +169,33 @@ class SkypeConnection(object):
             return self.getRegToken()
         self.tokens["reg"] = re.search(r"(registrationToken=[a-z0-9\+/=]+)", regTokenHead, re.I).group(1)
         self.tokenExpiry["reg"] = datetime.fromtimestamp(int(re.search(r"expires=(\d+)", regTokenHead).group(1)))
-    @resubscribeOn(404)
+        if self.tokenFile:
+            with open(self.tokenFile, "w") as f:
+                f.write(self.user + "\n")
+                f.write(self.tokens["skype"] + "\n")
+                f.write(str(int(time.mktime(self.tokenExpiry["skype"].timetuple()))) + "\n")
+                f.write(self.tokens["reg"] + "\n")
+                f.write(str(int(time.mktime(self.tokenExpiry["reg"].timetuple()))) + "\n")
+                f.write(self.msgsHost + "\n")
+    def verifyToken(self, auth):
+        """
+        Ensure the authentication token for the given auth method is still valid.
+        """
+        if auth in (self.Auth.Skype, self.Auth.Authorize):
+            if "skype" in self.tokenExpiry and datetime.now() >= self.tokenExpiry["skype"]:
+                if not hasattr(self, "getSkypeToken"):
+                    raise SkypeException("Skype token expired, and no password specified")
+                self.getSkypeToken()
+        elif auth == self.Auth.Reg:
+            if "reg" in self.tokenExpiry and datetime.now() >= self.tokenExpiry["reg"]:
+                self.getRegToken()
     def makeEndpoint(self):
+        """
+        Create a new endpoint (a point of presence within Skype).
+        """
         endResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), auth=self.Auth.Reg, json={})
-        self.msgsEndpoint = endResp.headers["Location"]
-        self("PUT", "{0}/presenceDocs/messagingService".format(self.msgsEndpoint), auth=self.Auth.Reg, json={
+        endpoint = endResp.headers["Location"]
+        self("PUT", "{0}/presenceDocs/messagingService".format(endpoint), auth=self.Auth.Reg, json={
             "id": "messagingService",
             "privateInfo": {
                 "epname": "skype"
@@ -165,10 +209,13 @@ class SkypeConnection(object):
             "selfLink": "uri",
             "type": "EndpointPresenceDoc"
         })
+        return endpoint
     def subscribe(self):
         """
         Subscribe to contact and conversation events.  These are accessible through Skype.getEvents().
         """
+        if self.subscribed:
+            return
         self("POST", "{0}/users/ME/endpoints/SELF/subscriptions".format(self.msgsHost), auth=self.Auth.Reg, json={
             "interestedResources": [
                 "/v1/threads/ALL",
@@ -179,10 +226,11 @@ class SkypeConnection(object):
             "template": "raw",
             "channelType": "httpLongPoll"
         })
+        self.subscribed = True
     def __str__(self):
-        return "[{0}]".format(self.__class__.__name__)
+        return "[{0}]\nUser: {1}\nTokenFile: {2}".format(self.__class__.__name__, self.user, self.tokenFile)
     def __repr__(self):
-        return "{0}()".format(self.__class__.__name__)
+        return "{0}(user={1}, tokenFile={2})".format(self.__class__.__name__, repr(self.user), repr(self.tokenFile))
 
 def getMac256Hash(challenge, appId, key):
     def int32ToHexString(n):
