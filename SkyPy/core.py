@@ -164,6 +164,7 @@ class Skype(object):
                               auth=SkypeConnection.Auth.Reg).json().get("eventMessages", []):
             events.append(SkypeEvent.fromRaw(self, json))
         return events
+    @resubscribeOn(400, 404)
     def setPresence(self, online=True):
         """
         Set the user's presence (either Online or Hidden).
