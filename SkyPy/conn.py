@@ -64,7 +64,7 @@ class SkypeConnection(object):
         self.tokenExpiry = {}
         self.tokenFile = tokenFile
         self.msgsHost = self.API_MSGSHOST
-        self.subscribed = False
+        self.endpoints = {"self": SkypeEndpoint(self, "SELF")}
         if user and pwd:
             # Create a method to reauthenticate with login.skype.com (avoids storing the password in an accessible way).
             self.getSkypeToken = partial(self.login, user, pwd)
@@ -155,18 +155,20 @@ class SkypeConnection(object):
         Acquire a registration token.  See getMac256Hash(...) for the hash generation.
         """
         self.verifyToken(self.Auth.Skype)
-        self.subscribed = False
         secs = int(time.time())
         hash = getMac256Hash(str(secs), "msmsgs@msnmsgr.com", "Q1P7W2E4J9R8U3S5")
         endpointResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), codes=[201, 301], headers={
             "LockAndKey": "appId=msmsgs@msnmsgr.com; time={0}; lockAndKeyResponse={1}".format(secs, hash),
             "Authentication": "skypetoken=" + self.tokens["skype"]
         }, json={})
-        location = endpointResp.headers["Location"].rsplit("/", 2)[0]
+        locParts = endpointResp.headers["Location"].rsplit("/", 4)
+        msgsHost = locParts[0]
+        endId = locParts[4]
         regTokenHead = endpointResp.headers["Set-RegistrationToken"]
-        if not location[:-9] == self.msgsHost:
-            self.msgsHost = location[:-9]
+        if not msgsHost == self.msgsHost:
+            self.msgsHost = msgsHost
             return self.getRegToken()
+        self.endpoints["main"] = SkypeEndpoint(self, endId)
         self.tokens["reg"] = re.search(r"(registrationToken=[a-z0-9\+/=]+)", regTokenHead, re.I).group(1)
         self.tokenExpiry["reg"] = datetime.fromtimestamp(int(re.search(r"expires=(\d+)", regTokenHead).group(1)))
         if self.tokenFile:
@@ -189,34 +191,39 @@ class SkypeConnection(object):
         elif auth == self.Auth.Reg:
             if "reg" in self.tokenExpiry and datetime.now() >= self.tokenExpiry["reg"]:
                 self.getRegToken()
-    def makeEndpoint(self):
+    def __str__(self):
+        return "[{0}]\nUser: {1}\nTokenFile: {2}".format(self.__class__.__name__, self.user, self.tokenFile)
+    def __repr__(self):
+        return "{0}(user={1}, tokenFile={2})".format(self.__class__.__name__, repr(self.user), repr(self.tokenFile))
+
+class SkypeEndpoint(object):
+    """
+    An endpoint represents a single point of presence within Skype.
+
+    Typically, a user with multiple devices would have one endpoint per device (desktop, laptop, mobile and so on).
+
+    Endpoints are time-sensitive -- they lapse after a very short time unless kept alive (with ping() or other methods).
+    """
+    def __init__(self, conn, id):
         """
-        Create a new endpoint (a point of presence within Skype).
+        Create a new instance based on a newly-created endpoint identifier.
         """
-        endResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), auth=self.Auth.Reg, json={})
-        endpoint = endResp.headers["Location"]
-        self("PUT", "{0}/presenceDocs/messagingService".format(endpoint), auth=self.Auth.Reg, json={
-            "id": "messagingService",
-            "privateInfo": {
-                "epname": "skype"
-            },
-            "publicInfo": {
-                "capabilities": "",
-                "nodeInfo": "xx",
-                "skypeNameVersion": "skype.com",
-                "type": 1
-            },
-            "selfLink": "uri",
-            "type": "EndpointPresenceDoc"
-        })
-        return endpoint
+        self.conn = conn
+        self.id = id
+        self.subscribed = False
+    def ping(self, timeout=12):
+        """
+        Send a keep-alive request for the endpoint.
+
+        The timeout specifies the maximum amount of time for the endpoint to stay active unless pinged again.
+        """
+        self.conn("POST", "{0}/users/ME/endpoints/{1}/active".format(self.conn.msgsHost, self.id),
+                  auth=SkypeConnection.Auth.Reg, json={"timeout": timeout})
     def subscribe(self):
         """
         Subscribe to contact and conversation events.  These are accessible through Skype.getEvents().
         """
-        if self.subscribed:
-            return
-        self("POST", "{0}/users/ME/endpoints/SELF/subscriptions".format(self.msgsHost), auth=self.Auth.Reg, json={
+        meta = {
             "interestedResources": [
                 "/v1/threads/ALL",
                 "/v1/users/ME/contacts/ALL",
@@ -225,12 +232,27 @@ class SkypeConnection(object):
             ],
             "template": "raw",
             "channelType": "httpLongPoll"
-        })
+        }
+        self.conn("POST", "{0}/users/ME/endpoints/{1}/subscriptions".format(self.conn.msgsHost, self.id),
+                  auth=SkypeConnection.Auth.Reg, json=meta)
         self.subscribed = True
+    def getEvents(self):
+        """
+        Retrieve a list of events since the last poll.  Multiple calls may be needed to retrieve all events.
+
+        If no events occur, the API will block for up to 30 seconds, after which an empty list is returned.
+
+        If any event occurs whilst blocked, it is returned immediately.
+        """
+        if not self.subscribed:
+            self.subscribe()
+        events = []
+        return self.conn("POST", "{0}/users/ME/endpoints/{1}/subscriptions/0/poll".format(self.conn.msgsHost, self.id),
+                         auth=SkypeConnection.Auth.Reg).json().get("eventMessages", [])
     def __str__(self):
-        return "[{0}]\nUser: {1}\nTokenFile: {2}".format(self.__class__.__name__, self.user, self.tokenFile)
+        return "[{0}]\nId: {1}".format(self.__class__.__name__, self.id)
     def __repr__(self):
-        return "{0}(user={1}, tokenFile={2})".format(self.__class__.__name__, repr(self.user), repr(self.tokenFile))
+        return "{0}(id={1})".format(self.__class__.__name__, repr(self.id))
 
 def getMac256Hash(challenge, appId, key):
     def int32ToHexString(n):

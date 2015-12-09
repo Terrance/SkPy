@@ -153,7 +153,7 @@ class Skype(object):
         for obj in json:
             requests.append(SkypeRequest.fromRaw(self, obj))
         return requests
-    @SkypeConnection.handle(404, subscribe=True)
+    @SkypeConnection.handle(404, regToken=True)
     def getEvents(self):
         """
         Retrieve a list of events since the last poll.  Multiple calls may be needed to retrieve all events.
@@ -163,8 +163,7 @@ class Skype(object):
         If any event occurs whilst blocked, it is returned immediately.
         """
         events = []
-        for json in self.conn("POST", "{0}/users/ME/endpoints/SELF/subscriptions/0/poll".format(self.conn.msgsHost),
-                              auth=SkypeConnection.Auth.Reg).json().get("eventMessages", []):
+        for json in self.conn.endpoints["self"].getEvents():
             events.append(SkypeEvent.fromRaw(self, json))
         return events
     def setPresence(self, online=True):
