@@ -30,7 +30,6 @@ class SkypeConnection(object):
         Decorator: if a given status code is received, reauthenticate and try again.
         """
         regToken = kwargs.get("regToken", False)
-        subscribe = kwargs.get("subscribe", False)
         def decorator(fn):
             @wraps(fn)
             def wrapper(self, *args, **kwargs):
@@ -41,8 +40,6 @@ class SkypeConnection(object):
                         conn = self if isinstance(self, SkypeConnection) else self.conn
                         if regToken:
                             conn.getRegToken()
-                        if subscribe:
-                            conn.subscribe()
                         return fn(self, *args, **kwargs)
                     raise
             return wrapper
