@@ -30,7 +30,11 @@ class SkypeEvent(SkypeObj):
         resType = raw.get("resourceType")
         res = raw.get("resource", {})
         evtCls = cls
-        if resType == "NewMessage":
+        if resType == "UserPresence":
+            evtCls = SkypePresenceEvent
+        elif resType == "EndpointPresence":
+            evtCls = SkypeEndpointEvent
+        elif resType == "NewMessage":
             msgType = res.get("messagetype")
             if msgType in ("Control/Typing", "Control/ClearTyping"):
                 evtCls = SkypeTypingEvent
@@ -44,6 +48,37 @@ class SkypeEvent(SkypeObj):
         url = self.raw.get("resource", {}).get("ackrequired")
         if url:
             self.skype.conn("POST", url, auth=SkypeConnection.Auth.Reg)
+
+@initAttrs
+@convertIds("user")
+class SkypePresenceEvent(SkypeEvent):
+    """
+    An event for contacts changing status or presence.
+    """
+    attrs = SkypeEvent.attrs + ("userId", "online", "status")
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypePresenceEvent, cls).rawToFields(raw)
+        res = raw.get("resource", {})
+        fields.update({
+            "userId": userToId(raw.get("resourceLink")),
+            "online": res.get("availability") == "Online",
+            "status": res.get("status")
+        })
+        return fields
+
+@initAttrs
+@convertIds("user")
+class SkypeEndpointEvent(SkypeEvent):
+    """
+    An event for changes to individual contact endpoints.
+    """
+    attrs = SkypeEvent.attrs + ("userId",)
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeEndpointEvent, cls).rawToFields(raw)
+        fields["userId"] = userToId(raw.get("resourceLink"))
+        return fields
 
 @initAttrs
 @convertIds("user", "chat")

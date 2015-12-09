@@ -20,14 +20,14 @@ def userToId(url):
     """
     Extract the username from a contact URL.
     """
-    match = re.search(r"/v1/users/ME/contacts/[0-9]+:([A-Za-z0-9\.,_-]+)", url)
-    return match.group(1) if match else None
+    match = re.search(r"users(/ME/contacts)?/[0-9]+:([A-Za-z0-9\.,_-]+)", url)
+    return match.group(2) if match else None
 
 def chatToId(url):
     """
     Extract the conversation ID from a conversation URL.
     """
-    match = re.search(r"/v1/users/ME/conversations/([0-9]+:[A-Za-z0-9\.,_-]+(@thread\.skype)?)", url)
+    match = re.search(r"conversations/([0-9]+:[A-Za-z0-9\.,_-]+(@thread\.skype)?)", url)
     return match.group(1) if match else None
 
 def initAttrs(cls):
@@ -52,9 +52,9 @@ def convertIds(*types, **kwargs):
     """
     Class decorator: add helper methods to convert identifier properties into SkypeObjs.
     """
-    user = kwargs.get('user', ())
-    users = kwargs.get('users', ())
-    chat = kwargs.get('chat', ())
+    user = kwargs.get("user", ())
+    users = kwargs.get("users", ())
+    chat = kwargs.get("chat", ())
     def userObj(self, field):
         """
         Retrieve the user referred to in the object.
