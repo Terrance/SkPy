@@ -40,6 +40,8 @@ class SkypeEvent(SkypeObj):
                 evtCls = SkypeTypingEvent
             elif msgType in ("Text", "RichText", "RichText/Contacts", "RichText/UriObject"):
                 evtCls = SkypeEditMessageEvent if res.get("skypeeditedid") else SkypeNewMessageEvent
+        elif resType == "ConversationUpdate":
+            evtCls = SkypeChatUpdateEvent
         return evtCls(skype, raw, **evtCls.rawToFields(raw))
     def ack(self):
         """
@@ -128,3 +130,27 @@ class SkypeEditMessageEvent(SkypeMessageEvent):
     An event for the update of an existing message in a conversation.
     """
     pass
+
+@initAttrs
+@convertIds("chat")
+class SkypeChatUpdateEvent(SkypeEvent):
+    """
+    An event triggered by various conversation changes or messages.
+    """
+    attrs = SkypeEvent.attrs + ("chatId", "horizon")
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeChatUpdateEvent, cls).rawToFields(raw)
+        res = raw.get("resource", {})
+        fields.update({
+            "chatId": res.get("id"),
+            "horizon": res.get("properties", {}).get("consumptionhorizon")
+        })
+        return fields
+    def consume(self):
+        """
+        Use the consumption horizon to mark the conversation as up-to-date.
+        """
+        self.skype.conn("PUT", "{0}/users/ME/conversations/{1}/properties".format(self.skype.conn.msgsHost, self.chatId),
+                        auth=SkypeConnection.Auth.Reg, params={"name": "consumptionhorizon"},
+                        json={"consumptionhorizon": self.horizon})
