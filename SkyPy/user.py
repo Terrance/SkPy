@@ -126,6 +126,11 @@ class SkypeContact(SkypeUser):
             "blocked": raw.get("blocked")
         })
         return fields
+    def delete(self):
+        """
+        Remove the user from your contacts.
+        """
+        self.skype.conn("DELETE", "{0}/users/self/contacts/{1}".format(SkypeConnection.API_USER, self.id))
 
 @initAttrs
 @convertIds("user")
