@@ -1,7 +1,6 @@
 import time
 
 from .core import Skype
-from .event import SkypeChatUpdateEvent
 
 class SkypeBot(Skype):
     """

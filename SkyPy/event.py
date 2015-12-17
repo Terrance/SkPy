@@ -63,7 +63,7 @@ class SkypePresenceEvent(SkypeEvent):
         fields = super(SkypePresenceEvent, cls).rawToFields(raw)
         res = raw.get("resource", {})
         fields.update({
-            "userId": userToId(raw.get("resourceLink")),
+            "userId": userToId(res.get("selfLink")),
             "online": res.get("availability") == "Online",
             "status": res.get("status")
         })
@@ -79,7 +79,7 @@ class SkypeEndpointEvent(SkypeEvent):
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeEndpointEvent, cls).rawToFields(raw)
-        fields["userId"] = userToId(raw.get("resourceLink"))
+        fields["userId"] = userToId(raw.get("resource", {}).get("selfLink"))
         return fields
 
 @initAttrs

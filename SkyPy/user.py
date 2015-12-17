@@ -147,7 +147,9 @@ class SkypeRequest(SkypeObj):
         }
     def accept(self):
         self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/accept".format(SkypeConnection.API_USER, self.userId),
-                        auth=SkypeConnection.Auth.Skype).json()
+                        auth=SkypeConnection.Auth.Skype)
+        self.skype.conn("PUT", "{0}/users/ME/contacts/8:{1}".format(self.skype.conn.msgsHost, self.userId),
+                        auth=SkypeConnection.Auth.Reg)
     def reject(self):
         self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/decline".format(SkypeConnection.API_USER, self.userId),
-                        auth=SkypeConnection.Auth.Skype).json()
+                        auth=SkypeConnection.Auth.Skype)
