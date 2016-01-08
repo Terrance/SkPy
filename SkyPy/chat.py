@@ -369,7 +369,9 @@ class SkypeFileMsg(SkypeMsg):
                 "fileUrlView": (file.find("a") or {}).get("href")
             })
         return fields
-    def getContent(self):
+    @property
+    @cacheResult
+    def fileContent(self):
         """
         Retrieve the contents of the file as a byte string.
         """
@@ -381,7 +383,9 @@ class SkypeImageMsg(SkypeFileMsg):
     """
     An event for a picture shared in a conversation.
     """
-    def getContent(self):
+    @property
+    @cacheResult
+    def fileContent(self):
         """
         Retrieve the image as a byte string.
         """
