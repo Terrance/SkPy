@@ -38,7 +38,7 @@ class SkypeEvent(SkypeObj):
             msgType = res.get("messagetype")
             if msgType in ("Control/Typing", "Control/ClearTyping"):
                 evtCls = SkypeTypingEvent
-            elif msgType in ("Text", "RichText", "RichText/Contacts", "RichText/UriObject"):
+            elif msgType in ("Text", "RichText", "RichText/Contacts", "RichText/Media_GenericFile", "RichText/UriObject"):
                 evtCls = SkypeEditMessageEvent if res.get("skypeeditedid") else SkypeNewMessageEvent
         elif resType == "ConversationUpdate":
             evtCls = SkypeChatUpdateEvent

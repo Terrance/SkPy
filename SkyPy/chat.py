@@ -95,37 +95,41 @@ class SkypeChat(SkypeObj):
         objType = "imgpsh" if image else "original"
         self.skype.conn("PUT", "https://api.asm.skype.com/v1/objects/{0}/content/{1}".format(objId, objType),
                         auth=SkypeConnection.Auth.Authorize, data=content.read())
+        size = content.tell()
         if image:
-            content = """<URIObject type="Picture.1" uri="https://api.asm.skype.com/v1/objects/{0}" """ \
-                      """url_thumbnail="https://api.asm.skype.com/v1/objects/{0}/views/imgt1">MyLegacy pish """ \
-                      """<a href="https://api.asm.skype.com/s/i?{0}">https://api.asm.skype.com/s/i?{0}</a>""" \
-                      """<Title/><Description/><OriginalName v="{1}"/>""" \
-                      """<meta type="photo" originalName="{1}"/></URIObject>""".format(objId, name)
+            body = """<URIObject type="Picture.1" uri="https://api.asm.skype.com/v1/objects/{0}" """ \
+                   """url_thumbnail="https://api.asm.skype.com/v1/objects/{0}/views/imgt1">MyLegacy pish """ \
+                   """<a href="https://api.asm.skype.com/s/i?{0}">https://api.asm.skype.com/s/i?{0}</a>""" \
+                   """<Title/><Description/><OriginalName v="{1}"/>""" \
+                   """<meta type="photo" originalName="{1}"/></URIObject>""".format(objId, name)
         else:
-            content = """<URIObject type="File.1" uri="https://api.asm.skype.com/v1/objects/{0}" """ \
-                      """url_thumbnail="https://api.asm.skype.com/v1/objects/{0}/views/thumbnail">""" \
-                      """<Title>Title: {1}</Title><Description> Description: {1}</Description>""" \
-                      """<a href="https://login.skype.com/login/sso?go=webclient.xmm&amp;docid={0}"> """ \
-                      """https://login.skype.com/login/sso?go=webclient.xmm&amp;docid={0}</a>""" \
-                      """<OriginalName v="{1}"/><FileSize v="{2}"/></URIObject>""".format(objId, name, content.tell())
+            body = """<URIObject type="File.1" uri="https://api.asm.skype.com/v1/objects/{0}" """ \
+                   """url_thumbnail="https://api.asm.skype.com/v1/objects/{0}/views/thumbnail">""" \
+                   """<Title>Title: {1}</Title><Description> Description: {1}</Description>""" \
+                   """<a href="https://login.skype.com/login/sso?go=webclient.xmm&amp;docid={0}"> """ \
+                   """https://login.skype.com/login/sso?go=webclient.xmm&amp;docid={0}</a>""" \
+                   """<OriginalName v="{1}"/><FileSize v="{2}"/></URIObject>""".format(objId, name, size)
         msg = {
             "clientmessageid": int(time()),
             "contenttype": "text",
             "messagetype": "RichText/{0}".format("UriObject" if image else "Media_GenericFile"),
-            "content": content
+            "content": body
         }
         self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
                         auth=SkypeConnection.Auth.Reg, json=msg)
         timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
         if image:
             return SkypeImageMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr,
-                                 userId=self.skype.user.id, chatId=self.id, content=msg["content"], imageName=name,
-                                 imageUrlFull="https://api.asm.skype.com/v1/objects/{0}".format(objId),
-                                 imageUrlThumb="https://api.asm.skype.com/v1/objects/{0}/views/imgtl".format(objId),
-                                 imageUrlView="https://api.asm.skype.com/s/i?{0}".format(objId))
+                                 userId=self.skype.user.id, chatId=self.id, content=msg["content"], fileName=name,
+                                 fileUrlFull="https://api.asm.skype.com/v1/objects/{0}".format(objId),
+                                 fileUrlThumb="https://api.asm.skype.com/v1/objects/{0}/views/imgtl".format(objId),
+                                 fileUrlView="https://api.asm.skype.com/s/i?{0}".format(objId))
         else:
-            return SkypeMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr,
-                            userId=self.skype.user.id, chatId=self.id, content=msg["content"])
+            return SkypeFileMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr,
+                                userId=self.skype.user.id, chatId=self.id, content=msg["content"], fileName=name,
+                                fileSize=size, fileUrlFull="https://api.asm.skype.com/v1/objects/{0}".format(objId),
+                                fileUrlThumb="https://api.asm.skype.com/v1/objects/{0}/views/thumbnail".format(objId),
+                                fileUrlView="https://login.skype.com/login/sso?go=webclient.xmm&docid={0}".format(objId))
     def sendContact(self, contact):
         """
         Share a contact with the conversation.
@@ -298,6 +302,8 @@ class SkypeMsg(SkypeObj):
         msgCls = cls
         if msgType == "RichText/Contacts":
             msgCls = SkypeContactMsg
+        elif msgType == "RichText/Media_GenericFile":
+            msgCls = SkypeFileMsg
         elif msgType == "RichText/UriObject":
             msgCls = SkypeImageMsg
         return msgCls(skype, raw, **msgCls.rawToFields(raw))
@@ -344,21 +350,29 @@ class SkypeContactMsg(SkypeMsg):
         return fields
 
 @initAttrs
-class SkypeImageMsg(SkypeMsg):
+class SkypeFileMsg(SkypeMsg):
+    """
+    An event for a file shared in a conversation.
+    """
+    attrs = SkypeMsg.attrs + ("fileName", "fileSize", "fileUrlFull", "fileUrlThumb", "fileUrlView")
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeFileMsg, cls).rawToFields(raw)
+        # BeautifulSoup converts tag names to lower case, and find() is case-sensitive.
+        file = BeautifulSoup(raw.get("content"), "html.parser").find("uriobject")
+        if file:
+            fields.update({
+                "fileName": (file.find("originalname") or {}).get("v"),
+                "fileSize": (file.find("filesize") or {}).get("v"),
+                "fileUrlFull": file.get("uri"),
+                "fileUrlThumb": file.get("url_thumbnail"),
+                "fileUrlView": (file.find("a") or {}).get("href")
+            })
+        return fields
+
+@initAttrs
+class SkypeImageMsg(SkypeFileMsg):
     """
     An event for a picture shared in a conversation.
     """
-    attrs = SkypeMsg.attrs + ("imageName", "imageUrlFull", "imageUrlThumb", "imageUrlView")
-    @classmethod
-    def rawToFields(cls, raw={}):
-        fields = super(SkypeImageMsg, cls).rawToFields(raw)
-        # BeautifulSoup converts tag names to lower case, and find() is case-sensitive.
-        image = BeautifulSoup(raw.get("content"), "html.parser").find("uriobject")
-        if image:
-            fields.update({
-                "imageName": image.get("v") or (image.find("originalname") or {}).get("v"),
-                "imageUrlFull": image.get("uri"),
-                "imageUrlThumb": image.get("url_thumbnail"),
-                "imageUrlView": (image.find("a") or {}).get("href")
-            })
-        return fields
+    pass
