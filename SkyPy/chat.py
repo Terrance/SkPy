@@ -369,10 +369,21 @@ class SkypeFileMsg(SkypeMsg):
                 "fileUrlView": (file.find("a") or {}).get("href")
             })
         return fields
+    def getContent(self):
+        """
+        Retrieve the contents of the file as a byte string.
+        """
+        return self.skype.conn("GET", "{0}/views/original".format(self.fileUrlFull),
+                               auth=SkypeConnection.Auth.Authorize).content
 
 @initAttrs
 class SkypeImageMsg(SkypeFileMsg):
     """
     An event for a picture shared in a conversation.
     """
-    pass
+    def getContent(self):
+        """
+        Retrieve the image as a byte string.
+        """
+        return self.skype.conn("GET", "{0}/views/imgpsh_fullsize".format(self.fileUrlFull),
+                               auth=SkypeConnection.Auth.Authorize).content
