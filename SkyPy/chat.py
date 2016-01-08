@@ -335,7 +335,7 @@ class SkypeContactMsg(SkypeMsg):
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeContactMsg, cls).rawToFields(raw)
-        contact = BeautifulSoup(raw.get("content")).find("c")
+        contact = BeautifulSoup(raw.get("content"), "html.parser").find("c")
         if contact:
             fields.update({
                 "contactId": contact.get("s"),
@@ -353,7 +353,7 @@ class SkypeImageMsg(SkypeMsg):
     def rawToFields(cls, raw={}):
         fields = super(SkypeImageMsg, cls).rawToFields(raw)
         # BeautifulSoup converts tag names to lower case, and find() is case-sensitive.
-        image = BeautifulSoup(raw.get("content")).find("uriobject")
+        image = BeautifulSoup(raw.get("content"), "html.parser").find("uriobject")
         if image:
             fields.update({
                 "name": image.get("v") or (image.find("originalname") or {}).get("v"),
