@@ -33,14 +33,18 @@ def chatToId(url):
 def initAttrs(cls):
     """
     Class decorator: automatically generate an __init__ method that expects args from cls.attrs and stores them.
-
-    Drops any unrecognised properties from kwargs.
     """
     def __init__(self, skype=None, raw=None, *args, **kwargs):
         super(cls, self).__init__(skype, raw)
         # Merge args into kwargs based on cls.attrs.
         for i in range(len(args)):
             kwargs[cls.attrs[i]] = args[i]
+        # Disallow any unknown kwargs.
+        unknown = set(kwargs) - set(cls.attrs)
+        if unknown:
+            unknownDesc = "an unexpected keyword argument" if len(unknown) == 1 else "unexpected keyword arguments"
+            unknownList = ", ".join("'{0}'".format(k) for k in sorted(unknown))
+            raise TypeError("TypeError: __init__() got {0} {1}".format(unknownDesc, unknownList))
         # Set each attribute from kwargs, or use the default if not specified.
         for k in cls.attrs:
             setattr(self, k, kwargs.get(k, cls.defaults.get(k)))
