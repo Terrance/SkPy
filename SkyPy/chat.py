@@ -119,10 +119,10 @@ class SkypeChat(SkypeObj):
         timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
         if image:
             return SkypeImageMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr,
-                                 userId=self.skype.user.id, chatId=self.id, content=msg["content"], name=name,
-                                 full="https://api.asm.skype.com/v1/objects/{0}".format(objId),
-                                 thumbnail="https://api.asm.skype.com/v1/objects/{0}/views/imgtl".format(objId),
-                                 viewUrl="https://api.asm.skype.com/s/i?{0}".format(objId))
+                                 userId=self.skype.user.id, chatId=self.id, content=msg["content"], imageName=name,
+                                 imageUrlFull="https://api.asm.skype.com/v1/objects/{0}".format(objId),
+                                 imageUrlThumb="https://api.asm.skype.com/v1/objects/{0}/views/imgtl".format(objId),
+                                 imageUrlView="https://api.asm.skype.com/s/i?{0}".format(objId))
         else:
             return SkypeMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr,
                             userId=self.skype.user.id, chatId=self.id, content=msg["content"])
@@ -348,7 +348,7 @@ class SkypeImageMsg(SkypeMsg):
     """
     An event for a picture shared in a conversation.
     """
-    attrs = SkypeMsg.attrs + ("name", "full", "thumbnail", "viewUrl")
+    attrs = SkypeMsg.attrs + ("imageName", "imageUrlFull", "imageUrlThumb", "imageUrlView")
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeImageMsg, cls).rawToFields(raw)
@@ -356,9 +356,9 @@ class SkypeImageMsg(SkypeMsg):
         image = BeautifulSoup(raw.get("content"), "html.parser").find("uriobject")
         if image:
             fields.update({
-                "name": image.get("v") or (image.find("originalname") or {}).get("v"),
-                "full": image.get("uri"),
-                "thumbnail": image.get("url_thumbnail"),
-                "viewUrl": (image.find("a") or {}).get("href")
+                "imageName": image.get("v") or (image.find("originalname") or {}).get("v"),
+                "imageUrlFull": image.get("uri"),
+                "imageUrlThumb": image.get("url_thumbnail"),
+                "imageUrlView": (image.find("a") or {}).get("href")
             })
         return fields
