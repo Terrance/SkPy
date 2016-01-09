@@ -120,9 +120,10 @@ class SkypeConnection(object):
         """
         Scrape the Skype Web login page, and perform a login with the given username and password.
         """
-        loginPage = BeautifulSoup(self("GET", self.API_LOGIN).text, "html.parser")
+        loginResp = self("GET", self.API_LOGIN)
+        loginPage = BeautifulSoup(loginResp.text, "html.parser")
         if loginPage.find(id="captcha"):
-            raise SkypeApiException("Captcha required", loginPage)
+            raise SkypeApiException("Captcha required", loginResp)
         pie = loginPage.find(id="pie").get("value")
         etm = loginPage.find(id="etm").get("value")
         secs = int(time.time())
