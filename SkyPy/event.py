@@ -3,7 +3,7 @@ import re
 
 from .conn import SkypeConnection
 from .chat import SkypeMsg
-from .util import SkypeObj, userToId, chatToId, initAttrs, convertIds, cacheResult
+from .util import SkypeObj, noPrefix, userToId, chatToId, initAttrs, convertIds, cacheResult
 
 @initAttrs
 class SkypeEvent(SkypeObj):
@@ -28,22 +28,21 @@ class SkypeEvent(SkypeObj):
         Return a subclass instance of SkypeEvent if appropriate.
         """
         resType = raw.get("resourceType")
-        res = raw.get("resource", {})
-        evtCls = cls
-        if resType == "UserPresence":
-            evtCls = SkypePresenceEvent
-        elif resType == "EndpointPresence":
-            evtCls = SkypeEndpointEvent
-        elif resType == "NewMessage":
-            msgType = res.get("messagetype")
+        evtCls = {
+            "UserPresence": SkypePresenceEvent,
+            "EndpointPresence": SkypeEndpointEvent,
+            "NewMessage": SkypeMessageEvent,
+            "ConversationUpdate": SkypeChatUpdateEvent,
+            "ThreadUpdate": SkypeChatMemberEvent
+        }.get(resType, cls)
+        if evtCls is SkypeMessageEvent:
+            msgType = raw.get("resource", {}).get("messagetype")
             if msgType in ("Control/Typing", "Control/ClearTyping"):
                 evtCls = SkypeTypingEvent
             elif msgType in ("Text", "RichText", "RichText/Contacts", "RichText/Media_GenericFile", "RichText/UriObject"):
                 evtCls = SkypeEditMessageEvent if res.get("skypeeditedid") else SkypeNewMessageEvent
             elif msgType == "Event/Call":
                 evtCls = SkypeCallEvent
-        elif resType == "ConversationUpdate":
-            evtCls = SkypeChatUpdateEvent
         return evtCls(skype, raw, **evtCls.rawToFields(raw))
     def ack(self):
         """
@@ -163,3 +162,20 @@ class SkypeChatUpdateEvent(SkypeEvent):
         self.skype.conn("PUT", "{0}/users/ME/conversations/{1}/properties".format(self.skype.conn.msgsHost, self.chatId),
                         auth=SkypeConnection.Auth.Reg, params={"name": "consumptionhorizon"},
                         json={"consumptionhorizon": self.horizon})
+
+@initAttrs
+@convertIds("users", "chat")
+class SkypeChatMemberEvent(SkypeEvent):
+    """
+    An event triggered when someone is added to or removed from a conversation.
+    """
+    attrs = SkypeEvent.attrs + ("userIds", "chatId")
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeChatMemberEvent, cls).rawToFields(raw)
+        res = raw.get("resource", {})
+        fields.update({
+            "userIds": filter(None, [noPrefix(m.get("id")) for m in res.get("members")]),
+            "chatId": res.get("id")
+        })
+        return fields

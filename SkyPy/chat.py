@@ -298,16 +298,14 @@ class SkypeMsg(SkypeObj):
         """
         Return a subclass instance of SkypeMsg if appropriate.
         """
-        msgType = raw.get("messagetype")
-        msgCls = cls
-        if msgType == "RichText/Contacts":
-            msgCls = SkypeContactMsg
-        elif msgType == "RichText/Media_GenericFile":
-            msgCls = SkypeFileMsg
-        elif msgType == "RichText/UriObject":
-            msgCls = SkypeImageMsg
-        elif msgType == "Event/Call":
-            msgCls = SkypeCallMsg
+        msgCls = {
+            "RichText/Contacts": SkypeContactMsg,
+            "RichText/Media_GenericFile": SkypeFileMsg,
+            "RichText/UriObject": SkypeImageMsg,
+            "Event/Call": SkypeCallMsg,
+            "ThreadActivity/AddMember": SkypeMemberAddMsg,
+            "ThreadActivity/DeleteMember": SkypeMemberRemoveMsg
+        }.get(raw.get("messagetype"), cls)
         return msgCls(skype, raw, **msgCls.rawToFields(raw))
     def plain(self, entities=False):
         """
@@ -410,4 +408,46 @@ class SkypeCallMsg(SkypeMsg):
         fields = super(SkypeCallMsg, cls).rawToFields(raw)
         partType = (BeautifulSoup(raw.get("content"), "html.parser").find("partlist") or {}).get("type")
         fields["state"] = {"started": cls.State.Started, "ended": cls.State.Ended}[partType]
+        return fields
+
+@initAttrs
+@convertIds(user=("member",))
+class SkypeMemberMsg(SkypeMsg):
+    """
+    A message representing a change in a group conversation's participants.
+
+    Note that Skype represents these messages as being sent by the conversation user, rather than the initiator.
+
+    Instead, user is set to the initiator, and member to the target.
+    """
+    attrs = SkypeMsg.attrs + ("memberId",)
+
+@initAttrs
+class SkypeMemberAddMsg(SkypeMemberMsg):
+    """
+    A message representing a user added to a group conversation.
+    """
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeMemberAddMsg, cls).rawToFields(raw)
+        addInfo = (BeautifulSoup(raw.get("content"), "html.parser").find("addmember") or {})
+        fields.update({
+            "userId": noPrefix(addInfo.find("initiator").text),
+            "memberId": noPrefix(addInfo.find("target").text)
+        })
+        return fields
+
+@initAttrs
+class SkypeMemberRemoveMsg(SkypeMemberMsg):
+    """
+    A message representing a user removed from a group conversation.
+    """
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeMemberRemoveMsg, cls).rawToFields(raw)
+        addInfo = (BeautifulSoup(raw.get("content"), "html.parser").find("deletemember") or {})
+        fields.update({
+            "userId": noPrefix(addInfo.find("initiator").text),
+            "memberId": noPrefix(addInfo.find("target").text)
+        })
         return fields
