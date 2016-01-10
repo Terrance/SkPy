@@ -40,6 +40,8 @@ class SkypeEvent(SkypeObj):
                 evtCls = SkypeTypingEvent
             elif msgType in ("Text", "RichText", "RichText/Contacts", "RichText/Media_GenericFile", "RichText/UriObject"):
                 evtCls = SkypeEditMessageEvent if res.get("skypeeditedid") else SkypeNewMessageEvent
+            elif msgType == "Event/Call":
+                evtCls = SkypeCallEvent
         elif resType == "ConversationUpdate":
             evtCls = SkypeChatUpdateEvent
         return evtCls(skype, raw, **evtCls.rawToFields(raw))
@@ -128,6 +130,13 @@ class SkypeNewMessageEvent(SkypeMessageEvent):
 class SkypeEditMessageEvent(SkypeMessageEvent):
     """
     An event for the update of an existing message in a conversation.
+    """
+    pass
+
+@initAttrs
+class SkypeCallEvent(SkypeMessageEvent):
+    """
+    An event for incoming or missed Skype calls.
     """
     pass
 

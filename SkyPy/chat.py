@@ -306,6 +306,8 @@ class SkypeMsg(SkypeObj):
             msgCls = SkypeFileMsg
         elif msgType == "RichText/UriObject":
             msgCls = SkypeImageMsg
+        elif msgType == "Event/Call":
+            msgCls = SkypeCallMsg
         return msgCls(skype, raw, **msgCls.rawToFields(raw))
     def plain(self, entities=False):
         """
@@ -352,7 +354,7 @@ class SkypeContactMsg(SkypeMsg):
 @initAttrs
 class SkypeFileMsg(SkypeMsg):
     """
-    An event for a file shared in a conversation.
+    A message containing a file shared in a conversation.
     """
     attrs = SkypeMsg.attrs + ("fileName", "fileSize", "fileUrlFull", "fileUrlThumb", "fileUrlView")
     @classmethod
@@ -381,7 +383,7 @@ class SkypeFileMsg(SkypeMsg):
 @initAttrs
 class SkypeImageMsg(SkypeFileMsg):
     """
-    An event for a picture shared in a conversation.
+    A message containing a picture shared in a conversation.
     """
     @property
     @cacheResult
@@ -391,3 +393,21 @@ class SkypeImageMsg(SkypeFileMsg):
         """
         return self.skype.conn("GET", "{0}/views/imgpsh_fullsize".format(self.fileUrlFull),
                                auth=SkypeConnection.Auth.Authorize).content
+
+@initAttrs
+class SkypeCallMsg(SkypeMsg):
+    """
+    A message representing a change in state to a call inside the conversation.
+    """
+    class State:
+        """
+        Enum: possible call states (either started and incoming, or ended).
+        """
+        Started, Ended = range(2)
+    attrs = SkypeMsg.attrs + ("state",)
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeCallMsg, cls).rawToFields(raw)
+        partType = (BeautifulSoup(raw.get("content"), "html.parser").find("partlist") or {}).get("type")
+        fields["state"] = {"started": cls.State.Started, "ended": cls.State.Ended}[partType]
+        return fields
