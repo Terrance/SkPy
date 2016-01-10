@@ -114,7 +114,7 @@ class Skype(object):
         """
         Get a single conversation by identifier.
 
-        If the first API call has already been made (e.g. getChats(), use raw and skip it here.
+        If the first API call has already been made (e.g. getChats()), use raw and skip it here.
         """
         if not json:
             json = self.conn("GET", "{0}/users/ME/conversations/{1}".format(self.conn.msgsHost, id),

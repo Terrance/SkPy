@@ -104,7 +104,7 @@ def cacheResult(fn):
     """
     Decorator: calculate the value on first access, produce the cached value thereafter.
 
-    If the function takes an argument, the cache is a dictionary using the first argument as a key.
+    If the function takes arguments, the cache is a dictionary using all arguments as the key.
     """
     cache = {}
     @wraps(fn)
