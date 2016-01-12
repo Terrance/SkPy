@@ -27,6 +27,7 @@ class SkypeEvent(SkypeObj):
         """
         Return a subclass instance of SkypeEvent if appropriate.
         """
+        res = raw.get("resource", {})
         resType = raw.get("resourceType")
         evtCls = {
             "UserPresence": SkypePresenceEvent,
@@ -36,7 +37,7 @@ class SkypeEvent(SkypeObj):
             "ThreadUpdate": SkypeChatMemberEvent
         }.get(resType, cls)
         if evtCls is SkypeMessageEvent:
-            msgType = raw.get("resource", {}).get("messagetype")
+            msgType = res.get("messagetype")
             if msgType in ("Control/Typing", "Control/ClearTyping"):
                 evtCls = SkypeTypingEvent
             elif msgType in ("Text", "RichText", "RichText/Contacts", "RichText/Media_GenericFile", "RichText/UriObject"):
