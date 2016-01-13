@@ -330,6 +330,11 @@ class SkypeMsg(SkypeObj):
         Send an edit of this message.  Follows the same arguments as SkypeChat.sendMsg().
         """
         self.chat.sendMsg(content, me, rich, self.editId or self.id)
+    def delete(self):
+        """
+        Delete the message and remove it from the conversation.  Equivalent to edit(content="").
+        """
+        self.edit("")
 
 @initAttrs
 @convertIds(user=("contact",))
