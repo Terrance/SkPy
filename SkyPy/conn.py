@@ -113,7 +113,7 @@ class SkypeConnection(object):
         resp = requests.request(method, url, headers=headers, **kwargs)
         if resp.status_code not in codes:
             if resp.status_code == 429:
-                raise SkypeApiException("Auth rate limit exceeded", resp)
+                raise SkypeAuthException("Auth rate limit exceeded", resp)
             raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
         return resp
     def login(self, user, pwd):
@@ -123,7 +123,7 @@ class SkypeConnection(object):
         loginResp = self("GET", self.API_LOGIN)
         loginPage = BeautifulSoup(loginResp.text, "html.parser")
         if loginPage.find(id="captcha"):
-            raise SkypeApiException("Captcha required", loginResp)
+            raise SkypeAuthException("Captcha required", loginResp)
         pie = loginPage.find(id="pie").get("value")
         etm = loginPage.find(id="etm").get("value")
         secs = int(time.time())
@@ -140,7 +140,7 @@ class SkypeConnection(object):
         loginRespPage = BeautifulSoup(loginResp.text, "html.parser")
         errors = loginRespPage.select("div.messageBox.message_error span")
         if errors:
-            raise SkypeApiException(errors[0].text, loginResp)
+            raise SkypeAuthException(errors[0].text, loginResp)
         try:
             self.tokens["skype"] = loginRespPage.find("input", {"name": "skypetoken"}).get("value")
             length = int(loginRespPage.find("input", {"name": "expires_in"}).get("value"))
@@ -251,6 +251,14 @@ class SkypeEndpoint(object):
         return "[{0}]\nId: {1}".format(self.__class__.__name__, self.id)
     def __repr__(self):
         return "{0}(id={1})".format(self.__class__.__name__, repr(self.id))
+
+class SkypeAuthException(SkypeException):
+    """
+    An exception thrown when authentication cannot be completed.
+
+    Generally this means the request should not be retried (e.g. incorrect password), or a cooldown is needed (rate limits).
+    """
+    pass
 
 def getMac256Hash(challenge, appId, key):
     def int32ToHexString(n):
