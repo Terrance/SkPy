@@ -7,10 +7,19 @@ from .conn import SkypeConnection
 from .user import SkypeUser, SkypeContact, SkypeRequest
 from .chat import SkypeSingleChat, SkypeGroupChat
 from .event import SkypeEvent, SkypeTypingEvent, SkypeNewMessageEvent, SkypeEditMessageEvent
-from .util import SkypeApiException, cacheResult, syncState
+from .util import SkypeObj, SkypeApiException, cacheResult, syncState
 
-class Skype(object):
+class Skype(SkypeObj):
+    attrs = ("userId",)
+    """
+    The main Skype instance.  Provides methods for retrieving various other object types.
+    """
     def __init__(self, user=None, pwd=None, tokenFile=None):
+        """
+        Create a new Skype object and corresponding connection.
+
+        All arguments are passed to the SkypeConnection class.
+        """
         self.conn = SkypeConnection(user, pwd, tokenFile)
         self.userId = self.conn.user
     @property
@@ -178,10 +187,6 @@ class Skype(object):
         """
         self.conn("PUT", "{0}/users/{1}/profile/avatar".format(SkypeConnection.API_USER, self.userId),
                   auth=SkypeConnection.Auth.Skype, data=file.read())
-    def __str__(self):
-        return "[{0}]\nUserId: {1}".format(self.__class__.__name__, self.userId)
-    def __repr__(self):
-        return "{0}(userId={1})".format(self.__class__.__name__, repr(self.userId))
 
 class SkypeEventLoop(Skype):
     """

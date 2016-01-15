@@ -9,9 +9,9 @@ import hashlib
 from bs4 import BeautifulSoup
 import requests
 
-from .util import SkypeException, SkypeApiException
+from .util import SkypeObj, SkypeException, SkypeApiException
 
-class SkypeConnection(object):
+class SkypeConnection(SkypeObj):
     """
     The main connection class -- handles all requests to API resources.
 
@@ -24,6 +24,7 @@ class SkypeConnection(object):
         Enum: authentication types.  Skype uses X-SkypeToken, whereas Reg includes RegistrationToken.
         """
         Skype, Authorize, Reg = range(3)
+    attrs = ("user", "tokenFile")
     @staticmethod
     def handle(*codes, **kwargs):
         """
@@ -189,10 +190,6 @@ class SkypeConnection(object):
         elif auth == self.Auth.Reg:
             if "reg" in self.tokenExpiry and datetime.now() >= self.tokenExpiry["reg"]:
                 self.getRegToken()
-    def __str__(self):
-        return "[{0}]\nUser: {1}\nTokenFile: {2}".format(self.__class__.__name__, self.user, self.tokenFile)
-    def __repr__(self):
-        return "{0}(user={1}, tokenFile={2})".format(self.__class__.__name__, repr(self.user), repr(self.tokenFile))
 
 class SkypeEndpoint(object):
     """
