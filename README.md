@@ -44,21 +44,20 @@ If you make too many authentication attempts, the Skype API may temporarily rate
 
 To avoid this, you should reuse the Skype token where possible.  A token only appears to last 24 hours (web.skype.com forces re-authentication after that time), though you can check the expiry with `sk.tokenExpiry`.  Pass a filename as the third argument to the `Skype()` constructor to read and write session information to that file.
 
-## Writing a bot
+## Writing event-processing programs
 
-Create a class that subclasses `SkypeBot`, then override the `onEvent(event)` method to handle incoming messages.
+Make your class a subclass of `SkypeEventLoop`, then override the `onEvent(event)` method to handle incoming messages and other events.
 
 ```python
-import re
-from SkyPy import SkypeBot, SkypeMessageEvent
-class MyBot(SkypeBot):
+from SkyPy import SkypeEventLoop, SkypeNewMessageEvent
+class SkypePing(SkypeEventLoop):
     def __init__(self):
-        super(SkypeBot, self).__init__(username, password)
+        super(SkypePing, self).__init__(username, password)
     def onEvent(self, event):
-        if isinstance(event, SkypeMessageEvent)
+        if isinstance(event, SkypeNewMessageEvent)
           and not event.msg.userId == self.userId:
-            if re.search("ping", event.msg.content, re.IGNORECASE):
-                event.msg.chat.sendMsg("Pong!")
+          and "ping" in event.msg.content:
+            event.msg.chat.sendMsg("Pong!")
 ```
 
-The bot will immediately start processing events, though you can set `loop=False` in the super `__init__` to disable this (in which case call `loop()` when ready).
+Create an instance and call its `loop()` method to start processing events.  For programs with a frontend (e.g. a custom client), you'll likely want to put the event loop in its own thread.

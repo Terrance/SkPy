@@ -182,3 +182,28 @@ class Skype(object):
         return "[{0}]\nUserId: {1}".format(self.__class__.__name__, self.userId)
     def __repr__(self):
         return "{0}(userId={1})".format(self.__class__.__name__, repr(self.userId))
+
+class SkypeEventLoop(Skype):
+    """
+    A skeleton class for producting event processing programs.
+
+    Implementors should override the onEvent(event) method to react to messages and status changes.
+    """
+    def __init__(self, user=None, pwd=None, tokenFile=None, autoAck=True):
+        super(SkypeEventLoop, self).__init__(user, pwd, tokenFile)
+        self.autoAck = autoAck
+    def loop(self):
+        """
+        Handle any incoming events.  If autoAck is set, any 'ackrequired' URLs are automatically called.
+        """
+        while True:
+            try:
+                events = self.getEvents();
+            except requests.ConnectionError:
+                continue
+            for event in events:
+                self.onEvent(event)
+                if self.autoAck:
+                    event.ack()
+    def onEvent(self, event):
+        pass
