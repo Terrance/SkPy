@@ -54,8 +54,8 @@ class SkypePing(SkypeEventLoop):
     def __init__(self):
         super(SkypePing, self).__init__(username, password)
     def onEvent(self, event):
-        if isinstance(event, SkypeNewMessageEvent)
-          and not event.msg.userId == self.userId:
+        if isinstance(event, SkypeNewMessageEvent) \
+          and not event.msg.userId == self.userId \
           and "ping" in event.msg.content:
             event.msg.chat.sendMsg("Pong!")
 ```
