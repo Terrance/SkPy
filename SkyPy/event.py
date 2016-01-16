@@ -2,7 +2,7 @@ from datetime import datetime
 import re
 
 from .conn import SkypeConnection
-from .chat import SkypeMsg
+from .msg import SkypeMsg
 from .util import SkypeObj, noPrefix, userToId, chatToId, initAttrs, convertIds, cacheResult
 
 @initAttrs
