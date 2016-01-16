@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from .conn import SkypeConnection
-from .util import SkypeObj, SkypeApiException, upper, initAttrs, convertIds, cacheResult
+from .util import SkypeObj, SkypeObjs, SkypeApiException, upper, initAttrs, convertIds, cacheResult
 
 @initAttrs
 class SkypeUser(SkypeObj):
@@ -132,7 +132,7 @@ class SkypeContact(SkypeUser):
         """
         self.skype.conn("DELETE", "{0}/users/self/contacts/{1}".format(SkypeConnection.API_USER, self.id))
 
-class SkypeContacts(SkypeObj):
+class SkypeContacts(SkypeObjs):
     """
     A container of contacts, providing caching of user info to reduce API requests.
 
@@ -144,11 +144,8 @@ class SkypeContacts(SkypeObj):
 
     When using key lookups, the individual methods are abstracted -- it uses a), with a fallback of c) for non-contacts.
     """
-    def __init__(self, skype):
-        super(SkypeContacts, self).__init__()
-        self.skype = skype
-        self.synced = False
-        self.cache = {}
+    def __init__(self, skype=None):
+        super(SkypeContacts, self).__init__(skype)
         self.contactIds = []
     def __getitem__(self, key):
         """
@@ -158,28 +155,10 @@ class SkypeContacts(SkypeObj):
 
         If not, retrieve their user object, cache it and return it.
         """
-        if not self.synced:
-            self.sync()
-        if key == self.skype.userId:
-            return self.skype.user
-        return self.cache.get(key) or self.user(key)
-    def __iter__(self):
-        """
-        Create an iterator for all contacts (that is, users in the contact list that are not suggestions).
-        """
-        if not self.synced:
-            self.sync()
-        for id in sorted(self.contactIds):
-            yield self.cache[id]
-    def merge(self, obj):
-        """
-        Add a given contact or user to the cache, or update an existing entry to include more fields.
-        """
-        if obj.id in self.cache:
-            self.cache[obj.id].merge(obj)
-        else:
-            self.cache[obj.id] = obj
-        return self.cache[obj.id]
+        try:
+            return super(SkypeContacts, self).__getitem__(key)
+        except KeyError:
+            return self.skype.user if key == self.skype.userId else self.user(key)
     def sync(self):
         """
         Retrieve all contacts and store them in the cache.

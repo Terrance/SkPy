@@ -159,20 +159,6 @@ def exhaust(fn, init, *args, **kwargs):
             break
     return init
 
-class SkypeException(Exception):
-    """
-    A generic Skype-related exception.
-    """
-    pass
-
-class SkypeApiException(SkypeException):
-    """
-    An exception thrown for errors specific to external API calls.
-
-    Args will usually be of the form (message, response).
-    """
-    pass
-
 class SkypeObj(object):
     """
     A basic Skype-related object.  Holds references to the parent Skype instance, and the raw dict from the API.
@@ -205,11 +191,15 @@ class SkypeObj(object):
         return cls(skype, raw, **cls.rawToFields(raw))
     def merge(self, other):
         """
-        Copy properties from other into self, skipping None values.
+        Copy properties from other into self, skipping None values.  Also merges the raw data.
         """
         for attr in self.attrs:
             if not getattr(other, attr, None) == None:
                 setattr(self, attr, getattr(other, attr))
+        if other.raw:
+            if not self.raw:
+                self.raw = {}
+            self.raw.update(other.raw)
     def __str__(self):
         """
         Pretty print the object, based on the class' attrs parameter.  Produces output something like:
@@ -233,3 +223,50 @@ class SkypeObj(object):
         """
         reprs = ", ".join("{0}={1}".format(k, repr(getattr(self, k))) for k in self.attrs)
         return "{0}({1})".format(self.__class__.__name__, reprs)
+
+class SkypeObjs(SkypeObj):
+    """
+    A basic Skype collection.  Acts as a container for objects of a given type.
+    """
+    def __init__(self, skype=None):
+        super(SkypeObjs, self).__init__(skype)
+        self.synced = False
+        self.cache = {}
+    def __getitem__(self, key):
+        """
+        Provide key lookups for items in the cache.  Subclasses may override this to handle not-yet-cached objects.
+        """
+        if not self.synced:
+            self.sync()
+        return self.cache[key]
+    def __iter__(self):
+        """
+        Create an iterator for all objects (not their keys) in this collection.
+        """
+        if not self.synced:
+            self.sync()
+        for id in sorted(self.cache):
+            yield self.cache[id]
+    def merge(self, obj):
+        """
+        Add a given object to the cache, or update an existing entry to include more fields.
+        """
+        if obj.id in self.cache:
+            self.cache[obj.id].merge(obj)
+        else:
+            self.cache[obj.id] = obj
+        return self.cache[obj.id]
+
+class SkypeException(Exception):
+    """
+    A generic Skype-related exception.
+    """
+    pass
+
+class SkypeApiException(SkypeException):
+    """
+    An exception thrown for errors specific to external API calls.
+
+    Args will usually be of the form (message, response).
+    """
+    pass
