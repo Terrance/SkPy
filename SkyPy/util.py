@@ -64,13 +64,13 @@ def convertIds(*types, **kwargs):
         Retrieve the user referred to in the object.
         """
         userId = getattr(self, field)
-        return self.skype.getContact(userId) or self.skype.getUser(userId)
+        return self.skype.contacts[userId]
     def userObjs(self, field):
         """
         Retrieve all users referred to in the object.
         """
         userIds = getattr(self, field)
-        return ((self.skype.getContact(id) or self.skype.getUser(id)) for id in userIds)
+        return (self.skype.contacts[id] for id in userIds)
     def chatObj(self, field):
         """
         Retrieve the user referred to in the object.

@@ -4,10 +4,10 @@ import datetime
 import requests
 
 from .conn import SkypeConnection
-from .user import SkypeUser, SkypeContact, SkypeRequest
+from .user import SkypeContact, SkypeContacts, SkypeRequest
 from .chat import SkypeSingleChat, SkypeGroupChat
-from .event import SkypeEvent, SkypeTypingEvent, SkypeNewMessageEvent, SkypeEditMessageEvent
-from .util import SkypeObj, SkypeApiException, cacheResult, syncState
+from .event import SkypeEvent
+from .util import SkypeObj, cacheResult, syncState
 
 class Skype(SkypeObj):
     attrs = ("userId",)
@@ -22,6 +22,7 @@ class Skype(SkypeObj):
         """
         self.conn = SkypeConnection(user, pwd, tokenFile)
         self.userId = self.conn.user
+        self.contacts = SkypeContacts(self)
     @property
     @cacheResult
     def user(self):
@@ -31,71 +32,6 @@ class Skype(SkypeObj):
         json = self.conn("GET", "{0}/users/self/profile".format(SkypeConnection.API_USER),
                          auth=SkypeConnection.Auth.Skype).json()
         return SkypeContact.fromRaw(self, json)
-    @property
-    @cacheResult
-    def contacts(self):
-        """
-        Retrieve all contacts for the current user.
-
-        Note that full details on each contact are not provided, this requires a further call to getContact().
-        """
-        contacts = {}
-        for json in self.conn("GET", "{0}/users/{1}/contacts".format(SkypeConnection.API_CONTACTS, self.userId),
-                              auth=SkypeConnection.Auth.Skype).json().get("contacts", []):
-            if not json.get("suggested"):
-                contacts[json.get("id")] = SkypeContact.fromRaw(self, json)
-        contacts[self.userId] = self.user
-        return contacts
-    @cacheResult
-    def getContact(self, id, full=False):
-        """
-        Retrieve a specific contact.  Data from contacts is used if possible, or unless full is set.
-
-        Full details requires an extra API call, and includes fields such as birthday and mood.
-
-        Returns None if the identifier represents a user not in the contact list.
-        """
-        if not full and id in self.contacts:
-            return self.contacts.get(id)
-        try:
-            json = self.conn("GET", "{0}/users/{1}/profile".format(SkypeConnection.API_USER, id),
-                             auth=SkypeConnection.Auth.Skype).json()
-            return SkypeContact.fromRaw(self, json)
-        except SkypeApiException as e:
-            if len(e.args) >= 2 and isinstance(e.args[1], requests.Response) and e.args[1].status_code == 403:
-                # Not a contact, so no permission to retrieve information.
-                return
-            raise
-    @cacheResult
-    def searchUsers(self, query):
-        """
-        Search the Skype Directory for a user.
-        """
-        search = {
-            "keyWord": query,
-            "contactTypes[]": "skype"
-        }
-        json = self.conn("GET", "{0}/search/users/any".format(SkypeConnection.API_USER),
-                         auth=SkypeConnection.Auth.Skype, params=search).json()
-        results = []
-        for obj in json:
-            res = obj.get("ContactCards", {}).get("Skype")
-            # Make result data nesting a bit cleaner.
-            res["Location"] = obj.get("ContactCards", {}).get("CurrentLocation")
-            results.append(res)
-        return results
-    @cacheResult
-    def getUser(self, id):
-        """
-        Get information about a user, without them being a contact.
-
-        Note that it is not possible to distinguish if a contacts exists or not.
-
-        An unregistered identifier produces a profile with only the identifier populated.
-        """
-        json = self.conn("POST", "{0}/users/self/contacts/profiles".format(SkypeConnection.API_USER),
-                         auth=SkypeConnection.Auth.Skype, data={"contacts[]": id}).json()
-        return SkypeUser.fromRaw(self, json[0])
     @syncState
     def getChats(self):
         """
