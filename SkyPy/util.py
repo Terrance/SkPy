@@ -203,6 +203,13 @@ class SkypeObj(object):
         Create a new instance based on the raw properties of an API response.
         """
         return cls(skype, raw, **cls.rawToFields(raw))
+    def merge(self, other):
+        """
+        Copy properties from other into self, skipping None values.
+        """
+        for attr in self.attrs:
+            if not getattr(other, attr, None) == None:
+                setattr(self, attr, getattr(other, attr))
     def __str__(self):
         """
         Pretty print the object, based on the class' attrs parameter.  Produces output something like:
