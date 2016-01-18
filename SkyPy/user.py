@@ -159,6 +159,14 @@ class SkypeContacts(SkypeObjs):
             return super(SkypeContacts, self).__getitem__(key)
         except KeyError:
             return self.skype.user if key == self.skype.userId else self.user(key)
+    def __iter__(self):
+        """
+        Create an iterator for all contacts (that is, authorised users in the current user's list, not the entire cache).
+        """
+        if not self.synced:
+            self.sync()
+        for id in sorted(self.contactIds):
+            yield self.cache[id]
     def sync(self):
         """
         Retrieve all contacts and store them in the cache.
@@ -168,7 +176,7 @@ class SkypeContacts(SkypeObjs):
             self.merge(SkypeContact.fromRaw(self.skype, json))
             if not json.get("suggested"):
                 self.contactIds.append(json.get("id"))
-        self.synced = True
+        super(SkypeContacts, self).sync()
     def contact(self, id):
         """
         Retrieve all details for a specific contact, including fields such as birthday and mood.

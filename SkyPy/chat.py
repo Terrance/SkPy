@@ -3,7 +3,7 @@ from datetime import datetime
 
 from .conn import SkypeConnection
 from .msg import SkypeMsg, SkypeContactMsg, SkypeFileMsg, SkypeImageMsg
-from .util import SkypeObj, noPrefix, initAttrs, convertIds, cacheResult, syncState
+from .util import SkypeObj, SkypeObjs, noPrefix, initAttrs, convertIds, cacheResult, syncState
 
 @initAttrs
 class SkypeChat(SkypeObj):
@@ -181,7 +181,7 @@ class SkypeGroupChat(SkypeChat):
         fields = super(SkypeGroupChat, cls).rawToFields(raw)
         props = raw.get("properties", {})
         userIds = []
-        for obj in raw.get("members"):
+        for obj in raw.get("members", []):
             userIds.append(noPrefix(obj.get("id")))
         fields.update({
             "topic": raw.get("threadProperties", {}).get("topic"),
@@ -243,3 +243,76 @@ class SkypeGroupChat(SkypeChat):
         If public joining is disabled, you may need to be re-invited in order to return.
         """
         self.removeMember(self.skype.userId)
+
+class SkypeChats(SkypeObjs):
+    """
+    A container of conversations, providing caching of user info to reduce API requests.
+    """
+    def __getitem__(self, key):
+        """
+        Provide key lookups for Skype conversation IDs.
+
+        If a group conversation, but thread information has not been looked up, do that first.
+        """
+        try:
+            return super(SkypeChats, self).__getitem__(key)
+        except KeyError:
+            return self.chat(key)
+    @syncState
+    def recent(self):
+        """
+        Retrieve a list of recent conversations, and store them in the cache.
+
+        Each conversation is only retrieved once, so subsequent calls may exhaust the set and return an empty list.
+        """
+        url = "{0}/users/ME/conversations".format(self.skype.conn.msgsHost)
+        params = {
+            "startTime": 0,
+            "view": "msnp24Equivalent",
+            "targetType": "Passport|Skype|Lync|Thread"
+        }
+        def fetch(url, params):
+            resp = self.skype.conn("GET", url, auth=SkypeConnection.Auth.Reg, params=params).json()
+            return resp, resp.get("_metadata", {}).get("syncState")
+        def process(resp):
+            chats = {}
+            for json in resp.get("conversations", []):
+                cls = SkypeSingleChat
+                if "threadProperties" in json:
+                    info = self.skype.conn("GET", "{0}/threads/{1}".format(self.skype.conn.msgsHost, json.get("id")),
+                                           auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
+                    json.update(info)
+                    cls = SkypeGroupChat
+                chats[json.get("id")] = self.merge(cls.fromRaw(self.skype, json))
+            return chats
+        return url, params, fetch, process
+    def chat(self, id):
+        """
+        Get a single conversation by identifier.
+        """
+        json = self.skype.conn("GET", "{0}/users/ME/conversations/{1}".format(self.skype.conn.msgsHost, id),
+                               auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
+        cls = SkypeSingleChat
+        if "threadProperties" in json:
+            info = self.skype.conn("GET", "{0}/threads/{1}".format(self.skype.conn.msgsHost, json.get("id")),
+                                   auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
+            json.update(info)
+            cls = SkypeGroupChat
+        return self.merge(cls.fromRaw(self.skype, json))
+    def create(self, members=[], admins=[]):
+        """
+        Create a new group chat with the given users.
+        """
+        members = [{
+            "id": "8:{0}".format(self.userId),
+            "role": "Admin"
+        }] + [{
+            "id": "8:{0}".format(id),
+            "role": "User"
+        } for id in members if id not in admins] + [{
+            "id": "8:{0}".format(id),
+            "role": "Admin"
+        } for id in admins]
+        resp = self.skype.conn("POST", "{0}/threads".format(self.skype.conn.msgsHost),
+                               auth=SkypeConnection.Auth.Reg, json={"members": members})
+        return self.chat(resp.headers["Location"].rsplit("/", 1)[1])

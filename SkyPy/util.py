@@ -247,6 +247,11 @@ class SkypeObjs(SkypeObj):
             self.sync()
         for id in sorted(self.cache):
             yield self.cache[id]
+    def sync(self):
+        """
+        Subclasses can implement this method to retrieve an initial set of objects.
+        """
+        self.synced = True
     def merge(self, obj):
         """
         Add a given object to the cache, or update an existing entry to include more fields.
