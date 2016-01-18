@@ -299,20 +299,23 @@ class SkypeChats(SkypeObjs):
             json.update(info)
             cls = SkypeGroupChat
         return self.merge(cls.fromRaw(self.skype, json))
-    def create(self, members=[], admins=[]):
+    def create(self, members=(), admins=()):
         """
         Create a new group chat with the given users.
+
+        The current user is automatically an admin.  Note that any other admin IDs must be present in the member list.
         """
-        members = [{
-            "id": "8:{0}".format(self.userId),
+        memberObjs = [{
+            "id": "8:{0}".format(self.skype.userId),
             "role": "Admin"
-        }] + [{
-            "id": "8:{0}".format(id),
-            "role": "User"
-        } for id in members if id not in admins] + [{
-            "id": "8:{0}".format(id),
-            "role": "Admin"
-        } for id in admins]
+        }]
+        for id in members:
+            if id == self.skype.userId:
+                continue
+            memberObjs.append({
+                "id": "8:{0}".format(id),
+                "role": "Admin" if id in admins else "User"
+            })
         resp = self.skype.conn("POST", "{0}/threads".format(self.skype.conn.msgsHost),
-                               auth=SkypeConnection.Auth.Reg, json={"members": members})
+                               auth=SkypeConnection.Auth.Reg, json={"members": memberObjs})
         return self.chat(resp.headers["Location"].rsplit("/", 1)[1])

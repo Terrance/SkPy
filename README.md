@@ -20,9 +20,7 @@ sk = Skype(username, password, tokenFile) # connect to Skype
 
 sk.user # you
 sk.contacts # your contacts
-sk.getChats() # recent conversations
-sk.getRequests() # contact requests
-sk.getEvents() # presences, new messages etc.
+sk.chats # your conversations
 
 buddychat = sk.contacts[buddyname].chat # 1-to-1 conversation
 groupchat = sk.createChat() # new group conversation
@@ -36,7 +34,7 @@ A full class reference can be found [in the wiki](https://github.com/OllieTerran
 
 ## State-synced methods
 
-Some APIs, such as recent conversations or messages, include a state URL for the next query -- this allows you to fetch the next chunk of data without resending any duplicates.  Wrapper methods for APIs that support state syncing (e.g. `Skype.getChats()`) automatically handle this for you.
+Some APIs, such as recent conversations or messages, include a state URL for the next query -- this allows you to fetch the next chunk of data without resending any duplicates.  Wrapper methods for APIs that support state syncing (e.g. `SkypeChat.getMsgs()`) automatically handle this for you.
 
 ## Rate limiting and session reuse
 

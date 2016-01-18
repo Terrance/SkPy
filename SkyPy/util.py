@@ -63,19 +63,17 @@ def convertIds(*types, **kwargs):
         """
         Retrieve the user referred to in the object.
         """
-        userId = getattr(self, field)
-        return self.skype.contacts[userId]
+        return self.skype.contacts[getattr(self, field)]
     def userObjs(self, field):
         """
         Retrieve all users referred to in the object.
         """
-        userIds = getattr(self, field)
-        return (self.skype.contacts[id] for id in userIds)
+        return (self.skype.contacts[id] for id in getattr(self, field))
     def chatObj(self, field):
         """
         Retrieve the user referred to in the object.
         """
-        return self.skype.getChat(getattr(self, field))
+        return self.skype.chats[getattr(self, field)]
     def attach(cls, method, field, idField):
         """
         Generate the property object and attach it to the class.

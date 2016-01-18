@@ -5,7 +5,7 @@ import requests
 
 from .conn import SkypeConnection
 from .user import SkypeContact, SkypeContacts, SkypeRequest
-from .chat import SkypeSingleChat, SkypeGroupChat
+from .chat import SkypeSingleChat, SkypeGroupChat, SkypeChats
 from .event import SkypeEvent
 from .util import SkypeObj, cacheResult, syncState
 
@@ -23,6 +23,7 @@ class Skype(SkypeObj):
         self.conn = SkypeConnection(user, pwd, tokenFile)
         self.userId = self.conn.user
         self.contacts = SkypeContacts(self)
+        self.chats = SkypeChats(self)
     @property
     @cacheResult
     def user(self):
@@ -32,72 +33,6 @@ class Skype(SkypeObj):
         json = self.conn("GET", "{0}/users/self/profile".format(SkypeConnection.API_USER),
                          auth=SkypeConnection.Auth.Skype).json()
         return SkypeContact.fromRaw(self, json)
-    @syncState
-    def getChats(self):
-        """
-        Retrieve a list of recent conversations.
-
-        Each conversation is only retrieved once, so subsequent calls may exhaust the set and return an empty list.
-        """
-        url = "{0}/users/ME/conversations".format(self.conn.msgsHost)
-        params = {
-            "startTime": 0,
-            "view": "msnp24Equivalent",
-            "targetType": "Passport|Skype|Lync|Thread"
-        }
-        def fetch(url, params):
-            resp = self.conn("GET", url, auth=SkypeConnection.Auth.Reg, params=params).json()
-            return resp, resp.get("_metadata", {}).get("syncState")
-        def process(resp):
-            chats = {}
-            for json in resp.get("conversations", []):
-                chats[json.get("id")] = self.getChat(json.get("id"), json)
-            return chats
-        return url, params, fetch, process
-    @cacheResult
-    def getChat(self, id, json=None):
-        """
-        Get a single conversation by identifier.
-
-        If the first API call has already been made (e.g. getChats()), use raw and skip it here.
-        """
-        if not json:
-            json = self.conn("GET", "{0}/users/ME/conversations/{1}".format(self.conn.msgsHost, id),
-                             auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
-        if "threadProperties" in json:
-            info = self.conn("GET", "{0}/threads/{1}".format(self.conn.msgsHost, json.get("id")),
-                             auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
-            json.update(info)
-            return SkypeGroupChat.fromRaw(self, json)
-        else:
-            return SkypeSingleChat.fromRaw(self, json)
-    def createChat(self, members=[], admins=[]):
-        """
-        Create a new group chat with the given users.
-        """
-        members = [{
-            "id": "8:{0}".format(self.userId),
-            "role": "Admin"
-        }] + [{
-            "id": "8:{0}".format(id),
-            "role": "User"
-        } for id in members if id not in admins] + [{
-            "id": "8:{0}".format(id),
-            "role": "Admin"
-        } for id in admins]
-        resp = self.conn("POST", "{0}/threads".format(self.conn.msgsHost),
-                         auth=SkypeConnection.Auth.Reg, json={"members": members})
-        return self.getChat(resp.headers["Location"].rsplit("/", 1)[1])
-    def getRequests(self):
-        """
-        Retrieve a list of pending contact requests.
-        """
-        json = self.conn("GET", "{0}/users/self/contacts/auth-request".format(SkypeConnection.API_USER),
-                         auth=SkypeConnection.Auth.Skype).json()
-        requests = []
-        for obj in json:
-            requests.append(SkypeRequest.fromRaw(self, obj))
-        return requests
     @SkypeConnection.handle(404, regToken=True)
     def getEvents(self):
         """

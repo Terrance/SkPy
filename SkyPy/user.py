@@ -70,7 +70,7 @@ class SkypeUser(SkypeObj):
         """
         Return the conversation object for this user.
         """
-        return self.skype.getChat("8:" + self.id)
+        return self.skype.chats["8:" + self.id]
     def invite(self, greeting=None):
         """
         Send the user a contact request.
@@ -221,6 +221,16 @@ class SkypeContacts(SkypeObjs):
             res["Location"] = obj.get("ContactCards", {}).get("CurrentLocation")
             results.append(res)
         return results
+    def requests(self):
+        """
+        Retrieve a list of pending contact requests.
+        """
+        json = self.skype.conn("GET", "{0}/users/self/contacts/auth-request".format(SkypeConnection.API_USER),
+                               auth=SkypeConnection.Auth.Skype).json()
+        requests = []
+        for obj in json:
+            requests.append(SkypeRequest.fromRaw(self.skype, obj))
+        return requests
 
 @initAttrs
 @convertIds("user")
@@ -236,10 +246,10 @@ class SkypeRequest(SkypeObj):
             "greeting": raw.get("greeting")
         }
     def accept(self):
-        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/accept".format(SkypeConnection.API_USER, self.userId),
-                        auth=SkypeConnection.Auth.Skype)
-        self.skype.conn("PUT", "{0}/users/ME/contacts/8:{1}".format(self.skype.conn.msgsHost, self.userId),
+        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/accept" \
+                               .format(SkypeConnection.API_USER, self.skype.userId), auth=SkypeConnection.Auth.Skype)
+        self.skype.conn("PUT", "{0}/users/ME/contacts/8:{1}".format(self.skype.conn.msgsHost, self.skype.userId),
                         auth=SkypeConnection.Auth.Reg)
     def reject(self):
-        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/decline".format(SkypeConnection.API_USER, self.userId),
-                        auth=SkypeConnection.Auth.Skype)
+        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/decline" \
+                               .format(SkypeConnection.API_USER, self.skype.userId), auth=SkypeConnection.Auth.Skype)
