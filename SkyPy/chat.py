@@ -170,23 +170,28 @@ class SkypeSingleChat(SkypeChat):
         return [self.userId]
 
 @initAttrs
-@convertIds("users", user=("creator",))
+@convertIds("users", user=("creator",), users=("admin",))
 class SkypeGroupChat(SkypeChat):
     """
     A group conversation within Skype.  Compared to single chats, groups have a topic and participant list.
     """
-    attrs = SkypeChat.attrs + ("topic", "creatorId", "userIds", "open", "history", "picture")
+    attrs = SkypeChat.attrs + ("topic", "creatorId", "userIds", "adminIds", "open", "history", "picture")
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeGroupChat, cls).rawToFields(raw)
         props = raw.get("properties", {})
         userIds = []
+        adminIds = []
         for obj in raw.get("members", []):
-            userIds.append(noPrefix(obj.get("id")))
+            id = noPrefix(obj.get("id"))
+            userIds.append(id)
+            if obj.get("role") == "Admin":
+                adminIds.append(id)
         fields.update({
             "topic": raw.get("threadProperties", {}).get("topic"),
             "creatorId": noPrefix(props.get("creator")),
             "userIds": userIds,
+            "adminIds": adminIds,
             "open": props.get("joiningenabled", "") == "true",
             "history": props.get("historydisclosed", "") == "true",
             "picture": props.get("picture", "")[4:] or None
@@ -230,12 +235,20 @@ class SkypeGroupChat(SkypeChat):
         """
         self.skype.conn("PUT", "{0}/threads/{1}/members/8:{2}".format(self.skype.conn.msgsHost, self.id, id),
                         auth=SkypeConnection.Auth.Reg, json={"role": "Admin" if admin else "User"})
+        if id not in self.userIds:
+            self.userIds.append(id)
+        if admin and id not in self.adminIds:
+            self.adminIds.append(id)
+        elif not admin and id in self.adminIds:
+            self.adminIds.remove(id)
     def removeMember(self, id):
         """
         Remove a user from the conversation.
         """
         self.skype.conn("DELETE", "{0}/threads/{1}/members/8:{2}".format(self.skype.conn.msgsHost, self.id, id),
                         auth=SkypeConnection.Auth.Reg)
+        if id in self.userIds:
+            self.userIds.remove(id)
     def leave(self):
         """
         Leave the conversation.  You will lose any admin rights.

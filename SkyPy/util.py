@@ -92,7 +92,7 @@ def convertIds(*types, **kwargs):
         for field in user:
             attach(cls, userObj, field, "{0}Id".format(field))
         for field in users:
-            attach(cls, userObjs, "{0}s.".format(field), "{0}Ids".format(field))
+            attach(cls, userObjs, "{0}s".format(field), "{0}Ids".format(field))
         for field in chat:
             attach(cls, chatObj, field, "{0}Id".format(field))
         return cls
