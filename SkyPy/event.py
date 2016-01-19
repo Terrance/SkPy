@@ -51,7 +51,7 @@ class SkypeEvent(SkypeObj):
         """
         url = self.raw.get("resource", {}).get("ackrequired")
         if url:
-            self.skype.conn("POST", url, auth=SkypeConnection.Auth.Reg)
+            self.skype.conn("POST", url, auth=SkypeConnection.Auth.RegToken)
 
 @initAttrs
 @convertIds("user")
@@ -161,7 +161,7 @@ class SkypeChatUpdateEvent(SkypeEvent):
         Use the consumption horizon to mark the conversation as up-to-date.
         """
         self.skype.conn("PUT", "{0}/users/ME/conversations/{1}/properties".format(self.skype.conn.msgsHost, self.chatId),
-                        auth=SkypeConnection.Auth.Reg, params={"name": "consumptionhorizon"},
+                        auth=SkypeConnection.Auth.RegToken, params={"name": "consumptionhorizon"},
                         json={"consumptionhorizon": self.horizon})
 
 @initAttrs

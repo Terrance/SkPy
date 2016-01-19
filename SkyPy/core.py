@@ -31,7 +31,7 @@ class Skype(SkypeObj):
         Retrieve the current user.
         """
         json = self.conn("GET", "{0}/users/self/profile".format(SkypeConnection.API_USER),
-                         auth=SkypeConnection.Auth.Skype).json()
+                         auth=SkypeConnection.Auth.SkypeToken).json()
         return SkypeContact.fromRaw(self, json)
     @SkypeConnection.handle(404, regToken=True)
     def getEvents(self):
@@ -51,13 +51,13 @@ class Skype(SkypeObj):
         Set the user's presence (either Online or Hidden).
         """
         self.conn("PUT", "{0}/users/ME/presenceDocs/messagingService".format(self.conn.msgsHost),
-                  auth=SkypeConnection.Auth.Reg, json={"status": "Online" if online else "Hidden"})
+                  auth=SkypeConnection.Auth.RegToken, json={"status": "Online" if online else "Hidden"})
     def setAvatar(self, file):
         """
         Update the profile picture for the current user.
         """
         self.conn("PUT", "{0}/users/{1}/profile/avatar".format(SkypeConnection.API_USER, self.userId),
-                  auth=SkypeConnection.Auth.Skype, data=file.read())
+                  auth=SkypeConnection.Auth.SkypeToken, data=file.read())
 
 class SkypeEventLoop(Skype):
     """

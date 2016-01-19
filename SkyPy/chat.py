@@ -34,7 +34,7 @@ class SkypeChat(SkypeObj):
             "targetType": "Passport|Skype|Lync|Thread"
         }
         def fetch(url, params):
-            resp = self.skype.conn("GET", url, auth=SkypeConnection.Auth.Reg, params=params).json()
+            resp = self.skype.conn("GET", url, auth=SkypeConnection.Auth.RegToken, params=params).json()
             return resp, resp.get("_metadata", {}).get("syncState")
         def process(resp):
             msgs = []
@@ -70,7 +70,7 @@ class SkypeChat(SkypeObj):
                 "skypeemoteoffset": len(name) + 1
             })
         self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
-                        auth=SkypeConnection.Auth.Reg, json=msgRaw)
+                        auth=SkypeConnection.Auth.RegToken, json=msgRaw)
         timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
         editId = msgId if edit else None
         return SkypeMsg(self.skype, id=timeId, type=msgType, time=timeStr, editId=editId,
@@ -113,7 +113,7 @@ class SkypeChat(SkypeObj):
             "content": body
         }
         self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
-                        auth=SkypeConnection.Auth.Reg, json=msg)
+                        auth=SkypeConnection.Auth.RegToken, json=msg)
         timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
         if image:
             return SkypeImageMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr,
@@ -138,7 +138,7 @@ class SkypeChat(SkypeObj):
             "content": """<contacts><c t="s" s="{0}" f="{1}"/></contacts>""".format(contact.id, contact.name)
         }
         self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
-                        auth=SkypeConnection.Auth.Reg, json=msg)
+                        auth=SkypeConnection.Auth.RegToken, json=msg)
         timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
         return SkypeContactMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"],
                                time=timeStr, userId=self.skype.user.id, chatId=self.id,
@@ -148,7 +148,7 @@ class SkypeChat(SkypeObj):
         Delete the conversation and all message history.
         """
         self.skype.conn("DELETE", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
-                        auth=SkypeConnection.Auth.Reg)
+                        auth=SkypeConnection.Auth.RegToken)
 
 @initAttrs
 @convertIds("user", "users")
@@ -205,20 +205,20 @@ class SkypeGroupChat(SkypeChat):
             "threadId": self.id
         }
         return self.skype.conn("POST", "{0}/threads".format(SkypeConnection.API_SCHEDULE),
-                               auth=SkypeConnection.Auth.Skype, json=query).json()["JoinUrl"]
+                               auth=SkypeConnection.Auth.SkypeToken, json=query).json()["JoinUrl"]
     def setTopic(self, topic):
         """
         Update the topic message.  An empty string clears the topic.
         """
         self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id),
-                        auth=SkypeConnection.Auth.Reg, params={"name": "topic"}, json={"topic": topic})
+                        auth=SkypeConnection.Auth.RegToken, params={"name": "topic"}, json={"topic": topic})
         self.topic = topic
     def setOpen(self, open):
         """
         Enable or disable public join links.
         """
         self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id),
-                        auth=SkypeConnection.Auth.Reg, params={"name": "joiningenabled"},
+                        auth=SkypeConnection.Auth.RegToken, params={"name": "joiningenabled"},
                         json={"joiningenabled": open})
         self.open = open
     def setHistory(self, history):
@@ -226,7 +226,7 @@ class SkypeGroupChat(SkypeChat):
         Enable or disable conversation history.
         """
         self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id),
-                        auth=SkypeConnection.Auth.Reg, params={"name": "historydisclosed"},
+                        auth=SkypeConnection.Auth.RegToken, params={"name": "historydisclosed"},
                         json={"historydisclosed": history})
         self.history = history
     def addMember(self, id, admin=False):
@@ -234,7 +234,7 @@ class SkypeGroupChat(SkypeChat):
         Add a user to the conversation, or update their user/admin status.
         """
         self.skype.conn("PUT", "{0}/threads/{1}/members/8:{2}".format(self.skype.conn.msgsHost, self.id, id),
-                        auth=SkypeConnection.Auth.Reg, json={"role": "Admin" if admin else "User"})
+                        auth=SkypeConnection.Auth.RegToken, json={"role": "Admin" if admin else "User"})
         if id not in self.userIds:
             self.userIds.append(id)
         if admin and id not in self.adminIds:
@@ -246,7 +246,7 @@ class SkypeGroupChat(SkypeChat):
         Remove a user from the conversation.
         """
         self.skype.conn("DELETE", "{0}/threads/{1}/members/8:{2}".format(self.skype.conn.msgsHost, self.id, id),
-                        auth=SkypeConnection.Auth.Reg)
+                        auth=SkypeConnection.Auth.RegToken)
         if id in self.userIds:
             self.userIds.remove(id)
     def leave(self):
@@ -285,7 +285,7 @@ class SkypeChats(SkypeObjs):
             "targetType": "Passport|Skype|Lync|Thread"
         }
         def fetch(url, params):
-            resp = self.skype.conn("GET", url, auth=SkypeConnection.Auth.Reg, params=params).json()
+            resp = self.skype.conn("GET", url, auth=SkypeConnection.Auth.RegToken, params=params).json()
             return resp, resp.get("_metadata", {}).get("syncState")
         def process(resp):
             chats = {}
@@ -293,7 +293,7 @@ class SkypeChats(SkypeObjs):
                 cls = SkypeSingleChat
                 if "threadProperties" in json:
                     info = self.skype.conn("GET", "{0}/threads/{1}".format(self.skype.conn.msgsHost, json.get("id")),
-                                           auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
+                                           auth=SkypeConnection.Auth.RegToken, params={"view": "msnp24Equivalent"}).json()
                     json.update(info)
                     cls = SkypeGroupChat
                 chats[json.get("id")] = self.merge(cls.fromRaw(self.skype, json))
@@ -304,11 +304,11 @@ class SkypeChats(SkypeObjs):
         Get a single conversation by identifier.
         """
         json = self.skype.conn("GET", "{0}/users/ME/conversations/{1}".format(self.skype.conn.msgsHost, id),
-                               auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
+                               auth=SkypeConnection.Auth.RegToken, params={"view": "msnp24Equivalent"}).json()
         cls = SkypeSingleChat
         if "threadProperties" in json:
             info = self.skype.conn("GET", "{0}/threads/{1}".format(self.skype.conn.msgsHost, json.get("id")),
-                                   auth=SkypeConnection.Auth.Reg, params={"view": "msnp24Equivalent"}).json()
+                                   auth=SkypeConnection.Auth.RegToken, params={"view": "msnp24Equivalent"}).json()
             json.update(info)
             cls = SkypeGroupChat
         return self.merge(cls.fromRaw(self.skype, json))
@@ -330,5 +330,5 @@ class SkypeChats(SkypeObjs):
                 "role": "Admin" if id in admins else "User"
             })
         resp = self.skype.conn("POST", "{0}/threads".format(self.skype.conn.msgsHost),
-                               auth=SkypeConnection.Auth.Reg, json={"members": memberObjs})
+                               auth=SkypeConnection.Auth.RegToken, json={"members": memberObjs})
         return self.chat(resp.headers["Location"].rsplit("/", 1)[1])

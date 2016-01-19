@@ -23,7 +23,7 @@ class SkypeConnection(SkypeObj):
         """
         Enum: authentication types.  Skype uses X-SkypeToken, whereas Reg includes RegistrationToken.
         """
-        Skype, Authorize, Reg = range(3)
+        SkypeToken, Authorize, RegToken = range(3)
     attrs = ("user", "tokenFile")
     @staticmethod
     def handle(*codes, **kwargs):
@@ -105,11 +105,11 @@ class SkypeConnection(SkypeObj):
         self.verifyToken(auth)
         if not headers:
             headers = {}
-        if auth == self.Auth.Skype:
+        if auth == self.Auth.SkypeToken:
             headers["X-SkypeToken"] = self.tokens["skype"]
         elif auth == self.Auth.Authorize:
             headers["Authorization"] = "skype_token {0}".format(self.tokens["skype"])
-        elif auth == self.Auth.Reg:
+        elif auth == self.Auth.RegToken:
             headers["RegistrationToken"] = self.tokens["reg"]
         resp = requests.request(method, url, headers=headers, **kwargs)
         if resp.status_code not in codes:
@@ -153,7 +153,7 @@ class SkypeConnection(SkypeObj):
         """
         Acquire a registration token.  See getMac256Hash(...) for the hash generation.
         """
-        self.verifyToken(self.Auth.Skype)
+        self.verifyToken(self.Auth.SkypeToken)
         secs = int(time.time())
         hash = getMac256Hash(str(secs), "msmsgs@msnmsgr.com", "Q1P7W2E4J9R8U3S5")
         endpointResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), codes=[201, 301], headers={
@@ -182,12 +182,12 @@ class SkypeConnection(SkypeObj):
         """
         Ensure the authentication token for the given auth method is still valid.
         """
-        if auth in (self.Auth.Skype, self.Auth.Authorize):
+        if auth in (self.Auth.SkypeToken, self.Auth.Authorize):
             if "skype" in self.tokenExpiry and datetime.now() >= self.tokenExpiry["skype"]:
                 if not hasattr(self, "getSkypeToken"):
                     raise SkypeException("Skype token expired, and no password specified")
                 self.getSkypeToken()
-        elif auth == self.Auth.Reg:
+        elif auth == self.Auth.RegToken:
             if "reg" in self.tokenExpiry and datetime.now() >= self.tokenExpiry["reg"]:
                 self.getRegToken()
 
@@ -213,7 +213,7 @@ class SkypeEndpoint(object):
         The timeout specifies the maximum amount of time for the endpoint to stay active unless pinged again.
         """
         self.conn("POST", "{0}/users/ME/endpoints/{1}/active".format(self.conn.msgsHost, self.id),
-                  auth=SkypeConnection.Auth.Reg, json={"timeout": timeout})
+                  auth=SkypeConnection.Auth.RegToken, json={"timeout": timeout})
     def subscribe(self):
         """
         Subscribe to contact and conversation events.  These are accessible through Skype.getEvents().
@@ -229,7 +229,7 @@ class SkypeEndpoint(object):
             "channelType": "httpLongPoll"
         }
         self.conn("POST", "{0}/users/ME/endpoints/{1}/subscriptions".format(self.conn.msgsHost, self.id),
-                  auth=SkypeConnection.Auth.Reg, json=meta)
+                  auth=SkypeConnection.Auth.RegToken, json=meta)
         self.subscribed = True
     def getEvents(self):
         """
@@ -243,7 +243,7 @@ class SkypeEndpoint(object):
             self.subscribe()
         events = []
         return self.conn("POST", "{0}/users/ME/endpoints/{1}/subscriptions/0/poll".format(self.conn.msgsHost, self.id),
-                         auth=SkypeConnection.Auth.Reg).json().get("eventMessages", [])
+                         auth=SkypeConnection.Auth.RegToken).json().get("eventMessages", [])
     def __str__(self):
         return "[{0}]\nId: {1}".format(self.__class__.__name__, self.id)
     def __repr__(self):

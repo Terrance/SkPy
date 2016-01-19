@@ -172,7 +172,7 @@ class SkypeContacts(SkypeObjs):
         Retrieve all contacts and store them in the cache.
         """
         for json in self.skype.conn("GET", "{0}/users/{1}/contacts".format(SkypeConnection.API_CONTACTS, self.skype.userId),
-                                    auth=SkypeConnection.Auth.Skype).json().get("contacts", []):
+                                    auth=SkypeConnection.Auth.SkypeToken).json().get("contacts", []):
             self.merge(SkypeContact.fromRaw(self.skype, json))
             if not json.get("suggested"):
                 self.contactIds.append(json.get("id"))
@@ -183,7 +183,7 @@ class SkypeContacts(SkypeObjs):
         """
         try:
             json = self.skype.conn("GET", "{0}/users/{1}/profile".format(SkypeConnection.API_USER, id),
-                                   auth=SkypeConnection.Auth.Skype).json()
+                                   auth=SkypeConnection.Auth.SkypeToken).json()
             if json.get("id") not in self.contactIds:
                 self.contactIds.append(json.get("id"))
             return self.merge(SkypeContact.fromRaw(self.skype, json))
@@ -201,7 +201,7 @@ class SkypeContacts(SkypeObjs):
         An unregistered identifier produces a profile with only the identifier populated.
         """
         json = self.skype.conn("POST", "{0}/users/self/contacts/profiles".format(SkypeConnection.API_USER),
-                               auth=SkypeConnection.Auth.Skype, data={"contacts[]": id}).json()
+                               auth=SkypeConnection.Auth.SkypeToken, data={"contacts[]": id}).json()
         return self.merge(SkypeUser.fromRaw(self.skype, json[0]))
     @cacheResult
     def search(self, query):
@@ -213,7 +213,7 @@ class SkypeContacts(SkypeObjs):
             "contactTypes[]": "skype"
         }
         json = self.skype.conn("GET", "{0}/search/users/any".format(SkypeConnection.API_USER),
-                               auth=SkypeConnection.Auth.Skype, params=search).json()
+                               auth=SkypeConnection.Auth.SkypeToken, params=search).json()
         results = []
         for obj in json:
             res = obj.get("ContactCards", {}).get("Skype")
@@ -226,7 +226,7 @@ class SkypeContacts(SkypeObjs):
         Retrieve a list of pending contact requests.
         """
         json = self.skype.conn("GET", "{0}/users/self/contacts/auth-request".format(SkypeConnection.API_USER),
-                               auth=SkypeConnection.Auth.Skype).json()
+                               auth=SkypeConnection.Auth.SkypeToken).json()
         requests = []
         for obj in json:
             requests.append(SkypeRequest.fromRaw(self.skype, obj))
@@ -247,9 +247,9 @@ class SkypeRequest(SkypeObj):
         }
     def accept(self):
         self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/accept" \
-                               .format(SkypeConnection.API_USER, self.skype.userId), auth=SkypeConnection.Auth.Skype)
+                               .format(SkypeConnection.API_USER, self.skype.userId), auth=SkypeConnection.Auth.SkypeToken)
         self.skype.conn("PUT", "{0}/users/ME/contacts/8:{1}".format(self.skype.conn.msgsHost, self.skype.userId),
-                        auth=SkypeConnection.Auth.Reg)
+                        auth=SkypeConnection.Auth.RegToken)
     def reject(self):
         self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/decline" \
-                               .format(SkypeConnection.API_USER, self.skype.userId), auth=SkypeConnection.Auth.Skype)
+                               .format(SkypeConnection.API_USER, self.skype.userId), auth=SkypeConnection.Auth.SkypeToken)
