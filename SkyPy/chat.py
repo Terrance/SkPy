@@ -116,17 +116,19 @@ class SkypeChat(SkypeObj):
                         auth=SkypeConnection.Auth.RegToken, json=msg)
         timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
         if image:
-            return SkypeImageMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr,
-                                 userId=self.skype.user.id, chatId=self.id, content=msg["content"], fileName=name,
-                                 fileUrlFull="https://api.asm.skype.com/v1/objects/{0}".format(objId),
-                                 fileUrlThumb="https://api.asm.skype.com/v1/objects/{0}/views/imgtl".format(objId),
-                                 fileUrlView="https://api.asm.skype.com/s/i?{0}".format(objId))
+            msgCls = SkypeImageMsg
+            msgFile = SkypeFileMsg.File(self.skype, name=name,
+                                        urlFull="https://api.asm.skype.com/v1/objects/{0}".format(objId),
+                                        urlThumb="https://api.asm.skype.com/v1/objects/{0}/views/imgtl".format(objId),
+                                        urlView="https://api.asm.skype.com/s/i?{0}".format(objId))
         else:
-            return SkypeFileMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr,
-                                userId=self.skype.user.id, chatId=self.id, content=msg["content"], fileName=name,
-                                fileSize=size, fileUrlFull="https://api.asm.skype.com/v1/objects/{0}".format(objId),
-                                fileUrlThumb="https://api.asm.skype.com/v1/objects/{0}/views/thumbnail".format(objId),
-                                fileUrlView="https://login.skype.com/login/sso?go=webclient.xmm&docid={0}".format(objId))
+            msgCls = SkypeFileMsg
+            msgFile = SkypeFileMsg.File(self.skype, name=name, size=size,
+                                        urlFull="https://api.asm.skype.com/v1/objects/{0}".format(objId),
+                                        urlThumb="https://api.asm.skype.com/v1/objects/{0}/views/thumbnail".format(objId),
+                                        urlView="https://login.skype.com/login/sso?go=webclient.xmm&docid={0}".format(objId))
+        return msgCls(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr,
+                      userId=self.skype.user.id, chatId=self.id, content=msg["content"], file=msgFile)
     def sendContact(self, contact):
         """
         Share a contact with the conversation.

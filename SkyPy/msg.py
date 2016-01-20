@@ -119,20 +119,24 @@ class SkypeFileMsg(SkypeMsg):
     """
     A message containing a file shared in a conversation.
     """
-    attrs = SkypeMsg.attrs + ("fileName", "fileSize", "fileUrlFull", "fileUrlThumb", "fileUrlView")
+    @initAttrs
+    class File(SkypeObj):
+        attrs = ("name", "size", "urlFull", "urlThumb", "urlView")
+    attrs = SkypeMsg.attrs + ("file",)
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeFileMsg, cls).rawToFields(raw)
         # BeautifulSoup converts tag names to lower case, and find() is case-sensitive.
         file = BeautifulSoup(raw.get("content"), "html.parser").find("uriobject")
         if file:
-            fields.update({
-                "fileName": (file.find("originalname") or {}).get("v"),
-                "fileSize": (file.find("filesize") or {}).get("v"),
-                "fileUrlFull": file.get("uri"),
-                "fileUrlThumb": file.get("url_thumbnail"),
-                "fileUrlView": (file.find("a") or {}).get("href")
-            })
+            fileFields = {
+                "name": (file.find("originalname") or {}).get("v"),
+                "size": (file.find("filesize") or {}).get("v"),
+                "urlFull": file.get("uri"),
+                "urlThumb": file.get("url_thumbnail"),
+                "urlView": (file.find("a") or {}).get("href")
+            }
+            fields["file"] = SkypeFileMsg.File(**fileFields)
         return fields
     @property
     @cacheResult
@@ -140,7 +144,7 @@ class SkypeFileMsg(SkypeMsg):
         """
         Retrieve the contents of the file as a byte string.
         """
-        return self.skype.conn("GET", "{0}/views/original".format(self.fileUrlFull),
+        return self.skype.conn("GET", "{0}/views/original".format(self.file.urlFull),
                                auth=SkypeConnection.Auth.Authorize).content
 
 @initAttrs
@@ -154,7 +158,7 @@ class SkypeImageMsg(SkypeFileMsg):
         """
         Retrieve the image as a byte string.
         """
-        return self.skype.conn("GET", "{0}/views/imgpsh_fullsize".format(self.fileUrlFull),
+        return self.skype.conn("GET", "{0}/views/imgpsh_fullsize".format(self.file.urlFull),
                                auth=SkypeConnection.Auth.Authorize).content
 
 @initAttrs
