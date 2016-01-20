@@ -219,8 +219,12 @@ class SkypeObj(object):
 
         The resulting string is an expression that should evaluate to a similar object, minus Skype connection.
         """
-        reprs = ", ".join("{0}={1}".format(k, repr(getattr(self, k))) for k in self.attrs)
-        return "{0}({1})".format(self.__class__.__name__, reprs)
+        reprs = []
+        for attr in self.attrs:
+            val = getattr(self, attr)
+            if not val == self.defaults.get(attr):
+                reprs.append("{0}={1}".format(attr, repr(val)))
+        return "{0}({1})".format(self.__class__.__name__, ", ".join(reprs))
 
 class SkypeObjs(SkypeObj):
     """
