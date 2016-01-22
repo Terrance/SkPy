@@ -91,7 +91,7 @@ class SkypeConnection(SkypeObj):
                     self.getRegToken()
         if not self.tokens:
             if not hasattr(self, "getSkypeToken"):
-                raise SkypeException("No username or password provided, and no valid token file")
+                raise SkypeAuthException("No username or password provided, and no valid token file")
             self.getSkypeToken()
             self.getRegToken()
     def __call__(self, method, url, codes=(200, 201, 207), auth=None, headers=None, **kwargs):
@@ -185,7 +185,7 @@ class SkypeConnection(SkypeObj):
         if auth in (self.Auth.SkypeToken, self.Auth.Authorize):
             if "skype" in self.tokenExpiry and datetime.now() >= self.tokenExpiry["skype"]:
                 if not hasattr(self, "getSkypeToken"):
-                    raise SkypeException("Skype token expired, and no password specified")
+                    raise SkypeAuthException("Skype token expired, and no password specified")
                 self.getSkypeToken()
         elif auth == self.Auth.RegToken:
             if "reg" in self.tokenExpiry and datetime.now() >= self.tokenExpiry["reg"]:
