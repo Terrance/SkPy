@@ -140,22 +140,21 @@ def syncState(fn):
     wrapper.state = []
     return wrapper
 
-def exhaust(fn, init, *args, **kwargs):
+def exhaust(fn, transform=lambda x: x, *args, **kwargs):
     """
-    Repeatedly call a function, starting with init, until false-y, then combine all sets.
+    Repeatedly call a function, starting with init, until false-y, yielding each item in turn.
+
+    The transform parameter can be used to map the collection to another format, for example values from a dict.
 
     Use with state-synced functions to retrieve all results.
     """
     while True:
         iterRes = fn(*args, **kwargs)
         if iterRes:
-            if isinstance(init, dict):
-                init.update(iterRes)
-            else:
-                init += iterRes
+            for item in transform(iterRes):
+                yield item
         else:
             break
-    return init
 
 class SkypeObj(object):
     """
