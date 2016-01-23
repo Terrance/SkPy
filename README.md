@@ -23,7 +23,7 @@ sk.contacts # your contacts
 sk.chats # your conversations
 
 buddychat = sk.contacts[buddyname].chat # 1-to-1 conversation
-groupchat = sk.createChat() # new group conversation
+groupchat = sk.chats.create([buddyname]) # new group conversation
 
 groupchat.sendMsg(content) # plain-text message
 groupchat.sendFile(open(filename, "rb"), filename) # file upload
