@@ -6,19 +6,39 @@ from functools import partial, wraps
 
 def upper(s):
     """
-    Shorthand to uppercase a string, and leave None as None.
+    Shorthand to uppercase a string, and leave ``None`` as-is.
+
+    Args:
+        s (str): string to transform
+
+    Returns:
+        str: uppercase string
     """
     return s if s == None else s.upper()
 
 def noPrefix(s):
     """
-    Remove the type prefix from a chat identifier.
+    Remove the type prefix from a chat identifier (e.g. ``8:`` for a one-to-one, ``19:`` for a group).
+
+    Args:
+        s (str): string to transform
+
+    Returns:
+        str: unprefixed string
     """
     return s if s == None else s.split(":", 1)[1]
 
 def userToId(url):
     """
     Extract the username from a contact URL.
+
+    Matches addresses containing ``users/<user>`` or ``users/ME/contacts/<user>``.
+
+    Args:
+        url (str): Skype API URL
+
+    Returns:
+        str: extracted identifier
     """
     match = re.search(r"users(/ME/contacts)?/[0-9]+:([A-Za-z0-9\.,_-]+)", url)
     return match.group(2) if match else None
@@ -26,13 +46,27 @@ def userToId(url):
 def chatToId(url):
     """
     Extract the conversation ID from a conversation URL.
+
+    Matches addresses containing ``conversations/<chat>``.
+
+    Args:
+        url (str): Skype API URL
+
+    Returns:
+        str: extracted identifier
     """
     match = re.search(r"conversations/([0-9]+:[A-Za-z0-9\.,_-]+(@thread\.skype)?)", url)
     return match.group(1) if match else None
 
 def initAttrs(cls):
     """
-    Class decorator: automatically generate an __init__ method that expects args from cls.attrs and stores them.
+    Class decorator: automatically generate an ``__init__`` method that expects args from cls.attrs and stores them.
+
+    Args:
+        cls (class): class to decorate
+
+    Returns:
+        class: same, but modified, class
     """
     def __init__(self, skype=None, raw=None, *args, **kwargs):
         super(cls, self).__init__(skype, raw)
@@ -55,30 +89,36 @@ def initAttrs(cls):
 def convertIds(*types, **kwargs):
     """
     Class decorator: add helper methods to convert identifier properties into SkypeObjs.
+
+    Args:
+        types (str list): simple field types to add properties for (``user``, ``users`` or ``chat``)
+        user (str list): attribute names to treat as single user identifier fields
+        users (str list): attribute names to treat as user identifier lists
+        chat (str list): attribute names to treat as chat identifier fields
+
+    Returns:
+        method: decorator function, ready to apply to other methods
     """
     user = kwargs.get("user", ())
     users = kwargs.get("users", ())
     chat = kwargs.get("chat", ())
     def userObj(self, field):
-        """
-        Retrieve the user referred to in the object.
-        """
         return self.skype.contacts[getattr(self, field)]
     def userObjs(self, field):
-        """
-        Retrieve all users referred to in the object.
-        """
         return (self.skype.contacts[id] for id in getattr(self, field))
     def chatObj(self, field):
-        """
-        Retrieve the user referred to in the object.
-        """
         return self.skype.chats[getattr(self, field)]
-    def attach(cls, method, field, idField):
+    def attach(cls, fn, field, idField):
         """
         Generate the property object and attach it to the class.
+
+        Args:
+            cls (type): class to attach the property to
+            fn (method): function to be attached
+            field (str): attribute name for the new property
+            idField (str): reference field to retrieve identifier from
         """
-        setattr(cls, field, property(partial(method, field=idField)))
+        setattr(cls, field, property(wraps(fn)(partial(fn, field=idField))))
     def wrapper(cls):
         # Shorthand identifiers, e.g. @convertIds("user", "chat").
         for type in types:
@@ -100,9 +140,15 @@ def convertIds(*types, **kwargs):
 
 def cacheResult(fn):
     """
-    Decorator: calculate the value on first access, produce the cached value thereafter.
+    Method decorator: calculate the value on first access, produce the cached value thereafter.
 
     If the function takes arguments, the cache is a dictionary using all arguments as the key.
+
+    Args:
+        fn (method): function to decorate
+
+    Returns:
+        method: wrapper function with caching
     """
     cache = {}
     @wraps(fn)
@@ -120,9 +166,20 @@ def cacheResult(fn):
 
 def syncState(fn):
     """
-    Decorator: follow state-sync links when provided by an API.
+    Method decorator: follow state-sync links when provided by an API.
 
-    The function being wrapped must return: url, params, fetch(url, params), process(resp)
+    Functions implementing this flow must return a tuple containing the following:
+
+    - ``url`` (`str`): original URL to follow with no state
+    - ``params`` (`dict`): keyword parameters to add to the url
+    - ``fetch(url, params)`` (`method`): function to do the API request, returning the response and a new state URL
+    - ``process(resp)`` (`method`): function to handle the response returned from ``fetch``
+
+    Args:
+        fn (method): function to decorate
+
+    Returns:
+        method: wrapper function with state-syncing
     """
     @wraps(fn)
     def wrapper(self, *args, **kwargs):
@@ -140,37 +197,59 @@ def syncState(fn):
     wrapper.state = []
     return wrapper
 
-def exhaust(fn, transform=lambda x: x, *args, **kwargs):
+def exhaust(fn, transform=None, *args, **kwargs):
     """
     Repeatedly call a function, starting with init, until false-y, yielding each item in turn.
 
-    The transform parameter can be used to map the collection to another format, for example values from a dict.
+    The ``transform`` parameter can be used to map a collection to another format, for example iterating over a
+    :class:`dict` by value rather than key.
 
     Use with state-synced functions to retrieve all results.
+
+    Args:
+        fn (method): function to call
+        transform (method): secondary function to convert result into an iterable
+        args (list): positional arguments to pass to ``fn``
+        kwargs (dict): keyword arguments to pass to ``fn``
+
+    Returns:
+        generator: generator of objects produced from the method
     """
     while True:
         iterRes = fn(*args, **kwargs)
         if iterRes:
-            for item in transform(iterRes):
+            for item in transform(iterRes) if transform else iterRes:
                 yield item
         else:
             break
 
 class SkypeObj(object):
     """
-    A basic Skype-related object.  Holds references to the parent Skype instance, and the raw dict from the API.
+    A basic Skype object.  Holds references to the parent :class:`.Skype` instance, and a raw object from the API.
 
-    The attrs property should be set to the named attributes for that class.
-
-    Use defaults to override None for certain attributes.
+    Attributes:
+        attrs (tuple):
+            A list of defined fields for the class.  Used by :meth:`initAttrs` to create an :meth:`__init__` method.
+        defaults (dict):
+            A collection of default values when any keyword arguments are omitted from the constructor.
+        skype (:class:`.Skype`):
+            Parent Skype instance.
+        raw (dict):
+            Raw object, as provided by the API.
     """
     attrs = ()
     defaults = {}
     def __init__(self, skype=None, raw=None):
         """
-        Store a reference to the Skype object for later API calls.
+        Instantiate a plain instance of this class, and store a reference to the Skype object for later API calls.
 
-        Most implementers don't need to override this method directly, use @initAttrs instead.
+        Normally this method won't be called or implemented directly.
+
+        Implementers should make use of :meth:`fromRaw` and the :meth:`initAttrs` decorator instead.
+
+        Args:
+            skype (Skype): parent Skype instance
+            raw (dict): raw object, as provided by the API
         """
         self.skype = skype
         self.raw = raw
@@ -178,17 +257,35 @@ class SkypeObj(object):
     def rawToFields(cls, raw={}):
         """
         Convert the raw properties of an API response into class fields.  Override to process additional values.
+
+        Args:
+            raw (dict): raw object, as provided by the API
+
+        Returns:
+            dict: a collection of fields, with keys matching :attr:`attrs`
         """
         return {}
     @classmethod
     def fromRaw(cls, skype=None, raw={}):
         """
         Create a new instance based on the raw properties of an API response.
+
+        This can be overridden to automatically create subclass instances based on the raw content.
+
+        Args:
+            skype (Skype): parent Skype instance
+            raw (dict): raw object, as provided by the API
+
+        Returns:
+            SkypeObj: the new class instance
         """
         return cls(skype, raw, **cls.rawToFields(raw))
     def merge(self, other):
         """
-        Copy properties from other into self, skipping None values.  Also merges the raw data.
+        Copy properties from other into self, skipping ``None`` values.  Also merges the raw data.
+
+        Args:
+            other (SkypeObj): second object to copy fields from
         """
         for attr in self.attrs:
             if not getattr(other, attr, None) == None:
@@ -199,10 +296,10 @@ class SkypeObj(object):
             self.raw.update(other.raw)
     def __str__(self):
         """
-        Pretty print the object, based on the class' attrs parameter.  Produces output something like:
+        Pretty print the object, based on the class' attrs parameter.  Produces output something like::
 
-        [<class name>]
-        <attribute>: <value>
+            [<class name>]
+            <attribute>: <value>
 
         Nested objects are indented as needed.
         """
@@ -228,8 +325,20 @@ class SkypeObj(object):
 class SkypeObjs(SkypeObj):
     """
     A basic Skype collection.  Acts as a container for objects of a given type.
+
+    Attributes:
+        synced (bool):
+            Whether an initial set of objects has been cached.
+        cache (dict):
+            Storage of objects by identifier key.
     """
     def __init__(self, skype=None):
+        """
+        Create a new container object.  The :attr:`synced` state and internal :attr:`cache` are initialised here.
+
+        Args:
+            skype (Skype): parent Skype instance
+        """
         super(SkypeObjs, self).__init__(skype)
         self.synced = False
         self.cache = {}
@@ -256,6 +365,9 @@ class SkypeObjs(SkypeObj):
     def merge(self, obj):
         """
         Add a given object to the cache, or update an existing entry to include more fields.
+
+        Args:
+            obj (SkypeObj): object to add to the cache
         """
         if obj.id in self.cache:
             self.cache[obj.id].merge(obj)
@@ -267,12 +379,10 @@ class SkypeException(Exception):
     """
     A generic Skype-related exception.
     """
-    pass
 
 class SkypeApiException(SkypeException):
     """
     An exception thrown for errors specific to external API calls.
 
-    Args will usually be of the form (message, response).
+    Arguments will usually be of the form (``message``, ``response object``).
     """
-    pass

@@ -9,6 +9,14 @@ from .util import SkypeObj, noPrefix, userToId, chatToId, initAttrs, convertIds,
 class SkypeEvent(SkypeObj):
     """
     The base Skype event.  Pulls out common identifier, time and type parameters.
+
+    Attributes:
+        id (int):
+            Unique identifier of the event, usually starting from ``1000``.
+        type (str):
+            Raw message type, as specified by the Skype API.
+        time (datetime.datetime):
+            Time at which the event occurred.
     """
     attrs = ("id", "type", "time")
     @classmethod
@@ -24,9 +32,6 @@ class SkypeEvent(SkypeObj):
         }
     @classmethod
     def fromRaw(cls, skype=None, raw={}):
-        """
-        Return a subclass instance of SkypeEvent if appropriate.
-        """
         res = raw.get("resource", {})
         resType = raw.get("resourceType")
         evtCls = {
@@ -38,10 +43,10 @@ class SkypeEvent(SkypeObj):
         }.get(resType, cls)
         if evtCls is SkypeMessageEvent:
             msgType = res.get("messagetype")
-            if msgType in ("Control/Typing", "Control/ClearTyping"):
-                evtCls = SkypeTypingEvent
-            elif msgType in ("Text", "RichText", "RichText/Contacts", "RichText/Media_GenericFile", "RichText/UriObject"):
+            if msgType in ("Text", "RichText", "RichText/Contacts", "RichText/Media_GenericFile", "RichText/UriObject"):
                 evtCls = SkypeEditMessageEvent if res.get("skypeeditedid") else SkypeNewMessageEvent
+            elif msgType in ("Control/Typing", "Control/ClearTyping"):
+                evtCls = SkypeTypingEvent
             elif msgType == "Event/Call":
                 evtCls = SkypeCallEvent
         return evtCls(skype, raw, **evtCls.rawToFields(raw))
@@ -58,6 +63,14 @@ class SkypeEvent(SkypeObj):
 class SkypePresenceEvent(SkypeEvent):
     """
     An event for contacts changing status or presence.
+
+    Attributes:
+        user (:class:`.SkypeUser`):
+            User whose presence changed.
+        online (bool):
+            Whether the user is now connected.
+        status (str):
+            Chosen availability status.
     """
     attrs = SkypeEvent.attrs + ("userId", "online", "status")
     @classmethod
@@ -76,6 +89,10 @@ class SkypePresenceEvent(SkypeEvent):
 class SkypeEndpointEvent(SkypeEvent):
     """
     An event for changes to individual contact endpoints.
+
+    Attributes:
+        user (:class:`.SkypeUser`):
+            User whose endpoint emitted an event.
     """
     attrs = SkypeEvent.attrs + ("userId",)
     @classmethod
@@ -89,6 +106,14 @@ class SkypeEndpointEvent(SkypeEvent):
 class SkypeTypingEvent(SkypeEvent):
     """
     An event for users starting or stopping typing in a conversation.
+
+    Attributes:
+        user (:class:`.SkypeUser`):
+            User whose typing status changed.
+        chat (:class:`.SkypeChat`):
+            Conversation where the user was seen typing.
+        active (bool):
+            Whether the user has just started typing.
     """
     attrs = SkypeEvent.attrs + ("userId", "chatId", "active")
     @classmethod
@@ -106,6 +131,10 @@ class SkypeTypingEvent(SkypeEvent):
 class SkypeMessageEvent(SkypeEvent):
     """
     The base message event, when a message is received in a conversation.
+
+    Attributes:
+        msg (:class:`.SkypeMsg`):
+            Message received in the conversation.
     """
     attrs = SkypeEvent.attrs + ("msgId",)
     @classmethod
@@ -145,6 +174,12 @@ class SkypeCallEvent(SkypeMessageEvent):
 class SkypeChatUpdateEvent(SkypeEvent):
     """
     An event triggered by various conversation changes or messages.
+
+    Attributes:
+        chat (:class:`.SkypeChat`):
+            Conversation that emitted an update.
+        horizon (str):
+            Raw list of timestamps, as provided by the API.
     """
     attrs = SkypeEvent.attrs + ("chatId", "horizon")
     @classmethod
@@ -160,7 +195,8 @@ class SkypeChatUpdateEvent(SkypeEvent):
         """
         Use the consumption horizon to mark the conversation as up-to-date.
         """
-        self.skype.conn("PUT", "{0}/users/ME/conversations/{1}/properties".format(self.skype.conn.msgsHost, self.chatId),
+        self.skype.conn("PUT", "{0}/users/ME/conversations/{1}/properties" \
+                               .format(self.skype.conn.msgsHost, self.chatId),
                         auth=SkypeConnection.Auth.RegToken, params={"name": "consumptionhorizon"},
                         json={"consumptionhorizon": self.horizon})
 
@@ -169,6 +205,12 @@ class SkypeChatUpdateEvent(SkypeEvent):
 class SkypeChatMemberEvent(SkypeEvent):
     """
     An event triggered when someone is added to or removed from a conversation.
+
+    Attributes:
+        users (:class:`.SkypeUser` list):
+            List of users affected by the update.
+        chat (:class:`.SkypeChat`):
+            Conversation where the change occurred.
     """
     attrs = SkypeEvent.attrs + ("userIds", "chatId")
     @classmethod

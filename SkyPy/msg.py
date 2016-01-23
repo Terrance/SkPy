@@ -13,30 +13,104 @@ class SkypeMsg(SkypeObj):
     """
     A message either sent or received in a conversation.
 
-    Edits are represented by a follow-up messages that reference the original by editId.
+    Edits are represented by a follow-up messages that reference the original by :attr:`editId`.
+
+    Attributes:
+        id (str):
+            Identifier of the message, usually a timestamp.
+        type (str):
+            Raw message type, as specified by the Skype API.
+        time (datetime.datetime):
+            Original arrival time of the message.
+        editId (str):
+            Reference to an original message, that this message provides an edit to.
+        user (:class:`.SkypeUser`):
+            User that sent the message.
+        chat (:class:`.SkypeChat`):
+            Conversation where this message was received.
+        content (str):
+            Raw message content, as received from the API.
     """
     @staticmethod
     def bold(s):
+        """
+        Format text to be bold.
+
+        Args:
+            s (str): string to format
+
+        Returns:
+            str: formatted string
+        """
         return """<b raw_pre="*" raw_post="*">{0}</b>""".format(s)
     @staticmethod
     def italic(s):
+        """
+        Format text to be italic.
+
+        Args:
+            s (str): string to format
+
+        Returns:
+            str: formatted string
+        """
         return """<i raw_pre="_" raw_post="_">{0}</i>""".format(s)
     @staticmethod
     def strike(s):
+        """
+        Format text to be struck through.
+
+        Args:
+            s (str): string to format
+
+        Returns:
+            str: formatted string
+        """
         return """<s raw_pre="~" raw_post="~">{0}</s>""".format(s)
     @staticmethod
     def mono(s):
+        """
+        Format text to be monospaced.
+
+        Args:
+            s (str): string to format
+
+        Returns:
+            str: formatted string
+        """
         return """<pre raw_pre="{{code}}" raw_post="{{code}}">{0}</pre>""".format(s)
     @staticmethod
-    def link(l, s=None):
+    def link(url, display=None):
+        """
+        Create a hyperlink.  If ``display`` is not specified, display the URL.
+
+        .. note:: Anomalous API behaviour: official clients don't provide the ability to set display text.
+
+        Args:
+            url (str): full URL to link to
+            display (str): custom label for the hyperlink
+
+        Returns:
+            str: tag to display a hyperlink
+        """
         return """<a href="{0}">{1}</a>""".format(l, s or l)
     @staticmethod
-    def emote(s):
+    def emote(shortcut):
+        """
+        Display an emoticon.  This accepts any valid shortcut.
+
+        Args:
+            shortcut (str): emoticon shortcut
+
+        Returns:
+            str: tag to render the emoticon
+        """
         for emote in emoticons:
-            if s == emote or s in emoticons[emote]["shortcuts"]:
-                name = emoticons[emote]["shortcuts"][0] if s == emote else s
+            if shortcut == emote or shortcut in emoticons[emote]["shortcuts"]:
+                name = emoticons[emote]["shortcuts"][0] if shortcut == emote else shortcut
                 return """<ss type="{0}">{1}</ss>""".format(emote, name)
-        return s
+        # No match, return the input as-is.
+        return shortcut
     attrs = ("id", "type", "time", "editId", "userId", "chatId", "content")
     @classmethod
     def rawToFields(cls, raw={}):
@@ -55,9 +129,6 @@ class SkypeMsg(SkypeObj):
         }
     @classmethod
     def fromRaw(cls, skype=None, raw={}):
-        """
-        Return a subclass instance of SkypeMsg if appropriate.
-        """
         msgCls = {
             "RichText/Contacts": SkypeContactMsg,
             "RichText/Media_GenericFile": SkypeFileMsg,
@@ -71,28 +142,52 @@ class SkypeMsg(SkypeObj):
         """
         Attempt to convert the message to plain text.
 
-        With entities, formatting is converted to plain equivalents (e.g. *bold*).
+        Hyperlinks are replaced with their target, and message edit tags are stripped.
+
+        With ``entities`` set, instead of stripping all tags altogether, the following replacements are made:
+
+        ===========================  =========================
+        Rich text                    Plain text
+        ===========================  =========================
+        ``<b>bold</b>``              ``*bold*``
+        ``<i>italic</i>``            ``_italic_``
+        ``<s>strikethrough</s>``     ``~strikethrough~``
+        ``<pre>monospace</pre>``     ``{code}monospace{code}``
+        ===========================  =========================
+
+        Args:
+            entities (bool): whether to preserve formatting using the plain text equivalents
         """
         if self.type == "RichText":
-            text = self.content.replace("&quot;", "\"")
-            text = re.sub(r"<e.*?/>", "", text)
+            text = re.sub(r"<e.*?/>", "", self.content)
             text = re.sub(r"""<a.*?href="(.*?)">.*?</a>""", r"\1", text)
             text = re.sub(r"</?b.*?>", "*" if entities else "", text)
             text = re.sub(r"</?i.*?>", "_" if entities else "", text)
             text = re.sub(r"</?s.*?>", "~" if entities else "", text)
             text = re.sub(r"</?pre.*?>", "{code}" if entities else "", text)
+            text = text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&") \
+                       .replace("&quot;", "\"").replace("&apos;", "'")
             return text
         else:
             # It's already plain, or it's something we can't handle.
             return self.content
     def edit(self, content, me=False, rich=False):
         """
-        Send an edit of this message.  Follows the same arguments as SkypeChat.sendMsg().
+        Send an edit of this message.  Arguments are passed to :meth:`.SkypeChat.sendMsg`.
+
+        .. note:: Anomalous API behaviour: messages can be undeleted by editing their content to be non-empty.
+
+        Args:
+            content (str): main message body
+            me (bool): whether to send as an action, where the current account's name prefixes the message
+            rich (bool): whether to send with rich text formatting
         """
         self.chat.sendMsg(content, me, rich, self.editId or self.id)
     def delete(self):
         """
-        Delete the message and remove it from the conversation.  Equivalent to edit(content="").
+        Delete the message and remove it from the conversation.
+
+        Equivalent to calling :meth:`edit` with an empty ``content`` string.
         """
         self.edit("")
 
@@ -101,6 +196,12 @@ class SkypeMsg(SkypeObj):
 class SkypeContactMsg(SkypeMsg):
     """
     A message containing a shared contact.
+
+    Attributes:
+        contact (:class:`.SkypeUser`):
+            User object embedded in the message.
+        contactName (str):
+            Name of the user, as seen by the sender of the message.
     """
     attrs = SkypeMsg.attrs + ("contactId", "contactName")
     @classmethod
@@ -118,9 +219,18 @@ class SkypeContactMsg(SkypeMsg):
 class SkypeFileMsg(SkypeMsg):
     """
     A message containing a file shared in a conversation.
+
+    Attributes:
+        file (File):
+            File object embedded in the message.
+        fileContent (bytes):
+            Raw content of the file.
     """
     @initAttrs
     class File(SkypeObj):
+        """
+        Details about a file contained within a message.
+        """
         attrs = ("name", "size", "urlFull", "urlThumb", "urlView")
     attrs = SkypeMsg.attrs + ("file",)
     @classmethod
@@ -141,9 +251,6 @@ class SkypeFileMsg(SkypeMsg):
     @property
     @cacheResult
     def fileContent(self):
-        """
-        Retrieve the contents of the file as a byte string.
-        """
         return self.skype.conn("GET", "{0}/views/original".format(self.file.urlFull),
                                auth=SkypeConnection.Auth.Authorize).content
 
@@ -155,22 +262,30 @@ class SkypeImageMsg(SkypeFileMsg):
     @property
     @cacheResult
     def fileContent(self):
-        """
-        Retrieve the image as a byte string.
-        """
         return self.skype.conn("GET", "{0}/views/imgpsh_fullsize".format(self.file.urlFull),
                                auth=SkypeConnection.Auth.Authorize).content
 
 @initAttrs
 class SkypeCallMsg(SkypeMsg):
     """
-    A message representing a change in state to a call inside the conversation.
+    A message representing a change in state to a voice or video call inside the conversation.
+
+    Attributes:
+        state (:class:`State`):
+            New state of the call.
     """
     class State:
         """
         Enum: possible call states (either started and incoming, or ended).
         """
-        Started, Ended = range(2)
+        Started = 0
+        """
+        The call has just begun.
+        """
+        Ended = 1
+        """
+        All call participants have hung up.
+        """
     attrs = SkypeMsg.attrs + ("state",)
     @classmethod
     def rawToFields(cls, raw={}):
@@ -185,9 +300,12 @@ class SkypeMemberMsg(SkypeMsg):
     """
     A message representing a change in a group conversation's participants.
 
-    Note that Skype represents these messages as being sent by the conversation user, rather than the initiator.
+    Note that Skype represents these messages as being sent *by the conversation*, rather than the initiator.  Instead,
+    :attr:`user <SkypeMsg.user>` is set to the initiator, and :attr:`member` to the target.
 
-    Instead, user is set to the initiator, and member to the target.
+    Attributes:
+        member (:class:`.SkypeUser`):
+            User being added to or removed from the conversation.
     """
     attrs = SkypeMsg.attrs + ("memberId",)
 

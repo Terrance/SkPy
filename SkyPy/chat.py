@@ -10,9 +10,13 @@ class SkypeChat(SkypeObj):
     """
     A conversation within Skype.
 
-    One-to-one chats have identifiers of the form <type>:<username>.
+    Attributes:
+        id (str):
+            Unique identifier of the conversation.
 
-    Cloud group chat identifiers are of the form <type>:<identifier>@thread.skype.
+            One-to-one chats have identifiers of the form ``<type>:<username>``.
+
+            Cloud group chat identifiers are of the form ``<type>:<identifier>@thread.skype``.
     """
     attrs = ("id",)
     @classmethod
@@ -23,9 +27,14 @@ class SkypeChat(SkypeObj):
     @syncState
     def getMsgs(self):
         """
-        Retrieve any new messages in the conversation.
+        Retrieve a batch of messages from the conversation.
 
-        On first access, this method should be repeatedly called to retrieve older messages.
+        This method can be called repeatedly to retrieve older messages.
+
+        If new messages arrive in the meantime, they are returned first in the next batch.
+
+        Returns:
+            :class:`SkypeMsg` list: collection of messages
         """
         url = "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id)
         params = {
@@ -46,11 +55,17 @@ class SkypeChat(SkypeObj):
         """
         Send a message to the conversation.
 
-        If me is specified, the message is sent as an action (similar to "/me ...", where /me becomes your name).
+        If ``me`` is specified, the message is sent as an action (equivalent to ``/me <content>`` in other clients).
+        This is typically displayed as "*Name* ``<content>``", where clicking the name links back to your profile.
 
-        Set rich to allow formatting tags -- use the SkypeMsg static helper methods for rich components.
+        Rich text can also be sent, provided it is formatted using Skype's subset of HTML.  Helper methods on the
+        :class:`.SkypeMsg` class can generate the necessary markup.
 
-        If edit is specified, perform an edit (or delete if content is empty) of the message with that identifier.
+        Args:
+            content (str): main message body
+            me (bool): whether to send as an action, where the current account's name prefixes the message
+            rich (bool): whether to send with rich text formatting
+            edit (int): identifier of an existing message to edit
         """
         timeId = int(time())
         msgId = edit or timeId
@@ -80,6 +95,11 @@ class SkypeChat(SkypeObj):
         Upload a file to the conversation.  Content should be an ASCII or binary file-like object.
 
         If an image, Skype will generate a thumbnail and link to the full image.
+
+        Args:
+            content (file): file-like object to retrieve the attachment's body
+            name (str): filename displayed to other clients
+            image (bool): whether to treat the file as an image
         """
         meta = {
             "type": "pish/image" if image else "sharing/file",
@@ -90,22 +110,21 @@ class SkypeChat(SkypeObj):
         objId = self.skype.conn("POST", "https://api.asm.skype.com/v1/objects",
                                 auth=SkypeConnection.Auth.Authorize, json=meta).json()["id"]
         objType = "imgpsh" if image else "original"
-        self.skype.conn("PUT", "https://api.asm.skype.com/v1/objects/{0}/content/{1}".format(objId, objType),
+        urlFull = "https://api.asm.skype.com/v1/objects/{0}".format(objId)
+        self.skype.conn("PUT", "{0}/content/{1}".format(urlFull, objType),
                         auth=SkypeConnection.Auth.Authorize, data=content.read())
         size = content.tell()
         if image:
-            body = """<URIObject type="Picture.1" uri="https://api.asm.skype.com/v1/objects/{0}" """ \
-                   """url_thumbnail="https://api.asm.skype.com/v1/objects/{0}/views/imgt1">MyLegacy pish """ \
+            body = """<URIObject type="Picture.1" uri="{1}" url_thumbnail="{1}/views/imgt1">MyLegacy pish """ \
                    """<a href="https://api.asm.skype.com/s/i?{0}">https://api.asm.skype.com/s/i?{0}</a>""" \
-                   """<Title/><Description/><OriginalName v="{1}"/>""" \
-                   """<meta type="photo" originalName="{1}"/></URIObject>""".format(objId, name)
+                   """<Title/><Description/><OriginalName v="{2}"/>""" \
+                   """<meta type="photo" originalName="{2}"/></URIObject>""".format(objId, urlFull, name)
         else:
-            body = """<URIObject type="File.1" uri="https://api.asm.skype.com/v1/objects/{0}" """ \
-                   """url_thumbnail="https://api.asm.skype.com/v1/objects/{0}/views/thumbnail">""" \
-                   """<Title>Title: {1}</Title><Description> Description: {1}</Description>""" \
-                   """<a href="https://login.skype.com/login/sso?go=webclient.xmm&amp;docid={0}"> """ \
-                   """https://login.skype.com/login/sso?go=webclient.xmm&amp;docid={0}</a>""" \
-                   """<OriginalName v="{1}"/><FileSize v="{2}"/></URIObject>""".format(objId, name, size)
+            urlView = "https://login.skype.com/login/sso?go=webclient.xmm&docid={0}".format(objId)
+            body = """<URIObject type="File.1" uri="{1}" url_thumbnail="{1}/views/thumbnail">""" \
+                   """<Title>Title: {3}</Title><Description> Description: {3}</Description>""" \
+                   """<a href="{2}"> {2}</a><OriginalName v="{3}"/><FileSize v="{4}"/></URIObject>""" \
+                   .format(objId, urlFull, urlLogin, name, size)
         msg = {
             "clientmessageid": int(time()),
             "contenttype": "text",
@@ -117,21 +136,21 @@ class SkypeChat(SkypeObj):
         timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
         if image:
             msgCls = SkypeImageMsg
-            msgFile = SkypeFileMsg.File(self.skype, name=name,
-                                        urlFull="https://api.asm.skype.com/v1/objects/{0}".format(objId),
-                                        urlThumb="https://api.asm.skype.com/v1/objects/{0}/views/imgtl".format(objId),
+            msgFile = SkypeFileMsg.File(self.skype, name=name, urlFull=urlFull,
+                                        urlThumb="{0}/views/imgtl".format(urlFull),
                                         urlView="https://api.asm.skype.com/s/i?{0}".format(objId))
         else:
             msgCls = SkypeFileMsg
-            msgFile = SkypeFileMsg.File(self.skype, name=name, size=size,
-                                        urlFull="https://api.asm.skype.com/v1/objects/{0}".format(objId),
-                                        urlThumb="https://api.asm.skype.com/v1/objects/{0}/views/thumbnail".format(objId),
-                                        urlView="https://login.skype.com/login/sso?go=webclient.xmm&docid={0}".format(objId))
+            msgFile = SkypeFileMsg.File(self.skype, name=name, size=size, urlFull=urlFull,
+                                        urlThumb="{0}/views/thumbnail".format(urlFull), urlView=urlView)
         return msgCls(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr,
                       userId=self.skype.user.id, chatId=self.id, content=msg["content"], file=msgFile)
     def sendContact(self, contact):
         """
         Share a contact with the conversation.
+
+        Args:
+            contact (SkypeUser): the user to embed in the message
         """
         msg = {
             "clientmessageid": int(time()),
@@ -156,7 +175,11 @@ class SkypeChat(SkypeObj):
 @convertIds("user", "users")
 class SkypeSingleChat(SkypeChat):
     """
-    A one-to-one conversation within Skype.  Has an associated user for the other participant.
+    A one-to-one conversation within Skype.
+
+    Attributes:
+        user (:class:`.SkypeUser`):
+            The other participant in the conversation.
     """
     attrs = SkypeChat.attrs + ("userId",)
     @classmethod
@@ -166,9 +189,7 @@ class SkypeSingleChat(SkypeChat):
         return fields
     @property
     def userIds(self):
-        """
-        Convenience method to treat and single and group chats alike.
-        """
+        # Provided for convenience, so single and group chats both have a users field.
         return [self.userId]
 
 @initAttrs
@@ -176,6 +197,24 @@ class SkypeSingleChat(SkypeChat):
 class SkypeGroupChat(SkypeChat):
     """
     A group conversation within Skype.  Compared to single chats, groups have a topic and participant list.
+
+    Attributes:
+        topic (str):
+            Description of the conversation, shown to all participants.
+        creator (:class:`.SkypeUser`):
+            User who originally created the conversation.
+        users (:class:`.SkypeUser` list):
+            Users currently participating in the conversation.
+        admins (:class:`.SkypeUser` list):
+            Participants with admin privileges.
+        open (boolean):
+            Whether new participants can join via a public join link.
+        history (boolean):
+            Whether message history is provided to new participants.
+        picture (str):
+            URL to retrieve the conversation picture.
+        joinUrl (str):
+            Public ``join.skype.com`` URL for any other users to access the conversation.
     """
     attrs = SkypeChat.attrs + ("topic", "creatorId", "userIds", "adminIds", "open", "history", "picture")
     @classmethod
@@ -211,13 +250,19 @@ class SkypeGroupChat(SkypeChat):
     def setTopic(self, topic):
         """
         Update the topic message.  An empty string clears the topic.
+
+        Args:
+            topic (str): new conversation topic
         """
         self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id),
                         auth=SkypeConnection.Auth.RegToken, params={"name": "topic"}, json={"topic": topic})
         self.topic = topic
     def setOpen(self, open):
         """
-        Enable or disable public join links.
+        Enable or disable joining by URL.  This does not affect current participants inviting others.
+
+        Args:
+            topic (str): whether to accept new participants via a public join link
         """
         self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id),
                         auth=SkypeConnection.Auth.RegToken, params={"name": "joiningenabled"},
@@ -225,7 +270,12 @@ class SkypeGroupChat(SkypeChat):
         self.open = open
     def setHistory(self, history):
         """
-        Enable or disable conversation history.
+        Enable or disable conversation history.  This only affects messages sent after the change.
+
+        If disabled, new participants will not see messages before they arrived.
+
+        Args:
+            history (bool): whether to provide message history to new participants
         """
         self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id),
                         auth=SkypeConnection.Auth.RegToken, params={"name": "historydisclosed"},
@@ -234,6 +284,10 @@ class SkypeGroupChat(SkypeChat):
     def addMember(self, id, admin=False):
         """
         Add a user to the conversation, or update their user/admin status.
+
+        Args:
+            id (str): user identifier to invite
+            admin (bool): whether the user will gain admin privileges
         """
         self.skype.conn("PUT", "{0}/threads/{1}/members/8:{2}".format(self.skype.conn.msgsHost, self.id, id),
                         auth=SkypeConnection.Auth.RegToken, json={"role": "Admin" if admin else "User"})
@@ -246,6 +300,9 @@ class SkypeGroupChat(SkypeChat):
     def removeMember(self, id):
         """
         Remove a user from the conversation.
+
+        Args:
+            id (str): user identifier to remove
         """
         self.skype.conn("DELETE", "{0}/threads/{1}/members/8:{2}".format(self.skype.conn.msgsHost, self.id, id),
                         auth=SkypeConnection.Auth.RegToken)
@@ -262,13 +319,10 @@ class SkypeGroupChat(SkypeChat):
 class SkypeChats(SkypeObjs):
     """
     A container of conversations, providing caching of user info to reduce API requests.
+
+    Key lookups allow retrieving conversations by identifier.
     """
     def __getitem__(self, key):
-        """
-        Provide key lookups for Skype conversation IDs.
-
-        If a group conversation, but thread information has not been looked up, do that first.
-        """
         try:
             return super(SkypeChats, self).__getitem__(key)
         except KeyError:
@@ -276,9 +330,12 @@ class SkypeChats(SkypeObjs):
     @syncState
     def recent(self):
         """
-        Retrieve a list of recent conversations, and store them in the cache.
+        Retrieve a selection of conversations with the most recent activity, and store them in the cache.
 
-        Each conversation is only retrieved once, so subsequent calls may exhaust the set and return an empty list.
+        Each conversation is only retrieved once, so subsequent calls will retrieve older conversations.
+
+        Returns:
+            :class:`SkypeChat` list: collection of recent conversations
         """
         url = "{0}/users/ME/conversations".format(self.skype.conn.msgsHost)
         params = {
@@ -295,7 +352,8 @@ class SkypeChats(SkypeObjs):
                 cls = SkypeSingleChat
                 if "threadProperties" in json:
                     info = self.skype.conn("GET", "{0}/threads/{1}".format(self.skype.conn.msgsHost, json.get("id")),
-                                           auth=SkypeConnection.Auth.RegToken, params={"view": "msnp24Equivalent"}).json()
+                                           auth=SkypeConnection.Auth.RegToken,
+                                           params={"view": "msnp24Equivalent"}).json()
                     json.update(info)
                     cls = SkypeGroupChat
                 chats[json.get("id")] = self.merge(cls.fromRaw(self.skype, json))
@@ -304,6 +362,9 @@ class SkypeChats(SkypeObjs):
     def chat(self, id):
         """
         Get a single conversation by identifier.
+
+        Args:
+            id (str): user identifier to retrieve chat for
         """
         json = self.skype.conn("GET", "{0}/users/ME/conversations/{1}".format(self.skype.conn.msgsHost, id),
                                auth=SkypeConnection.Auth.RegToken, params={"view": "msnp24Equivalent"}).json()
@@ -318,7 +379,12 @@ class SkypeChats(SkypeObjs):
         """
         Create a new group chat with the given users.
 
-        The current user is automatically an admin.  Note that any other admin IDs must be present in the member list.
+        The current user is automatically added to the conversation as an admin.  Any other admin identifiers must also
+        be present in the member list.
+
+        Args:
+            members (str list): user identifiers to initially join the conversation
+            admins (str list): user identifiers to gain admin privileges
         """
         memberObjs = [{
             "id": "8:{0}".format(self.skype.userId),

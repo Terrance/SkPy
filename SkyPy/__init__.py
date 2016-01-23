@@ -1,3 +1,7 @@
+"""
+Root of the SkyPy module.  Classes from all submodules are imported here for convenience.
+"""
+
 from SkyPy.core import Skype, SkypeEventLoop
 from SkyPy.conn import SkypeConnection, SkypeEndpoint, SkypeAuthException
 from SkyPy.user import SkypeUser, SkypeContact, SkypeContacts, SkypeRequest

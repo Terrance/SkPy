@@ -14,21 +14,35 @@ from .util import SkypeObj, SkypeException, SkypeApiException
 class SkypeConnection(SkypeObj):
     """
     The main connection class -- handles all requests to API resources.
-
-    An instance of this class is callable, and performs an API request.
-
-    Arguments are similar to the underlying requests library.
     """
     class Auth:
         """
-        Enum: authentication types.  Skype uses X-SkypeToken, whereas Reg includes RegistrationToken.
+        Enum: authentication types for different API calls.
         """
-        SkypeToken, Authorize, RegToken = range(3)
+        SkypeToken = 0
+        """
+        Add an ``X-SkypeToken`` header with the Skype token.
+        """
+        Authorize = 1
+        """
+        Add an ``Authorization`` header with the Skype token.
+        """
+        RegToken = 2
+        """
+        Add a ``RegistrationToken`` header with the registration token.
+        """
     attrs = ("user", "tokenFile")
     @staticmethod
     def handle(*codes, **kwargs):
         """
-        Decorator: if a given status code is received, reauthenticate and try again.
+        Method decorator: if a given status code is received, re-authenticate and try again.
+
+        Args:
+            codes (int list): status codes to respond to
+            regToken (bool): whether to try retrieving a new token on error
+
+        Returns:
+            method: decorator function, ready to apply to other methods
         """
         regToken = kwargs.get("regToken", False)
         def decorator(fn):
@@ -52,11 +66,18 @@ class SkypeConnection(SkypeObj):
     API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1"
     def __init__(self, user=None, pwd=None, tokenFile=None):
         """
-        Initialise a new Skype connection.
+        If ``tokenFile`` is specified, the file is searched for a valid set of tokens.  If this is successful, no Skype
+        authentication is needed.  If the registration token is valid too, no call to :meth:`getRegToken` is made.
 
-        If tokenFile is specified, it is searched for valid tokens.  If all is well, no further handshake is required.
+        Otherwise, if ``user`` and ``pwd`` are set, make a new login request with the given credentials.
 
-        Otherwise, if user and pwd are set, try to interact with login.skype.com and fetch tokens.
+        Args:
+            user (str): username of the connecting account
+            pwd (str): password of the connecting account
+            tokenFile (str): path to a file, used to cache session tokens
+
+        Raises:
+            SkypeAuthException: if no valid tokens are available, and no username/password are provided
         """
         self.tokens = {}
         self.tokenExpiry = {}
@@ -64,7 +85,7 @@ class SkypeConnection(SkypeObj):
         self.msgsHost = self.API_MSGSHOST
         self.endpoints = {"self": SkypeEndpoint(self, "SELF")}
         if user and pwd:
-            # Create a method to reauthenticate with login.skype.com (avoids storing the password in an accessible way).
+            # Create a method to re-authenticate with login.skype.com (avoids storing the password in an accessible way).
             self.getSkypeToken = partial(self.login, user, pwd)
         if tokenFile and os.path.isfile(tokenFile):
             try:
@@ -96,11 +117,26 @@ class SkypeConnection(SkypeObj):
             self.getRegToken()
     def __call__(self, method, url, codes=(200, 201, 207), auth=None, headers=None, **kwargs):
         """
-        Make an API call.  Most parameters are passed directly to requests.
+        Make an API call.  Most parameters are passed directly to the Requests library.
 
         Set codes to a list of valid HTTP response codes -- an exception is raised if the response does not match.
 
-        If authentication is required, set auth to one of the SkypeConnection.Auth constants.
+        If authentication is required, set auth to one of the :class:`Auth` constants.
+
+        Args:
+            method (str): HTTP request method
+            url (str): full URL to connect to
+            codes (int list): expected HTTP response codes for success
+            auth (Auth): authentication type to be included
+            headers (dict): additional headers to be included
+            kwargs (dict): any extra parameters to pass to :mod:`requests`
+
+        Returns:
+            requests.Response: the response object provided by :mod:`requests`
+
+        Raises:
+            SkypeAuthException: if an authentication rate limit is reached
+            .SkypeApiException: if a successful status code is not received
         """
         self.verifyToken(auth)
         if not headers:
@@ -119,7 +155,16 @@ class SkypeConnection(SkypeObj):
         return resp
     def login(self, user, pwd):
         """
-        Scrape the Skype Web login page, and perform a login with the given username and password.
+        Obtain connection parameters from the Skype web login page, and perform a login with the given username and
+        password.  This emulates a login to Skype for Web (``web.skype.com``).
+
+        Args:
+            user (str): username of the connecting account
+            pwd (str): password of the connecting account
+
+        Raises:
+            SkypeAuthException: if a captcha is required, or the login fails
+            .SkypeApiException: if the login form can't be processed
         """
         loginResp = self("GET", self.API_LOGIN)
         loginPage = BeautifulSoup(loginResp.text, "html.parser")
@@ -151,7 +196,9 @@ class SkypeConnection(SkypeObj):
             raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
     def getRegToken(self):
         """
-        Acquire a registration token.  See getMac256Hash(...) for the hash generation.
+        Acquire a registration token.  See :meth:`getMac256Hash` for the hash generation.
+
+        Once successful, all tokens and expiry times are written to the token file (if specified on initialisation).
         """
         self.verifyToken(self.Auth.SkypeToken)
         secs = int(time.time())
@@ -181,6 +228,12 @@ class SkypeConnection(SkypeObj):
     def verifyToken(self, auth):
         """
         Ensure the authentication token for the given auth method is still valid.
+
+        Args:
+            auth (Auth): authentication type to check
+
+        Raises:
+            SkypeAuthException: if Skype auth is required, and the current token has expired and can't be renewed
         """
         if auth in (self.Auth.SkypeToken, self.Auth.Authorize):
             if "skype" in self.tokenExpiry and datetime.now() >= self.tokenExpiry["skype"]:
@@ -191,18 +244,24 @@ class SkypeConnection(SkypeObj):
             if "reg" in self.tokenExpiry and datetime.now() >= self.tokenExpiry["reg"]:
                 self.getRegToken()
 
-class SkypeEndpoint(object):
+class SkypeEndpoint(SkypeObj):
     """
     An endpoint represents a single point of presence within Skype.
 
     Typically, a user with multiple devices would have one endpoint per device (desktop, laptop, mobile and so on).
 
-    Endpoints are time-sensitive -- they lapse after a very short time unless kept alive (with ping() or other methods).
+    Endpoints are time-sensitive -- they lapse after a short time unless kept alive (by :meth:`ping` or otherwise).
     """
+    attrs = ("id",)
     def __init__(self, conn, id):
         """
         Create a new instance based on a newly-created endpoint identifier.
+
+        Args:
+            conn (SkypeConnection): parent connection instance
+            id (str): endpoint identifier as generated by the API
         """
+        super(SkypeEndpoint).__init__()
         self.conn = conn
         self.id = id
         self.subscribed = False
@@ -210,13 +269,14 @@ class SkypeEndpoint(object):
         """
         Send a keep-alive request for the endpoint.
 
-        The timeout specifies the maximum amount of time for the endpoint to stay active unless pinged again.
+        Args:
+            timeout (int): maximum amount of time for the endpoint to stay active
         """
         self.conn("POST", "{0}/users/ME/endpoints/{1}/active".format(self.conn.msgsHost, self.id),
                   auth=SkypeConnection.Auth.RegToken, json={"timeout": timeout})
     def subscribe(self):
         """
-        Subscribe to contact and conversation events.  These are accessible through Skype.getEvents().
+        Subscribe to contact and conversation events.  These are accessible through :meth:`getEvents`.
         """
         meta = {
             "interestedResources": [
@@ -238,26 +298,28 @@ class SkypeEndpoint(object):
         If no events occur, the API will block for up to 30 seconds, after which an empty list is returned.
 
         If any event occurs whilst blocked, it is returned immediately.
+
+        Returns:
+            :class:`.SkypeEvent` list: a list of events, possibly empty
         """
         if not self.subscribed:
             self.subscribe()
-        events = []
         return self.conn("POST", "{0}/users/ME/endpoints/{1}/subscriptions/0/poll".format(self.conn.msgsHost, self.id),
                          auth=SkypeConnection.Auth.RegToken).json().get("eventMessages", [])
-    def __str__(self):
-        return "[{0}]\nId: {1}".format(self.__class__.__name__, self.id)
-    def __repr__(self):
-        return "{0}(id={1})".format(self.__class__.__name__, repr(self.id))
 
 class SkypeAuthException(SkypeException):
     """
     An exception thrown when authentication cannot be completed.
 
-    Generally this means the request should not be retried (e.g. incorrect password), or a cooldown is needed (rate limits).
+    Generally this means the request should not be retried (e.g. because of an incorrect password), or it should be
+    delayed (e.g. rate limits).
     """
     pass
 
 def getMac256Hash(challenge, appId, key):
+    """
+    Method to generate the lock-and-key response, needed to acquire registration tokens.
+    """
     def int32ToHexString(n):
         hexChars = "0123456789abcdef"
         hexString = ""
