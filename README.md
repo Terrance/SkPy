@@ -30,8 +30,6 @@ groupchat.sendFile(open(filename, "rb"), filename) # file upload
 groupchat.sendContact(sk.contacts[buddyname]) # contact sharing
 ```
 
-A full class reference can be found [in the wiki](https://github.com/OllieTerrance/SkyPy/wiki/Classes).
-
 ## State-synced methods
 
 Some APIs, such as recent conversations or messages, include a state URL for the next query -- this allows you to fetch the next chunk of data without resending any duplicates.  Wrapper methods for APIs that support state syncing (e.g. `SkypeChat.getMsgs()`) automatically handle this for you.
