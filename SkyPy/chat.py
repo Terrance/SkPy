@@ -400,3 +400,20 @@ class SkypeChats(SkypeObjs):
         resp = self.skype.conn("POST", "{0}/threads".format(self.skype.conn.msgsHost),
                                auth=SkypeConnection.Auth.RegToken, json={"members": memberObjs})
         return self.chat(resp.headers["Location"].rsplit("/", 1)[1])
+    @staticmethod
+    @cacheResult
+    def urlToId(url):
+        """
+        Resolves a ``join.skype.com`` URL and returns the group conversation identifier.
+
+        Args:
+            url (str): public join URL, or identifier from it
+
+        Returns:
+            str: related conversation's identifier
+        """
+        urlId = url.split("/")[-1]
+        meetingUrl = "https://join.skype.com/api/v1/meetings/{0}".format(urlId)
+        longId = SkypeConnection.externalCall("GET", meetingUrl).json().get("longId")
+        chatUrl = "https://api.scheduler.skype.com/conversation/{0}".format(longId)
+        return SkypeConnection.externalCall("GET", chatUrl).json().get("ThreadId")

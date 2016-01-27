@@ -117,11 +117,11 @@ class SkypeConnection(SkypeObj):
             self.getRegToken()
     def __call__(self, method, url, codes=(200, 201, 207), auth=None, headers=None, **kwargs):
         """
-        Make an API call.  Most parameters are passed directly to the Requests library.
+        Make an API call.  Most parameters are passed directly to :mod:`requests`.
 
         Set codes to a list of valid HTTP response codes -- an exception is raised if the response does not match.
 
-        If authentication is required, set auth to one of the :class:`Auth` constants.
+        If authentication is required, set ``auth`` to one of the :class:`Auth` constants.
 
         Args:
             method (str): HTTP request method
@@ -129,10 +129,10 @@ class SkypeConnection(SkypeObj):
             codes (int list): expected HTTP response codes for success
             auth (Auth): authentication type to be included
             headers (dict): additional headers to be included
-            kwargs (dict): any extra parameters to pass to :mod:`requests`
+            kwargs (dict): any extra parameters to pass to :func:`requests.request`
 
         Returns:
-            requests.Response: the response object provided by :mod:`requests`
+            requests.Response: response object provided by :mod:`requests`
 
         Raises:
             SkypeAuthException: if an authentication rate limit is reached
@@ -151,6 +151,31 @@ class SkypeConnection(SkypeObj):
         if resp.status_code not in codes:
             if resp.status_code == 429:
                 raise SkypeAuthException("Auth rate limit exceeded", resp)
+            raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
+        return resp
+    @classmethod
+    def externalCall(cls, method, url, codes=(200, 201, 207), **kwargs):
+        """
+        Make a public API call without a connected :class:`.Skype` instance.
+
+        The obvious implications are that no authenticated calls are possible, though this allows accessing some public
+        APIs such as join URL lookups.
+
+        Args:
+            method (str): HTTP request method
+            url (str): full URL to connect to
+            codes (int list): expected HTTP response codes for success
+            kwargs (dict): any extra parameters to pass to :func:`requests.request`
+
+        Returns:
+            requests.Response: response object provided by :mod:`requests`
+
+        Raises:
+            SkypeAuthException: if an authentication rate limit is reached
+            .SkypeApiException: if a successful status code is not received
+        """
+        resp = requests.request(method, url, **kwargs)
+        if resp.status_code not in codes:
             raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
         return resp
     def login(self, user, pwd):
@@ -300,7 +325,7 @@ class SkypeEndpoint(SkypeObj):
         If any event occurs whilst blocked, it is returned immediately.
 
         Returns:
-            :class:`.SkypeEvent` list: a list of events, possibly empty
+            :class:`.SkypeEvent` list: list of events, possibly empty
         """
         if not self.subscribed:
             self.subscribe()
