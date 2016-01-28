@@ -1,5 +1,6 @@
 import re
-from datetime import datetime
+from datetime import datetime, date
+import time
 
 from bs4 import BeautifulSoup
 
@@ -111,6 +112,33 @@ class SkypeMsg(SkypeObj):
                 return """<ss type="{0}">{1}</ss>""".format(emote, name)
         # No match, return the input as-is.
         return shortcut
+    @staticmethod
+    def quote(user, chat, timestamp, content):
+        """
+        Display a message excerpt as a quote from another user.
+
+        Skype for Web doesn't support native quotes, and instead displays the legacy quote text.  Supported desktop
+        clients show a blockquote with the author's name and timestamp underneath.
+
+        .. note:: Anomalous API behaviour: it is possible to fake the message content of a quote.
+
+        Args:
+            user (SkypeUser): user who is to be quoted saying the message
+            chat (SkypeChat): conversation the quote was originally seen in
+            timestamp (datetime.datetime): original arrival time of the quoted message
+            content (str): excerpt of the original message to be quoted
+
+        Returns:
+            str: tag to display the excerpt as a quote
+        """
+        # Single conversations lose their prefix here.
+        chatId = chat.id if chat.id.split(":")[0] == "19" else noPrefix(chat.id)
+        # Legacy timestamp includes the date if the quote is not from today.
+        unixTime = int(time.mktime(timestamp.timetuple()))
+        legacyTime = timestamp.strftime("{0}%H:%M:%S".format("" if timestamp.date() == date.today() else "%d/%m/%Y "))
+        return """<quote author="{0}" authorname="{1}" conversation="{2}" timestamp="{3}"><legacyquote>""" \
+               """[{4}] {1}: </legacyquote>{5}<legacyquote>\n\n&lt;&lt;&lt; </legacyquote></quote>""" \
+               .format(user.id, user.name, chatId, unixTime, legacyTime, content)
     attrs = ("id", "type", "time", "editId", "userId", "chatId", "content")
     @classmethod
     def rawToFields(cls, raw={}):
@@ -146,14 +174,14 @@ class SkypeMsg(SkypeObj):
 
         With ``entities`` set, instead of stripping all tags altogether, the following replacements are made:
 
-        ===========================  =========================
-        Rich text                    Plain text
-        ===========================  =========================
-        ``<b>bold</b>``              ``*bold*``
-        ``<i>italic</i>``            ``_italic_``
-        ``<s>strikethrough</s>``     ``~strikethrough~``
-        ``<pre>monospace</pre>``     ``{code}monospace{code}``
-        ===========================  =========================
+        ========================  =========================
+        Rich text                 Plain text
+        ========================  =========================
+        ``<b>bold</b>``           ``*bold*``
+        ``<i>italic</i>``         ``_italic_``
+        ``<s>strikethrough</s>``  ``~strikethrough~``
+        ``<pre>monospace</pre>``  ``{code}monospace{code}``
+        ========================  =========================
 
         Args:
             entities (bool): whether to preserve formatting using the plain text equivalents
