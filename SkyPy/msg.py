@@ -94,7 +94,7 @@ class SkypeMsg(SkypeObj):
         Returns:
             str: tag to display a hyperlink
         """
-        return """<a href="{0}">{1}</a>""".format(l, s or l)
+        return """<a href="{0}">{1}</a>""".format(url, display or url)
     @staticmethod
     def emote(shortcut):
         """
