@@ -51,12 +51,31 @@ class SkypeChat(SkypeObj):
                 msgs.append(SkypeMsg.fromRaw(self.skype, json))
             return msgs
         return url, params, fetch, process
+    def setTyping(self, active=True):
+        """
+        Send a typing presence notification to the conversation.  This will typically show the "*<name> is typing...*"
+        message in others clients.
+
+        .. note:: A user's event stream will not receive any events for their own typing notifications.
+
+        It may be necessary to send this type of message continuously, as each typing presence usually expires after a
+        few seconds.  Set ``active`` to ``False`` to clear a current presence.
+
+        Args:
+            active (bool): whether to show as currently typing
+        """
+        msgRaw = {
+            "messagetype": "Control/{0}Typing".format("" if active else "Clear"),
+            "content": None
+        }
+        self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
+                        auth=SkypeConnection.Auth.RegToken, json=msgRaw)
     def sendMsg(self, content, me=False, rich=False, edit=None):
         """
-        Send a message to the conversation.
+        Send a text message to the conversation.
 
         If ``me`` is specified, the message is sent as an action (equivalent to ``/me <content>`` in other clients).
-        This is typically displayed as "*Name* ``<content>``", where clicking the name links back to your profile.
+        This is typically displayed as "*<name>* ``<content>``", where clicking the name links back to your profile.
 
         Rich text can also be sent, provided it is formatted using Skype's subset of HTML.  Helper methods on the
         :class:`.SkypeMsg` class can generate the necessary markup.
@@ -152,14 +171,14 @@ class SkypeChat(SkypeObj):
         Args:
             contact (SkypeUser): the user to embed in the message
         """
-        msg = {
+        msgRaw = {
             "clientmessageid": int(time()),
             "messagetype": "RichText/Contacts",
             "contenttype": "text",
             "content": """<contacts><c t="s" s="{0}" f="{1}"/></contacts>""".format(contact.id, contact.name)
         }
         self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
-                        auth=SkypeConnection.Auth.RegToken, json=msg)
+                        auth=SkypeConnection.Auth.RegToken, json=msgRaw)
         timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
         return SkypeContactMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"],
                                time=timeStr, userId=self.skype.user.id, chatId=self.id,
