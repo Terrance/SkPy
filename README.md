@@ -30,6 +30,8 @@ groupchat.sendFile(open(filename, "rb"), filename) # file upload
 groupchat.sendContact(sk.contacts[buddyname]) # contact sharing
 ```
 
+Check the documentation for [more examples](http://sandbox.t.allofti.me/skypy/usage.html) or [the full API](http://sandbox.t.allofti.me/skypy/api.html).
+
 ## State-synced methods
 
 Some APIs, such as recent conversations or messages, include a state URL for the next query -- this allows you to fetch the next chunk of data without resending any duplicates.  Wrapper methods for APIs that support state syncing (e.g. `SkypeChat.getMsgs()`) automatically handle this for you.
