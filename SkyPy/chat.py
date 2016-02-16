@@ -34,7 +34,7 @@ class SkypeChat(SkypeObj):
         If new messages arrive in the meantime, they are returned first in the next batch.
 
         Returns:
-            :class:`SkypeMsg` list: collection of messages
+            :class:`.SkypeMsg` list: collection of messages
         """
         url = "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id)
         params = {
@@ -64,12 +64,60 @@ class SkypeChat(SkypeObj):
         Args:
             active (bool): whether to show as currently typing
         """
-        msgRaw = {
+        msg = {
             "messagetype": "Control/{0}Typing".format("" if active else "Clear"),
             "content": None
         }
         self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
-                        auth=SkypeConnection.Auth.RegToken, json=msgRaw)
+                        auth=SkypeConnection.Auth.RegToken, json=msg)
+    def sendRaw(self, editId=None, **kwargs):
+        """
+        Send a raw message to the conversation.  At a minimum, values for ``content``, ``messagetype`` and
+        ``contenttype`` should be provided.
+
+        The message object returned here will not have a server-provided identifier (needed for acks), as the messages
+        API does not provide it.  Note that message edits depend on the client identifier, which is included.
+
+        There is no need to include ``clientmessageid`` or ``skypeeditedid`` -- instead, use ``editId`` to update an
+        existing message, otherwise a new one will be created with its own client identifier.
+
+        Args:
+            editId (int): identifier of an existing message to replace
+            content (str): plain or HTML body for the message
+            contenttype (str): format of the message, normally ``text``
+            messagetype (str): base message type
+            skypeemoteoffset (int): used with action messages to control where the user's name ends
+            kwargs (dict): any additional arguments not listed above
+
+        Returns:
+            .SkypeMsg: copy of the sent message object
+        """
+        msg = {
+            "contenttype": "text",
+            "messagetype": "Text"
+        }
+        clientDate = datetime.now()
+        # Skype timestamps are integers and in milliseconds, whereas Python's are floats and in seconds.
+        clientTime = int(clientDate.timestamp() * 1000)
+        msg["skypeeditedid" if editId else "clientmessageid"] = str(editId or clientTime)
+        msg.update(kwargs)
+        arriveTime = self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages" \
+                                              .format(self.skype.conn.msgsHost, self.id),
+                                      auth=SkypeConnection.Auth.RegToken, json=msg).json().get("OriginalArrivalTime")
+        arriveDate = datetime.fromtimestamp(arriveTime / 1000) if arriveTime else datetime.now()
+        msg.update({
+            "composetime": datetime.strftime(clientDate, "%Y-%m-%dT%H:%M:%S.%fZ"),
+            "conversationLink": "{0}/users/ME/conversations/{1}".format(self.skype.conn.msgsHost, self.id),
+            "from": "{0}/users/ME/contacts/8:{1}".format(self.skype.conn.msgsHost, self.skype.userId),
+            "imdisplayname": self.skype.user.name,
+            "isactive": True,
+            "originalarrivaltime": datetime.strftime(arriveDate, "%Y-%m-%dT%H:%M:%S.%fZ"),
+            "type": "Message"
+        })
+        if arriveTime:
+            arriveDate = datetime.fromtimestamp(arriveTime / 1000)
+            msg["originalarrivaltime"] = datetime.strftime(arriveDate, "%Y-%m-%dT%H:%M:%S.%fZ")
+        return SkypeMsg.fromRaw(self.skype, msg)
     def sendMsg(self, content, me=False, rich=False, edit=None):
         """
         Send a text message to the conversation.
@@ -84,31 +132,19 @@ class SkypeChat(SkypeObj):
             content (str): main message body
             me (bool): whether to send as an action, where the current account's name prefixes the message
             rich (bool): whether to send with rich text formatting
-            edit (int): identifier of an existing message to edit
+            edit (int): client identifier of an existing message to edit
+
+        Returns:
+            .SkypeMsg: copy of the sent message object
         """
-        timeId = int(time())
-        msgId = edit or timeId
-        msgType = "RichText" if rich else "Text"
-        msgRaw = {
-            ("skypeeditedid" if edit else "clientmessageid"): msgId,
-            "messagetype": msgType,
-            "contenttype": "text",
-            "content": content
-        }
+        msgType = "Text"
+        meOffset = None
         if me:
-            name = str(self.skype.user.name)
-            msgRaw.update({
-                "messagetype": "Text",
-                "content": "{0} {1}".format(name, content),
-                "imdisplayname": name,
-                "skypeemoteoffset": len(name) + 1
-            })
-        self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
-                        auth=SkypeConnection.Auth.RegToken, json=msgRaw)
-        timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
-        editId = msgId if edit else None
-        return SkypeMsg(self.skype, id=timeId, type=msgType, time=timeStr, editId=editId,
-                        userId=self.skype.user.id, chatId=self.id, content=content)
+            content = "{0} {1}".format(self.skype.user.name, content)
+            meOffset = len(str(self.skype.user.name)) + 1
+        elif rich:
+            msgType = "RichText"
+        return self.sendRaw(editId=edit, messagetype=msgType, content=content, skypeemoteoffset=meOffset)
     def sendFile(self, content, name, image=False):
         """
         Upload a file to the conversation.  Content should be an ASCII or binary file-like object.
@@ -119,6 +155,9 @@ class SkypeChat(SkypeObj):
             content (file): file-like object to retrieve the attachment's body
             name (str): filename displayed to other clients
             image (bool): whether to treat the file as an image
+
+        Returns:
+            .SkypeFileMsg: copy of the sent message object
         """
         meta = {
             "type": "pish/image" if image else "sharing/file",
@@ -143,46 +182,21 @@ class SkypeChat(SkypeObj):
             body = """<URIObject type="File.1" uri="{1}" url_thumbnail="{1}/views/thumbnail">""" \
                    """<Title>Title: {3}</Title><Description> Description: {3}</Description>""" \
                    """<a href="{2}"> {2}</a><OriginalName v="{3}"/><FileSize v="{4}"/></URIObject>""" \
-                   .format(objId, urlFull, urlLogin, name, size)
-        msg = {
-            "clientmessageid": int(time()),
-            "contenttype": "text",
-            "messagetype": "RichText/{0}".format("UriObject" if image else "Media_GenericFile"),
-            "content": body
-        }
-        self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
-                        auth=SkypeConnection.Auth.RegToken, json=msg)
-        timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
-        if image:
-            msgCls = SkypeImageMsg
-            msgFile = SkypeFileMsg.File(self.skype, name=name, urlFull=urlFull,
-                                        urlThumb="{0}/views/imgtl".format(urlFull),
-                                        urlView="https://api.asm.skype.com/s/i?{0}".format(objId))
-        else:
-            msgCls = SkypeFileMsg
-            msgFile = SkypeFileMsg.File(self.skype, name=name, size=size, urlFull=urlFull,
-                                        urlThumb="{0}/views/thumbnail".format(urlFull), urlView=urlView)
-        return msgCls(self.skype, id=msg["clientmessageid"], type=msg["messagetype"], time=timeStr,
-                      userId=self.skype.user.id, chatId=self.id, content=msg["content"], file=msgFile)
+                   .format(objId, urlFull, urlView, name, size)
+        msgType = "RichText/{0}".format("UriObject" if image else "Media_GenericFile")
+        return self.sendRaw(content=body, messagetype=msgType)
     def sendContact(self, contact):
         """
         Share a contact with the conversation.
 
         Args:
             contact (SkypeUser): the user to embed in the message
+
+        Returns:
+            .SkypeContactMsg: copy of the sent message object
         """
-        msgRaw = {
-            "clientmessageid": int(time()),
-            "messagetype": "RichText/Contacts",
-            "contenttype": "text",
-            "content": """<contacts><c t="s" s="{0}" f="{1}"/></contacts>""".format(contact.id, contact.name)
-        }
-        self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
-                        auth=SkypeConnection.Auth.RegToken, json=msgRaw)
-        timeStr = datetime.strftime(datetime.now(), "%Y-%m-%dT%H:%M:%S.%fZ")
-        return SkypeContactMsg(self.skype, id=msg["clientmessageid"], type=msg["messagetype"],
-                               time=timeStr, userId=self.skype.user.id, chatId=self.id,
-                               content=msg["content"], contactId=contact.id, contactName="{0}".format(contact.name))
+        content = """<contacts><c t="s" s="{0}" f="{1}"/></contacts>""".format(contact.id, contact.name)
+        return self.sendRaw(content=content, messagetype="RichText/Contacts")
     def delete(self):
         """
         Delete the conversation and all message history.
