@@ -1,8 +1,7 @@
-from time import time
 from datetime import datetime
 
 from .conn import SkypeConnection
-from .msg import SkypeMsg, SkypeContactMsg, SkypeFileMsg, SkypeImageMsg
+from .msg import SkypeMsg
 from .util import SkypeObj, SkypeObjs, noPrefix, initAttrs, convertIds, cacheResult, syncState
 
 @initAttrs
@@ -101,9 +100,9 @@ class SkypeChat(SkypeObj):
         clientTime = int(clientDate.timestamp() * 1000)
         msg["skypeeditedid" if editId else "clientmessageid"] = str(editId or clientTime)
         msg.update(kwargs)
-        arriveTime = self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages" \
-                                              .format(self.skype.conn.msgsHost, self.id),
-                                      auth=SkypeConnection.Auth.RegToken, json=msg).json().get("OriginalArrivalTime")
+        arriveTime = self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages"
+                                             .format(self.skype.conn.msgsHost, self.id),
+                                     auth=SkypeConnection.Auth.RegToken, json=msg).json().get("OriginalArrivalTime")
         arriveDate = datetime.fromtimestamp(arriveTime / 1000) if arriveTime else datetime.now()
         msg.update({
             "composetime": datetime.strftime(clientDate, "%Y-%m-%dT%H:%M:%S.%fZ"),

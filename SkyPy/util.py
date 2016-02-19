@@ -14,7 +14,7 @@ def upper(s):
     Returns:
         str: uppercase string
     """
-    return s if s == None else s.upper()
+    return s if s is None else s.upper()
 
 def noPrefix(s):
     """
@@ -26,7 +26,7 @@ def noPrefix(s):
     Returns:
         str: unprefixed string
     """
-    return s if s == None else s.split(":", 1)[1]
+    return s if s is None else s.split(":", 1)[1]
 
 def userToId(url):
     """
@@ -288,7 +288,7 @@ class SkypeObj(object):
             other (SkypeObj): second object to copy fields from
         """
         for attr in self.attrs:
-            if not getattr(other, attr, None) == None:
+            if not getattr(other, attr, None) is None:
                 setattr(self, attr, getattr(other, attr))
         if other.raw:
             if not self.raw:

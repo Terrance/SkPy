@@ -1,5 +1,4 @@
 from datetime import datetime
-import re
 
 from .conn import SkypeConnection
 from .msg import SkypeMsg
@@ -195,7 +194,7 @@ class SkypeChatUpdateEvent(SkypeEvent):
         """
         Use the consumption horizon to mark the conversation as up-to-date.
         """
-        self.skype.conn("PUT", "{0}/users/ME/conversations/{1}/properties" \
+        self.skype.conn("PUT", "{0}/users/ME/conversations/{1}/properties"
                                .format(self.skype.conn.msgsHost, self.chatId),
                         auth=SkypeConnection.Auth.RegToken, params={"name": "consumptionhorizon"},
                         json={"consumptionhorizon": self.horizon})

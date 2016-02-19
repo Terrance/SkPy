@@ -202,7 +202,7 @@ class SkypeContacts(SkypeObjs):
         for id in sorted(self.contactIds):
             yield self.cache[id]
     def sync(self):
-        for json in self.skype.conn("GET", "{0}/users/{1}/contacts" \
+        for json in self.skype.conn("GET", "{0}/users/{1}/contacts"
                                            .format(SkypeConnection.API_CONTACTS, self.skype.userId),
                                     auth=SkypeConnection.Auth.SkypeToken).json().get("contacts", []):
             self.merge(SkypeContact.fromRaw(self.skype, json))
@@ -226,7 +226,7 @@ class SkypeContacts(SkypeObjs):
                 self.contactIds.append(json.get("id"))
             return self.merge(SkypeContact.fromRaw(self.skype, json))
         except SkypeApiException as e:
-            if len(e.args) >= 2 and isinstance(e.args[1], requests.Response) and e.args[1].status_code == 403:
+            if len(e.args) >= 2 and getattr(e.args[1], "status_code", None) == 403:
                 # Not a contact, so no permission to retrieve information.
                 return None
             raise
@@ -308,7 +308,7 @@ class SkypeRequest(SkypeObj):
         """
         Accept the contact request, and add the user to the contact list.
         """
-        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/accept" \
+        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/accept"
                                .format(SkypeConnection.API_USER, self.userId), auth=SkypeConnection.Auth.SkypeToken)
         self.skype.conn("PUT", "{0}/users/ME/contacts/8:{1}".format(self.skype.conn.msgsHost, self.userId),
                         auth=SkypeConnection.Auth.RegToken)
@@ -316,5 +316,5 @@ class SkypeRequest(SkypeObj):
         """
         Decline the contact request.
         """
-        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/decline" \
+        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/decline"
                                .format(SkypeConnection.API_USER, self.userId), auth=SkypeConnection.Auth.SkypeToken)

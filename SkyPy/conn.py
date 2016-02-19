@@ -217,7 +217,7 @@ class SkypeConnection(SkypeObj):
             length = int(loginRespPage.find("input", {"name": "expires_in"}).get("value"))
             self.tokenExpiry["skype"] = datetime.fromtimestamp(secs + length)
             self.user = user
-        except AttributeError as e:
+        except AttributeError:
             raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
     def getRegToken(self):
         """

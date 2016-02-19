@@ -1,13 +1,10 @@
-import time
-import datetime
-
 import requests
 
 from .conn import SkypeConnection
-from .user import SkypeContact, SkypeContacts, SkypeRequest
-from .chat import SkypeSingleChat, SkypeGroupChat, SkypeChats
+from .user import SkypeContact, SkypeContacts
+from .chat import SkypeChats
 from .event import SkypeEvent
-from .util import SkypeObj, cacheResult, syncState
+from .util import SkypeObj, cacheResult
 
 class Skype(SkypeObj):
     """
@@ -106,7 +103,7 @@ class SkypeEventLoop(Skype):
         """
         while True:
             try:
-                events = self.getEvents();
+                events = self.getEvents()
             except requests.ConnectionError:
                 continue
             for event in events:
