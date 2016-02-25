@@ -181,17 +181,18 @@ class SkypeChat(SkypeObj):
                                       OriginalName=name, FileSize=size)
         msgType = "RichText/{0}".format("UriObject" if image else "Media_GenericFile")
         return self.sendRaw(content=body, messagetype=msgType)
-    def sendContact(self, contact):
+    def sendContacts(self, *contacts):
         """
-        Share a contact with the conversation.
+        Share one or more contacts with the conversation.
 
         Args:
-            contact (SkypeUser): the user to embed in the message
+            contacts (SkypeUser list): users to embed in the message
 
         Returns:
             .SkypeContactMsg: copy of the sent message object
         """
-        content = """<contacts><c t="s" s="{0}" f="{1}"/></contacts>""".format(contact.id, contact.name)
+        contactTags = ("""<c t="s" s="{0}" f="{1}"/>""".format(contact.id, contact.name) for contact in contacts)
+        content = """<contacts>{0}</contacts>""".format("".join(contactTags))
         return self.sendRaw(content=content, messagetype="RichText/Contacts")
     def delete(self):
         """

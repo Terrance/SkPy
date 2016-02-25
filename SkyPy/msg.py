@@ -243,27 +243,29 @@ class SkypeMsg(SkypeObj):
         self.edit("")
 
 @initAttrs
-@convertIds(user=("contact",))
+@convertIds(users=("contact",))
 class SkypeContactMsg(SkypeMsg):
     """
-    A message containing a shared contact.
+    A message containing one or more shared contacts.
 
     Attributes:
-        contact (:class:`.SkypeUser`):
-            User object embedded in the message.
-        contactName (str):
-            Name of the user, as seen by the sender of the message.
+        contacts (:class:`.SkypeUser` list):
+            User objects embedded in the message.
+        contactNames (str list):
+            Names of the users, as seen by the sender of the message.
     """
-    attrs = SkypeMsg.attrs + ("contactId", "contactName")
+    attrs = SkypeMsg.attrs + ("contactIds", "contactNames")
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeContactMsg, cls).rawToFields(raw)
-        contact = BeautifulSoup(raw.get("content"), "html.parser").find("c")
-        if contact:
-            fields.update({
-                "contactId": contact.get("s"),
-                "contactName": contact.get("f")
-            })
+        fields.update({
+            "contactIds": [],
+            "contactNames": []
+        })
+        contactTags = BeautifulSoup(raw.get("content"), "html.parser").find_all("c")
+        for tag in contactTags:
+            fields["contactIds"].append(tag.get("s"))
+            fields["contactNames"].append(tag.get("f"))
         return fields
 
 @initAttrs
