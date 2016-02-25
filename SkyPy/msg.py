@@ -283,6 +283,18 @@ class SkypeFileMsg(SkypeMsg):
     class File(SkypeObj):
         """
         Details about a file contained within a message.
+
+        Attributes:
+            name (str):
+                Original filename from the client.
+            size (int):
+                Number of bytes in the file.
+            urlFull (str):
+                URL to retrieve the original file.
+            urlThumb (str):
+                URL to retrieve a thumbnail or display image for the file.
+            urlView (str):
+                URL for the user to access the file outside of the API.
         """
         attrs = ("name", "size", "urlFull", "urlThumb", "urlView")
     attrs = SkypeMsg.attrs + ("file",)
