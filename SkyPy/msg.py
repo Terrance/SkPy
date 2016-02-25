@@ -139,6 +139,29 @@ class SkypeMsg(SkypeObj):
         return """<quote author="{0}" authorname="{1}" conversation="{2}" timestamp="{3}"><legacyquote>""" \
                """[{4}] {1}: </legacyquote>{5}<legacyquote>\n\n&lt;&lt;&lt; </legacyquote></quote>""" \
                .format(user.id, user.name, chatId, unixTime, legacyTime, content)
+    @staticmethod
+    def uriObject(content, type, url, thumb=None, title=None, desc=None, **values):
+        """
+        Generate the markup needed for a URI component in a rich message.
+
+        Args:
+            content (str): object-specific content inside the object tag
+            type (str): URI object type
+            url (str): URL to content
+            title (str): name of object
+            desc (str): additional line of information
+            thumb (str): URL to thumbnail of content
+            values (dict): standard value tags of the form ``<key v="value"/>``
+
+        Returns:
+            str: ``<URIObject>`` tag
+        """
+        titleTag = """<Title>Title: {0}</Title>""".format(title) if title else """<Title/>"""
+        descTag = """<Description>Description: {0}</Description>""".format(desc) if desc else """<Description/>"""
+        thumbAttr = " url_thumbnail=\"{0}\"".format(thumb) if thumb else ""
+        valTags = "".join("""<{0} v="{1}"/>""".format(k, v) for k, v in values.items())
+        return """<URIObject type="{1}" uri="{2}"{3}>{4}{5}{6}{0}</URIObject>""" \
+               .format(content, type, url, thumbAttr, titleTag, descTag, valTags)
     attrs = ("id", "type", "time", "clientId", "userId", "chatId", "content")
     @classmethod
     def rawToFields(cls, raw={}):

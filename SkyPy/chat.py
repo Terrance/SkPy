@@ -172,16 +172,13 @@ class SkypeChat(SkypeObj):
                         auth=SkypeConnection.Auth.Authorize, data=content.read())
         size = content.tell()
         if image:
-            body = """<URIObject type="Picture.1" uri="{1}" url_thumbnail="{1}/views/imgt1">MyLegacy pish """ \
-                   """<a href="https://api.asm.skype.com/s/i?{0}">https://api.asm.skype.com/s/i?{0}</a>""" \
-                   """<Title/><Description/><OriginalName v="{2}"/>""" \
-                   """<meta type="photo" originalName="{2}"/></URIObject>""".format(objId, urlFull, name)
+            viewLink = SkypeMsg.link("https://api.asm.skype.com/s/i?{0}".format(objId))
+            body = SkypeMsg.uriObject("""{0}<meta type="photo" originalName="{1}"/>""".format(viewLink, name),
+                                      "Picture.1", urlFull, thumb="{0}/views/imgt1".format(urlFull), OriginalName=name)
         else:
-            urlView = "https://login.skype.com/login/sso?go=webclient.xmm&docid={0}".format(objId)
-            body = """<URIObject type="File.1" uri="{1}" url_thumbnail="{1}/views/thumbnail">""" \
-                   """<Title>Title: {3}</Title><Description> Description: {3}</Description>""" \
-                   """<a href="{2}"> {2}</a><OriginalName v="{3}"/><FileSize v="{4}"/></URIObject>""" \
-                   .format(objId, urlFull, urlView, name, size)
+            viewLink = SkypeMsg.link("https://login.skype.com/login/sso?go=webclient.xmm&docid={0}".format(objId))
+            body = SkypeMsg.uriObject(viewLink, "File.1", urlFull, "{0}/views/thumbnail".format(urlFull), name, name,
+                                      OriginalName=name, FileSize=size)
         msgType = "RichText/{0}".format("UriObject" if image else "Media_GenericFile")
         return self.sendRaw(content=body, messagetype=msgType)
     def sendContact(self, contact):
