@@ -8,6 +8,7 @@ from .conn import SkypeConnection
 from .static import emoticons
 from .util import SkypeObj, noPrefix, userToId, chatToId, initAttrs, convertIds, cacheResult
 
+
 @initAttrs
 @convertIds("user", "chat")
 class SkypeMsg(SkypeObj):
@@ -32,6 +33,7 @@ class SkypeMsg(SkypeObj):
         content (str):
             Raw message content, as received from the API.
     """
+
     @staticmethod
     def bold(s):
         """
@@ -44,6 +46,7 @@ class SkypeMsg(SkypeObj):
             str: formatted string
         """
         return """<b raw_pre="*" raw_post="*">{0}</b>""".format(s)
+
     @staticmethod
     def italic(s):
         """
@@ -56,6 +59,7 @@ class SkypeMsg(SkypeObj):
             str: formatted string
         """
         return """<i raw_pre="_" raw_post="_">{0}</i>""".format(s)
+
     @staticmethod
     def strike(s):
         """
@@ -68,6 +72,7 @@ class SkypeMsg(SkypeObj):
             str: formatted string
         """
         return """<s raw_pre="~" raw_post="~">{0}</s>""".format(s)
+
     @staticmethod
     def mono(s):
         """
@@ -80,6 +85,7 @@ class SkypeMsg(SkypeObj):
             str: formatted string
         """
         return """<pre raw_pre="{{code}}" raw_post="{{code}}">{0}</pre>""".format(s)
+
     @staticmethod
     def link(url, display=None):
         """
@@ -95,6 +101,7 @@ class SkypeMsg(SkypeObj):
             str: tag to display a hyperlink
         """
         return """<a href="{0}">{1}</a>""".format(url, display or url)
+
     @staticmethod
     def emote(shortcut):
         """
@@ -112,6 +119,7 @@ class SkypeMsg(SkypeObj):
                 return """<ss type="{0}">{1}</ss>""".format(emote, name)
         # No match, return the input as-is.
         return shortcut
+
     @staticmethod
     def quote(user, chat, timestamp, content):
         """
@@ -139,6 +147,7 @@ class SkypeMsg(SkypeObj):
         return """<quote author="{0}" authorname="{1}" conversation="{2}" timestamp="{3}"><legacyquote>""" \
                """[{4}] {1}: </legacyquote>{5}<legacyquote>\n\n&lt;&lt;&lt; </legacyquote></quote>""" \
                .format(user.id, user.name, chatId, unixTime, legacyTime, content)
+
     @staticmethod
     def uriObject(content, type, url, thumb=None, title=None, desc=None, **values):
         """
@@ -162,7 +171,9 @@ class SkypeMsg(SkypeObj):
         valTags = "".join("""<{0} v="{1}"/>""".format(k, v) for k, v in values.items())
         return """<URIObject type="{1}" uri="{2}"{3}>{4}{5}{6}{0}</URIObject>""" \
                .format(content, type, url, thumbAttr, titleTag, descTag, valTags)
+
     attrs = ("id", "type", "time", "clientId", "userId", "chatId", "content")
+
     @classmethod
     def rawToFields(cls, raw={}):
         try:
@@ -178,6 +189,7 @@ class SkypeMsg(SkypeObj):
             "chatId": chatToId(raw.get("conversationLink", "")),
             "content": raw.get("content")
         }
+
     @classmethod
     def fromRaw(cls, skype=None, raw={}):
         msgCls = {
@@ -189,6 +201,7 @@ class SkypeMsg(SkypeObj):
             "ThreadActivity/DeleteMember": SkypeRemoveMemberMsg
         }.get(raw.get("messagetype"), cls)
         return msgCls(skype, raw, **msgCls.rawToFields(raw))
+
     def plain(self, entities=False):
         """
         Attempt to convert the message to plain text.
@@ -222,6 +235,7 @@ class SkypeMsg(SkypeObj):
         else:
             # It's already plain, or it's something we can't handle.
             return self.content
+
     def edit(self, content, me=False, rich=False):
         """
         Send an edit of this message.  Arguments are passed to :meth:`.SkypeChat.sendMsg`.
@@ -234,6 +248,7 @@ class SkypeMsg(SkypeObj):
             rich (bool): whether to send with rich text formatting
         """
         self.chat.sendMsg(content, me, rich, self.clientId)
+
     def delete(self):
         """
         Delete the message and remove it from the conversation.
@@ -241,6 +256,7 @@ class SkypeMsg(SkypeObj):
         Equivalent to calling :meth:`edit` with an empty ``content`` string.
         """
         self.edit("")
+
 
 @initAttrs
 @convertIds(users=("contact",))
@@ -254,7 +270,9 @@ class SkypeContactMsg(SkypeMsg):
         contactNames (str list):
             Names of the users, as seen by the sender of the message.
     """
+
     attrs = SkypeMsg.attrs + ("contactIds", "contactNames")
+
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeContactMsg, cls).rawToFields(raw)
@@ -268,6 +286,7 @@ class SkypeContactMsg(SkypeMsg):
             fields["contactNames"].append(tag.get("f"))
         return fields
 
+
 @initAttrs
 class SkypeFileMsg(SkypeMsg):
     """
@@ -279,6 +298,7 @@ class SkypeFileMsg(SkypeMsg):
         fileContent (bytes):
             Raw content of the file.
     """
+
     @initAttrs
     class File(SkypeObj):
         """
@@ -297,7 +317,9 @@ class SkypeFileMsg(SkypeMsg):
                 URL for the user to access the file outside of the API.
         """
         attrs = ("name", "size", "urlFull", "urlThumb", "urlView")
+
     attrs = SkypeMsg.attrs + ("file",)
+
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeFileMsg, cls).rawToFields(raw)
@@ -313,22 +335,26 @@ class SkypeFileMsg(SkypeMsg):
             }
             fields["file"] = SkypeFileMsg.File(**fileFields)
         return fields
+
     @property
     @cacheResult
     def fileContent(self):
         return self.skype.conn("GET", "{0}/views/original".format(self.file.urlFull),
                                auth=SkypeConnection.Auth.Authorize).content
 
+
 @initAttrs
 class SkypeImageMsg(SkypeFileMsg):
     """
     A message containing a picture shared in a conversation.
     """
+
     @property
     @cacheResult
     def fileContent(self):
         return self.skype.conn("GET", "{0}/views/imgpsh_fullsize".format(self.file.urlFull),
                                auth=SkypeConnection.Auth.Authorize).content
+
 
 @initAttrs
 class SkypeCallMsg(SkypeMsg):
@@ -339,6 +365,7 @@ class SkypeCallMsg(SkypeMsg):
         state (:class:`State`):
             New state of the call.
     """
+
     class State:
         """
         Enum: possible call states (either started and incoming, or ended).
@@ -351,13 +378,16 @@ class SkypeCallMsg(SkypeMsg):
         """
         All call participants have hung up.
         """
+
     attrs = SkypeMsg.attrs + ("state",)
+
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeCallMsg, cls).rawToFields(raw)
         partType = (BeautifulSoup(raw.get("content"), "html.parser").find("partlist") or {}).get("type")
         fields["state"] = {"started": cls.State.Started, "ended": cls.State.Ended}[partType]
         return fields
+
 
 @initAttrs
 @convertIds(user=("member",))
@@ -372,13 +402,16 @@ class SkypeMemberMsg(SkypeMsg):
         member (:class:`.SkypeUser`):
             User being added to or removed from the conversation.
     """
+
     attrs = SkypeMsg.attrs + ("memberId",)
+
 
 @initAttrs
 class SkypeAddMemberMsg(SkypeMemberMsg):
     """
     A message representing a user added to a group conversation.
     """
+
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeAddMemberMsg, cls).rawToFields(raw)
@@ -389,11 +422,13 @@ class SkypeAddMemberMsg(SkypeMemberMsg):
         })
         return fields
 
+
 @initAttrs
 class SkypeRemoveMemberMsg(SkypeMemberMsg):
     """
     A message representing a user removed from a group conversation.
     """
+
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeRemoveMemberMsg, cls).rawToFields(raw)

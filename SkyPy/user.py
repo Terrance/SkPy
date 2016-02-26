@@ -3,6 +3,7 @@ from datetime import datetime
 from .conn import SkypeConnection
 from .util import SkypeObj, SkypeObjs, SkypeApiException, upper, initAttrs, convertIds, cacheResult
 
+
 @initAttrs
 class SkypeUser(SkypeObj):
     """
@@ -26,14 +27,18 @@ class SkypeUser(SkypeObj):
         chat (:class:`.SkypeSingleChat`):
             One-to-one conversation with this user.
     """
+
     @initAttrs
     class Name(SkypeObj):
         """
         The name of a user or contact.
         """
+
         attrs = ("first", "last")
+
         def __str__(self):
             return " ".join(filter(None, (self.first, self.last)))
+
     @initAttrs
     class Location(SkypeObj):
         """
@@ -41,19 +46,26 @@ class SkypeUser(SkypeObj):
 
         Any number of fields may be filled in, so stringifying will combine them into a comma-separated list.
         """
+
         attrs = ("city", "region", "country")
+
         def __str__(self):
             return ", ".join(filter(None, (self.city, self.region, self.country)))
+
     @initAttrs
     class Mood(SkypeObj):
         """
         The mood message set by a user or contact.
         """
+
         attrs = ("plain", "rich")
+
         def __str__(self):
             return self.plain or ""
+
     attrs = ("id", "name", "location", "avatar", "mood")
     defaults = dict(name=Name(), location=Location())
+
     @classmethod
     def rawToFields(cls, raw={}):
         firstName = raw.get("firstname", raw.get("name", {}).get("first"))
@@ -80,10 +92,12 @@ class SkypeUser(SkypeObj):
             "avatar": avatar,
             "mood": mood
         }
+
     @property
     @cacheResult
     def chat(self):
         return self.skype.chats["8:" + self.id]
+
     def invite(self, greeting=None):
         """
         Send the user a contact request.
@@ -93,6 +107,7 @@ class SkypeUser(SkypeObj):
         """
         self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}".format(SkypeConnection.API_USER, self.id),
                         json={"greeting": greeting})
+
 
 @initAttrs
 class SkypeContact(SkypeUser):
@@ -111,6 +126,7 @@ class SkypeContact(SkypeUser):
         blocked (bool):
             Whether the logged-in account has blocked this user.
     """
+
     @initAttrs
     class Phone(SkypeObj):
         """
@@ -132,11 +148,15 @@ class SkypeContact(SkypeUser):
             """
             A mobile phone number.
             """
+
         attrs = ("type", "number")
+
         def __str__(self):
             return self.number or ""
+
     attrs = SkypeUser.attrs + ("language", "phones", "birthday", "authorised", "blocked")
     defaults = dict(SkypeUser.defaults, phones=[])
+
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeContact, cls).rawToFields(raw)
@@ -165,11 +185,13 @@ class SkypeContact(SkypeUser):
             "blocked": raw.get("blocked")
         })
         return fields
+
     def delete(self):
         """
         Remove the user from your contacts.
         """
         self.skype.conn("DELETE", "{0}/users/self/contacts/{1}".format(SkypeConnection.API_USER, self.id))
+
 
 class SkypeContacts(SkypeObjs):
     """
@@ -186,21 +208,25 @@ class SkypeContacts(SkypeObjs):
 
     Contacts can also be iterated over, where only authorised users are returned in the collection.
     """
+
     def __init__(self, skype=None):
         super(SkypeContacts, self).__init__(skype)
         self.contactIds = []
+
     def __getitem__(self, key):
         # Try to retrieve from the cache, otherwise return a user object instead.
         try:
             return super(SkypeContacts, self).__getitem__(key)
         except KeyError:
             return self.skype.user if key == self.skype.userId else self.user(key)
+
     def __iter__(self):
         if not self.synced:
             self.sync()
         # Only iterate over actual contacts, not all cached users.
         for id in sorted(self.contactIds):
             yield self.cache[id]
+
     def sync(self):
         for json in self.skype.conn("GET", "{0}/users/{1}/contacts"
                                            .format(SkypeConnection.API_CONTACTS, self.skype.userId),
@@ -209,6 +235,7 @@ class SkypeContacts(SkypeObjs):
             if not json.get("suggested"):
                 self.contactIds.append(json.get("id"))
         super(SkypeContacts, self).sync()
+
     def contact(self, id):
         """
         Retrieve all details for a specific contact, including fields such as birthday and mood.
@@ -230,6 +257,7 @@ class SkypeContacts(SkypeObjs):
                 # Not a contact, so no permission to retrieve information.
                 return None
             raise
+
     def user(self, id):
         """
         Retrieve public information about a user.
@@ -247,6 +275,7 @@ class SkypeContacts(SkypeObjs):
         json = self.skype.conn("POST", "{0}/users/self/contacts/profiles".format(SkypeConnection.API_USER),
                                auth=SkypeConnection.Auth.SkypeToken, data={"contacts[]": id}).json()
         return self.merge(SkypeUser.fromRaw(self.skype, json[0]))
+
     @cacheResult
     def search(self, query):
         """
@@ -271,6 +300,7 @@ class SkypeContacts(SkypeObjs):
             res["Location"] = obj.get("ContactCards", {}).get("CurrentLocation")
             results.append(res)
         return results
+
     def requests(self):
         """
         Retrieve any pending contact requests.
@@ -285,6 +315,7 @@ class SkypeContacts(SkypeObjs):
             requests.append(SkypeRequest.fromRaw(self.skype, obj))
         return requests
 
+
 @initAttrs
 @convertIds("user")
 class SkypeRequest(SkypeObj):
@@ -297,13 +328,16 @@ class SkypeRequest(SkypeObj):
         greeting (str):
             Custom message included with the request.
     """
+
     attrs = ("userId", "greeting")
+
     @classmethod
     def rawToFields(cls, raw={}):
         return {
             "userId": raw.get("sender"),
             "greeting": raw.get("greeting")
         }
+
     def accept(self):
         """
         Accept the contact request, and add the user to the contact list.
@@ -312,6 +346,7 @@ class SkypeRequest(SkypeObj):
                                .format(SkypeConnection.API_USER, self.userId), auth=SkypeConnection.Auth.SkypeToken)
         self.skype.conn("PUT", "{0}/users/ME/contacts/8:{1}".format(self.skype.conn.msgsHost, self.userId),
                         auth=SkypeConnection.Auth.RegToken)
+
     def reject(self):
         """
         Decline the contact request.

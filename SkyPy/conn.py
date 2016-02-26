@@ -11,10 +11,12 @@ import requests
 
 from .util import SkypeObj, SkypeException, SkypeApiException
 
+
 class SkypeConnection(SkypeObj):
     """
     The main connection class -- handles all requests to API resources.
     """
+
     class Auth:
         """
         Enum: authentication types for different API calls.
@@ -31,7 +33,7 @@ class SkypeConnection(SkypeObj):
         """
         Add a ``RegistrationToken`` header with the registration token.
         """
-    attrs = ("user", "tokenFile")
+
     @staticmethod
     def handle(*codes, **kwargs):
         """
@@ -44,7 +46,9 @@ class SkypeConnection(SkypeObj):
         Returns:
             method: decorator function, ready to apply to other methods
         """
+
         regToken = kwargs.get("regToken", False)
+
         def decorator(fn):
             @wraps(fn)
             def wrapper(self, *args, **kwargs):
@@ -58,12 +62,17 @@ class SkypeConnection(SkypeObj):
                         return fn(self, *args, **kwargs)
                     raise
             return wrapper
+
         return decorator
+
     API_LOGIN = "https://login.skype.com/login?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com"
     API_USER = "https://api.skype.com"
     API_SCHEDULE = "https://api.scheduler.skype.com"
     API_CONTACTS = "https://contacts.skype.com/contacts/v1"
     API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1"
+
+    attrs = ("user", "tokenFile")
+
     def __init__(self, user=None, pwd=None, tokenFile=None):
         """
         If ``tokenFile`` is specified, the file is searched for a valid set of tokens.  If this is successful, no Skype
@@ -115,6 +124,7 @@ class SkypeConnection(SkypeObj):
                 raise SkypeAuthException("No username or password provided, and no valid token file")
             self.getSkypeToken()
             self.getRegToken()
+
     def __call__(self, method, url, codes=(200, 201, 207), auth=None, headers=None, **kwargs):
         """
         Make an API call.  Most parameters are passed directly to :mod:`requests`.
@@ -153,6 +163,7 @@ class SkypeConnection(SkypeObj):
                 raise SkypeAuthException("Auth rate limit exceeded", resp)
             raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
         return resp
+
     @classmethod
     def externalCall(cls, method, url, codes=(200, 201, 207), **kwargs):
         """
@@ -178,6 +189,7 @@ class SkypeConnection(SkypeObj):
         if resp.status_code not in codes:
             raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
         return resp
+
     def login(self, user, pwd):
         """
         Obtain connection parameters from the Skype web login page, and perform a login with the given username and
@@ -219,6 +231,7 @@ class SkypeConnection(SkypeObj):
             self.user = user
         except AttributeError:
             raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
+
     def getRegToken(self):
         """
         Acquire a registration token.  See :meth:`getMac256Hash` for the hash generation.
@@ -250,6 +263,7 @@ class SkypeConnection(SkypeObj):
                 f.write(self.tokens["reg"] + "\n")
                 f.write(str(int(time.mktime(self.tokenExpiry["reg"].timetuple()))) + "\n")
                 f.write(self.msgsHost + "\n")
+
     def verifyToken(self, auth):
         """
         Ensure the authentication token for the given auth method is still valid.
@@ -269,6 +283,7 @@ class SkypeConnection(SkypeObj):
             if "reg" in self.tokenExpiry and datetime.now() >= self.tokenExpiry["reg"]:
                 self.getRegToken()
 
+
 class SkypeEndpoint(SkypeObj):
     """
     An endpoint represents a single point of presence within Skype.
@@ -277,7 +292,9 @@ class SkypeEndpoint(SkypeObj):
 
     Endpoints are time-sensitive -- they lapse after a short time unless kept alive (by :meth:`ping` or otherwise).
     """
+
     attrs = ("id",)
+
     def __init__(self, conn, id):
         """
         Create a new instance based on a newly-created endpoint identifier.
@@ -290,6 +307,7 @@ class SkypeEndpoint(SkypeObj):
         self.conn = conn
         self.id = id
         self.subscribed = False
+
     def ping(self, timeout=12):
         """
         Send a keep-alive request for the endpoint.
@@ -299,6 +317,7 @@ class SkypeEndpoint(SkypeObj):
         """
         self.conn("POST", "{0}/users/ME/endpoints/{1}/active".format(self.conn.msgsHost, self.id),
                   auth=SkypeConnection.Auth.RegToken, json={"timeout": timeout})
+
     def subscribe(self):
         """
         Subscribe to contact and conversation events.  These are accessible through :meth:`getEvents`.
@@ -316,6 +335,7 @@ class SkypeEndpoint(SkypeObj):
         self.conn("POST", "{0}/users/ME/endpoints/{1}/subscriptions".format(self.conn.msgsHost, self.id),
                   auth=SkypeConnection.Auth.RegToken, json=meta)
         self.subscribed = True
+
     def getEvents(self):
         """
         Retrieve a list of events since the last poll.  Multiple calls may be needed to retrieve all events.
@@ -332,6 +352,7 @@ class SkypeEndpoint(SkypeObj):
         return self.conn("POST", "{0}/users/ME/endpoints/{1}/subscriptions/0/poll".format(self.conn.msgsHost, self.id),
                          auth=SkypeConnection.Auth.RegToken).json().get("eventMessages", [])
 
+
 class SkypeAuthException(SkypeException):
     """
     An exception thrown when authentication cannot be completed.
@@ -339,12 +360,13 @@ class SkypeAuthException(SkypeException):
     Generally this means the request should not be retried (e.g. because of an incorrect password), or it should be
     delayed (e.g. rate limits).
     """
-    pass
+
 
 def getMac256Hash(challenge, appId, key):
     """
     Method to generate the lock-and-key response, needed to acquire registration tokens.
     """
+
     def int32ToHexString(n):
         hexChars = "0123456789abcdef"
         hexString = ""
@@ -352,6 +374,7 @@ def getMac256Hash(challenge, appId, key):
             hexString += hexChars[(n >> (i * 8 + 4)) & 15]
             hexString += hexChars[(n >> (i * 8)) & 15]
         return hexString
+
     def int64Xor(a, b):
         sA = "{0:b}".format(a)
         sB = "{0:b}".format(b)
@@ -369,6 +392,7 @@ def getMac256Hash(challenge, appId, key):
         for i in range(len(sA)):
             sC += "0" if sA[i] == sB[i] else "1"
         return int(sC, 2)
+
     def cS64(pdwData, pInHash):
         if len(pdwData) < 2 or len(pdwData) & 1 == 1:
             return None
@@ -403,6 +427,7 @@ def getMac256Hash(challenge, appId, key):
         qwSum += CS64_d
         qwSum = qwSum % MODULUS
         return [qwMAC, qwSum]
+
     clearText = challenge + appId
     clearText += "0" * (8 - len(clearText) % 8)
     cchClearText = len(clearText) // 4

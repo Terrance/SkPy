@@ -4,6 +4,7 @@ from .conn import SkypeConnection
 from .msg import SkypeMsg
 from .util import SkypeObj, SkypeObjs, noPrefix, initAttrs, convertIds, cacheResult, syncState
 
+
 @initAttrs
 class SkypeChat(SkypeObj):
     """
@@ -17,12 +18,15 @@ class SkypeChat(SkypeObj):
 
             Cloud group chat identifiers are of the form ``<type>:<identifier>@thread.skype``.
     """
+
     attrs = ("id",)
+
     @classmethod
     def rawToFields(cls, raw={}):
         return {
             "id": raw.get("id")
         }
+
     @syncState
     def getMsgs(self):
         """
@@ -35,21 +39,26 @@ class SkypeChat(SkypeObj):
         Returns:
             :class:`.SkypeMsg` list: collection of messages
         """
+
         url = "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id)
         params = {
             "startTime": 0,
             "view": "msnp24Equivalent",
             "targetType": "Passport|Skype|Lync|Thread"
         }
+
         def fetch(url, params):
             resp = self.skype.conn("GET", url, auth=SkypeConnection.Auth.RegToken, params=params).json()
             return resp, resp.get("_metadata", {}).get("syncState")
+
         def process(resp):
             msgs = []
             for json in resp.get("messages", []):
                 msgs.append(SkypeMsg.fromRaw(self.skype, json))
             return msgs
+
         return url, params, fetch, process
+
     def setTyping(self, active=True):
         """
         Send a typing presence notification to the conversation.  This will typically show the "*<name> is typing...*"
@@ -69,6 +78,7 @@ class SkypeChat(SkypeObj):
         }
         self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
                         auth=SkypeConnection.Auth.RegToken, json=msg)
+
     def sendRaw(self, editId=None, **kwargs):
         """
         Send a raw message to the conversation.  At a minimum, values for ``content``, ``messagetype`` and
@@ -117,6 +127,7 @@ class SkypeChat(SkypeObj):
             arriveDate = datetime.fromtimestamp(arriveTime / 1000)
             msg["originalarrivaltime"] = datetime.strftime(arriveDate, "%Y-%m-%dT%H:%M:%S.%fZ")
         return SkypeMsg.fromRaw(self.skype, msg)
+
     def sendMsg(self, content, me=False, rich=False, edit=None):
         """
         Send a text message to the conversation.
@@ -144,6 +155,7 @@ class SkypeChat(SkypeObj):
         elif rich:
             msgType = "RichText"
         return self.sendRaw(editId=edit, messagetype=msgType, content=content, skypeemoteoffset=meOffset)
+
     def sendFile(self, content, name, image=False):
         """
         Upload a file to the conversation.  Content should be an ASCII or binary file-like object.
@@ -181,6 +193,7 @@ class SkypeChat(SkypeObj):
                                       OriginalName=name, FileSize=size)
         msgType = "RichText/{0}".format("UriObject" if image else "Media_GenericFile")
         return self.sendRaw(content=body, messagetype=msgType)
+
     def sendContacts(self, *contacts):
         """
         Share one or more contacts with the conversation.
@@ -194,12 +207,14 @@ class SkypeChat(SkypeObj):
         contactTags = ("""<c t="s" s="{0}" f="{1}"/>""".format(contact.id, contact.name) for contact in contacts)
         content = """<contacts>{0}</contacts>""".format("".join(contactTags))
         return self.sendRaw(content=content, messagetype="RichText/Contacts")
+
     def delete(self):
         """
         Delete the conversation and all message history.
         """
         self.skype.conn("DELETE", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
                         auth=SkypeConnection.Auth.RegToken)
+
 
 @initAttrs
 @convertIds("user", "users")
@@ -211,16 +226,20 @@ class SkypeSingleChat(SkypeChat):
         user (:class:`.SkypeUser`):
             The other participant in the conversation.
     """
+
     attrs = SkypeChat.attrs + ("userId",)
+
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeSingleChat, cls).rawToFields(raw)
         fields["userId"] = noPrefix(fields.get("id"))
         return fields
+
     @property
     def userIds(self):
         # Provided for convenience, so single and group chats both have a users field.
         return [self.userId]
+
 
 @initAttrs
 @convertIds("users", user=("creator",), users=("admin",))
@@ -246,7 +265,9 @@ class SkypeGroupChat(SkypeChat):
         joinUrl (str):
             Public ``join.skype.com`` URL for any other users to access the conversation.
     """
+
     attrs = SkypeChat.attrs + ("topic", "creatorId", "userIds", "adminIds", "open", "history", "picture")
+
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeGroupChat, cls).rawToFields(raw)
@@ -268,6 +289,7 @@ class SkypeGroupChat(SkypeChat):
             "picture": props.get("picture", "")[4:] or None
         })
         return fields
+
     @property
     @cacheResult
     def joinUrl(self):
@@ -277,6 +299,7 @@ class SkypeGroupChat(SkypeChat):
         }
         return self.skype.conn("POST", "{0}/threads".format(SkypeConnection.API_SCHEDULE),
                                auth=SkypeConnection.Auth.SkypeToken, json=query).json()["JoinUrl"]
+
     def setTopic(self, topic):
         """
         Update the topic message.  An empty string clears the topic.
@@ -287,6 +310,7 @@ class SkypeGroupChat(SkypeChat):
         self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id),
                         auth=SkypeConnection.Auth.RegToken, params={"name": "topic"}, json={"topic": topic})
         self.topic = topic
+
     def setOpen(self, open):
         """
         Enable or disable joining by URL.  This does not affect current participants inviting others.
@@ -298,6 +322,7 @@ class SkypeGroupChat(SkypeChat):
                         auth=SkypeConnection.Auth.RegToken, params={"name": "joiningenabled"},
                         json={"joiningenabled": open})
         self.open = open
+
     def setHistory(self, history):
         """
         Enable or disable conversation history.  This only affects messages sent after the change.
@@ -311,6 +336,7 @@ class SkypeGroupChat(SkypeChat):
                         auth=SkypeConnection.Auth.RegToken, params={"name": "historydisclosed"},
                         json={"historydisclosed": history})
         self.history = history
+
     def addMember(self, id, admin=False):
         """
         Add a user to the conversation, or update their user/admin status.
@@ -327,6 +353,7 @@ class SkypeGroupChat(SkypeChat):
             self.adminIds.append(id)
         elif not admin and id in self.adminIds:
             self.adminIds.remove(id)
+
     def removeMember(self, id):
         """
         Remove a user from the conversation.
@@ -338,6 +365,7 @@ class SkypeGroupChat(SkypeChat):
                         auth=SkypeConnection.Auth.RegToken)
         if id in self.userIds:
             self.userIds.remove(id)
+
     def leave(self):
         """
         Leave the conversation.  You will lose any admin rights.
@@ -346,17 +374,20 @@ class SkypeGroupChat(SkypeChat):
         """
         self.removeMember(self.skype.userId)
 
+
 class SkypeChats(SkypeObjs):
     """
     A container of conversations, providing caching of user info to reduce API requests.
 
     Key lookups allow retrieving conversations by identifier.
     """
+
     def __getitem__(self, key):
         try:
             return super(SkypeChats, self).__getitem__(key)
         except KeyError:
             return self.chat(key)
+
     @syncState
     def recent(self):
         """
@@ -367,15 +398,18 @@ class SkypeChats(SkypeObjs):
         Returns:
             :class:`SkypeChat` list: collection of recent conversations
         """
+
         url = "{0}/users/ME/conversations".format(self.skype.conn.msgsHost)
         params = {
             "startTime": 0,
             "view": "msnp24Equivalent",
             "targetType": "Passport|Skype|Lync|Thread"
         }
+
         def fetch(url, params):
             resp = self.skype.conn("GET", url, auth=SkypeConnection.Auth.RegToken, params=params).json()
             return resp, resp.get("_metadata", {}).get("syncState")
+
         def process(resp):
             chats = {}
             for json in resp.get("conversations", []):
@@ -388,7 +422,9 @@ class SkypeChats(SkypeObjs):
                     cls = SkypeGroupChat
                 chats[json.get("id")] = self.merge(cls.fromRaw(self.skype, json))
             return chats
+
         return url, params, fetch, process
+
     def chat(self, id):
         """
         Get a single conversation by identifier.
@@ -405,6 +441,7 @@ class SkypeChats(SkypeObjs):
             json.update(info)
             cls = SkypeGroupChat
         return self.merge(cls.fromRaw(self.skype, json))
+
     def create(self, members=(), admins=()):
         """
         Create a new group chat with the given users.
@@ -430,6 +467,7 @@ class SkypeChats(SkypeObjs):
         resp = self.skype.conn("POST", "{0}/threads".format(self.skype.conn.msgsHost),
                                auth=SkypeConnection.Auth.RegToken, json={"members": memberObjs})
         return self.chat(resp.headers["Location"].rsplit("/", 1)[1])
+
     @staticmethod
     @cacheResult
     def urlToId(url):
