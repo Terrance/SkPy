@@ -1,4 +1,4 @@
-# SkyPy
+# SkPy
 
 An unofficial Python library for interacting with the Skype HTTP API.
 
@@ -15,7 +15,7 @@ This code is liable to fall apart if any part of the upstream API changes.  You 
 ## Getting started
 
 ```python
-from SkyPy import Skype
+from skpy import Skype
 sk = Skype(username, password, tokenFile) # connect to Skype
 
 sk.user # you
@@ -30,7 +30,7 @@ groupchat.sendFile(open(filename, "rb"), filename) # file upload
 groupchat.sendContact(sk.contacts[buddyname]) # contact sharing
 ```
 
-Check the documentation for [more examples](http://sandbox.t.allofti.me/skypy/usage.html) or [the full API](http://sandbox.t.allofti.me/skypy/api.html).
+Check the documentation for [more examples](http://sandbox.t.allofti.me/skpy/usage.html) or [the full API](http://sandbox.t.allofti.me/skpy/api.html).
 
 ## State-synced methods
 
@@ -47,7 +47,7 @@ To avoid this, you should reuse the Skype token where possible.  A token only ap
 Make your class a subclass of `SkypeEventLoop`, then override the `onEvent(event)` method to handle incoming messages and other events.
 
 ```python
-from SkyPy import SkypeEventLoop, SkypeNewMessageEvent
+from skpy import SkypeEventLoop, SkypeNewMessageEvent
 class SkypePing(SkypeEventLoop):
     def __init__(self):
         super(SkypePing, self).__init__(username, password)
