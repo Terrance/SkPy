@@ -1,4 +1,5 @@
 from datetime import datetime
+import time
 
 from .conn import SkypeConnection
 from .msg import SkypeMsg
@@ -105,9 +106,9 @@ class SkypeChat(SkypeObj):
             "contenttype": "text",
             "messagetype": "Text"
         }
-        clientDate = datetime.now()
         # Skype timestamps are integers and in milliseconds, whereas Python's are floats and in seconds.
-        clientTime = int(clientDate.timestamp() * 1000)
+        clientTime = int(time.time() * 1000)
+        clientDate = datetime.fromtimestamp(clientTime / 1000)
         msg["skypeeditedid" if editId else "clientmessageid"] = str(editId or clientTime)
         msg.update(kwargs)
         arriveTime = self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages"
