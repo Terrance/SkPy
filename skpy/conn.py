@@ -256,7 +256,7 @@ class SkypeConnection(SkypeObj):
         self.tokens["reg"] = re.search(r"(registrationToken=[a-z0-9\+/=]+)", regTokenHead, re.I).group(1)
         self.tokenExpiry["reg"] = datetime.fromtimestamp(int(re.search(r"expires=(\d+)", regTokenHead).group(1)))
         if self.tokenFile:
-            with open(self.tokenFile, "w") as f:
+            with os.fdopen(os.open(self.tokenFile, os.O_WRONLY | os.O_CREAT, 0o600), "w") as f:
                 f.write(self.user + "\n")
                 f.write(self.tokens["skype"] + "\n")
                 f.write(str(int(time.mktime(self.tokenExpiry["skype"].timetuple()))) + "\n")
