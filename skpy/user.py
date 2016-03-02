@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from .conn import SkypeConnection
-from .util import SkypeObj, SkypeObjs, SkypeApiException, upper, initAttrs, convertIds, cacheResult
+from .util import SkypeObj, SkypeObjs, SkypeApiException, initAttrs, convertIds, cacheResult
 
 
 @initAttrs
@@ -80,7 +80,7 @@ class SkypeUser(SkypeObj):
             "country": raw.get("country")
         }
         location = SkypeUser.Location(city=locationParts.get("city"), region=locationParts.get("region"),
-                                      country=upper(locationParts.get("country")))
+                                      country=(locationParts.get("country", "").upper() or None))
         avatar = raw.get("avatar_url", raw.get("avatarUrl"))
         mood = None
         if raw.get("mood", raw.get("richMood")):

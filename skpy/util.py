@@ -5,19 +5,6 @@ from collections import Hashable
 from functools import partial, wraps
 
 
-def upper(s):
-    """
-    Shorthand to uppercase a string, and leave ``None`` as-is.
-
-    Args:
-        s (str): string to transform
-
-    Returns:
-        str: uppercase string
-    """
-    return s if s is None else s.upper()
-
-
 def noPrefix(s):
     """
     Remove the type prefix from a chat identifier (e.g. ``8:`` for a one-to-one, ``19:`` for a group).
