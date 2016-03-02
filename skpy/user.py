@@ -32,6 +32,12 @@ class SkypeUser(SkypeObj):
     class Name(SkypeObj):
         """
         The name of a user or contact.
+
+        Attributes:
+            first (str):
+                First and middle names of the user.
+            last (str):
+                Surname of the user.
         """
 
         attrs = ("first", "last")
@@ -45,6 +51,14 @@ class SkypeUser(SkypeObj):
         The location of a user or contact.
 
         Any number of fields may be filled in, so stringifying will combine them into a comma-separated list.
+
+        Attributes:
+            city (str):
+                Town or city where the user is located.
+            region (str):
+                State or region where they are located.
+            country (str):
+                Two-letter country code for their location.
         """
 
         attrs = ("city", "region", "country")
@@ -56,12 +70,18 @@ class SkypeUser(SkypeObj):
     class Mood(SkypeObj):
         """
         The mood message set by a user or contact.
+
+        Attributes:
+            plain (str):
+                Plain text representation of a user's mood.
+            rich (str):
+                Mood message with original formatting.
         """
 
         attrs = ("plain", "rich")
 
         def __str__(self):
-            return self.plain or ""
+            return self.plain or self.rich or ""
 
     attrs = ("id", "name", "location", "avatar", "mood")
     defaults = dict(name=Name(), location=Location())
