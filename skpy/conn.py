@@ -15,6 +15,20 @@ from .util import SkypeObj, SkypeException, SkypeApiException
 class SkypeConnection(SkypeObj):
     """
     The main connection class -- handles all requests to API resources.
+
+    Attributes:
+        tokens (dict):
+            Token strings used to connect to various Skype APIs.  Uses keys ``skype`` and ``reg``.
+        tokenExpiry (dict):
+            Map from token key to :class:`datetime <datetime.datetime>` of expiry.
+        tokenFile (str):
+            Path to file holding token data for the current session.
+        msgsHost (str):
+            Derived API base URL during registration token retrieval.
+        sess (requests.Session):
+            Shared session used for all API requests.
+        endpoints (dict):
+            Container of :class:`SkypeEndpoint` instances for the current session.
     """
 
     class Auth:

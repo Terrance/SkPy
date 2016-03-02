@@ -240,9 +240,9 @@ class SkypeObj(object):
 
     Attributes:
         attrs (tuple):
-            A list of defined fields for the class.  Used by :meth:`initAttrs` to create an :meth:`__init__` method.
+            List of defined fields for the class.  Used by :meth:`initAttrs` to create an :meth:`__init__` method.
         defaults (dict):
-            A collection of default values when any keyword arguments are omitted from the constructor.
+            Collection of default values when any keyword arguments are omitted from the constructor.
         skype (:class:`.Skype`):
             Parent Skype instance.
         raw (dict):
@@ -410,5 +410,5 @@ class SkypeApiException(SkypeException):
     """
     An exception thrown for errors specific to external API calls.
 
-    Arguments will usually be of the form (``message``, ``response object``).
+    Arguments will usually be of the form (``message``, ``response``).
     """
