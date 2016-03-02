@@ -198,7 +198,7 @@ class SkypeContact(SkypeUser):
         except ValueError:
             birthday = None
         fields.update({
-            "language": upper(raw.get("language")),
+            "language": raw.get("language", "").upper() or None,
             "phones": phones,
             "birthday": birthday,
             "authorised": raw.get("authorized"),
