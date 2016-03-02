@@ -92,6 +92,7 @@ class SkypeConnection(SkypeObj):
         self.tokenExpiry = {}
         self.tokenFile = tokenFile
         self.msgsHost = self.API_MSGSHOST
+        self.sess = requests.Session()
         self.endpoints = {"self": SkypeEndpoint(self, "SELF")}
         if user and pwd:
             # Create a method to re-authenticate with login.skype.com (avoids storing the password in an accessible way).
@@ -157,7 +158,7 @@ class SkypeConnection(SkypeObj):
             headers["Authorization"] = "skype_token {0}".format(self.tokens["skype"])
         elif auth == self.Auth.RegToken:
             headers["RegistrationToken"] = self.tokens["reg"]
-        resp = requests.request(method, url, headers=headers, **kwargs)
+        resp = self.sess.request(method, url, headers=headers, **kwargs)
         if resp.status_code not in codes:
             if resp.status_code == 429:
                 raise SkypeAuthException("Auth rate limit exceeded", resp)
@@ -185,7 +186,7 @@ class SkypeConnection(SkypeObj):
             SkypeAuthException: if an authentication rate limit is reached
             .SkypeApiException: if a successful status code is not received
         """
-        resp = requests.request(method, url, **kwargs)
+        resp = self.sess.request(method, url, **kwargs)
         if resp.status_code not in codes:
             raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
         return resp
