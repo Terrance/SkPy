@@ -87,6 +87,20 @@ class SkypeMsg(SkypeObj):
         return """<pre raw_pre="{{code}}" raw_post="{{code}}">{0}</pre>""".format(s)
 
     @staticmethod
+    def colour(s, colour):
+        """
+        Format text to be coloured.
+
+        Args:
+            s (str): string to format
+            colour (str): colour to display text in
+
+        Returns:
+            str: formatted string
+        """
+        return """<font color="{0}">{1}</font>""".format(colour, s)
+
+    @staticmethod
     def link(url, display=None):
         """
         Create a hyperlink.  If ``display`` is not specified, display the URL.
