@@ -18,26 +18,46 @@ class Skype(SkypeObj):
             Container of contacts for the connected user.
         chats (:class:`.SkypeChats`):
             Container of conversations for the connected user.
+        conn (:class:`.SkypeConnection`):
+            Underlying connection instance.
     """
 
     attrs = ("userId",)
 
-    def __init__(self, user=None, pwd=None, tokenFile=None):
+    def __init__(self, user=None, pwd=None, tokenFile=None, connect=True):
         """
         Create a new Skype object and corresponding connection.
 
-        All arguments are passed to the :class:`.SkypeConnection` instance.
+        If ``user`` and ``pwd`` are given, they will be passed to :meth:`.SkypeConnection.setUserPwd`.  If a token file
+        path is present, it will be used if valid.  On a successful connection, the token file will also be written to.
+
+        By default, a connection attempt will be made based on the given parameters.  It is also possible to handle
+        authentication manually, by setting ``connect`` to ``False`` and omitting the other arguments, then work with
+        the underlying connection object instead.
 
         Args:
             user (str): username of the connecting account
             pwd (str): password of the connecting account
-            tokenFile (str): path to a file, used to cache session tokens
+            tokenFile (str): path to file used for token storage
+            connect (bool): whether to try and connect straight away
         """
         super(Skype, self).__init__(self)
-        self.conn = SkypeConnection(user, pwd, tokenFile)
-        self.userId = self.conn.user
+        self.conn = SkypeConnection()
+        if tokenFile:
+            self.conn.setTokenFile(tokenFile)
+        if user and pwd:
+            self.conn.setUserPwd(user, pwd)
+        if connect:
+            try:
+                self.conn.readToken()
+            except:
+                self.conn.getSkypeToken()
         self.contacts = SkypeContacts(self)
         self.chats = SkypeChats(self)
+
+    @property
+    def userId(self):
+        return self.conn.userId
 
     @property
     @cacheResult

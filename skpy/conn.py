@@ -16,6 +16,9 @@ class SkypeConnection(SkypeObj):
     """
     The main connection class -- handles all requests to API resources.
 
+    To authenticate with a username and password, use :meth:`setUserPwd` to store the credentials.  Token files can be
+    specified with :meth:`setTokenFile`.
+
     Attributes:
         tokens (dict):
             Token strings used to connect to various Skype APIs.  Uses keys ``skype`` and ``reg``.
@@ -29,6 +32,8 @@ class SkypeConnection(SkypeObj):
             Shared session used for all API requests.
         endpoints (dict):
             Container of :class:`SkypeEndpoint` instances for the current session.
+        connected (bool):
+            Whether the connection instance is ready to make API calls.
     """
 
     class Auth:
@@ -79,66 +84,53 @@ class SkypeConnection(SkypeObj):
 
         return decorator
 
+    @classmethod
+    def externalCall(cls, method, url, codes=(200, 201, 207), **kwargs):
+        """
+        Make a public API call without a connected :class:`.Skype` instance.
+
+        The obvious implications are that no authenticated calls are possible, though this allows accessing some public
+        APIs such as join URL lookups.
+
+        Args:
+            method (str): HTTP request method
+            url (str): full URL to connect to
+            codes (int list): expected HTTP response codes for success
+            kwargs (dict): any extra parameters to pass to :func:`requests.request`
+
+        Returns:
+            requests.Response: response object provided by :mod:`requests`
+
+        Raises:
+            SkypeAuthException: if an authentication rate limit is reached
+            .SkypeApiException: if a successful status code is not received
+        """
+        resp = cls.extSess.request(method, url, **kwargs)
+        if resp.status_code not in codes:
+            raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
+        return resp
+
     API_LOGIN = "https://login.skype.com/login?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com"
     API_USER = "https://api.skype.com"
     API_SCHEDULE = "https://api.scheduler.skype.com"
     API_CONTACTS = "https://contacts.skype.com/contacts/v1"
     API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1"
 
-    attrs = ("user", "tokenFile")
+    attrs = ("userId", "tokenFile", "connected")
 
-    def __init__(self, user=None, pwd=None, tokenFile=None):
+    extSess = requests.session()
+
+    def __init__(self):
         """
-        If ``tokenFile`` is specified, the file is searched for a valid set of tokens.  If this is successful, no Skype
-        authentication is needed.  If the registration token is valid too, no call to :meth:`getRegToken` is made.
-
-        Otherwise, if ``user`` and ``pwd`` are set, make a new login request with the given credentials.
-
-        Args:
-            user (str): username of the connecting account
-            pwd (str): password of the connecting account
-            tokenFile (str): path to a file, used to cache session tokens
-
-        Raises:
-            SkypeAuthException: if no valid tokens are available, and no username/password are provided
+        Creates a new, unconnected instance.
         """
+        self.userId = None
         self.tokens = {}
         self.tokenExpiry = {}
-        self.tokenFile = tokenFile
+        self.tokenFile = None
         self.msgsHost = self.API_MSGSHOST
         self.sess = requests.Session()
         self.endpoints = {"self": SkypeEndpoint(self, "SELF")}
-        if user and pwd:
-            # Create a method to re-authenticate with login.skype.com (avoids storing the password in an accessible way).
-            self.getSkypeToken = partial(self.login, user, pwd)
-        if tokenFile and os.path.isfile(tokenFile):
-            try:
-                with open(tokenFile, "r") as f:
-                    self.user, skypeToken, skypeExpiry, regToken, regExpiry, msgsHost = f.read().splitlines()
-                skypeExpiry = datetime.fromtimestamp(int(skypeExpiry))
-                regExpiry = datetime.fromtimestamp(int(regExpiry))
-                if datetime.now() >= skypeExpiry:
-                    # We want to ignore this (see except block).
-                    raise SkypeException("Token file has expired")
-            except:
-                # Expired or otherwise can't read the file, skip to user/pwd authentication.
-                pass
-            else:
-                self.tokens["skype"] = skypeToken
-                self.tokenExpiry["skype"] = skypeExpiry
-                if datetime.now() < regExpiry:
-                    self.tokens["reg"] = regToken
-                    self.tokenExpiry["reg"] = regExpiry
-                    self.msgsHost = msgsHost
-                    # No need to write the token file.
-                    return
-                else:
-                    self.getRegToken()
-        if not self.tokens:
-            if not hasattr(self, "getSkypeToken"):
-                raise SkypeAuthException("No username or password provided, and no valid token file")
-            self.getSkypeToken()
-            self.getRegToken()
 
     def __call__(self, method, url, codes=(200, 201, 207), auth=None, headers=None, **kwargs):
         """
@@ -179,36 +171,100 @@ class SkypeConnection(SkypeObj):
             raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
         return resp
 
-    @classmethod
-    def externalCall(cls, method, url, codes=(200, 201, 207), **kwargs):
-        """
-        Make a public API call without a connected :class:`.Skype` instance.
+    @property
+    def connected(self):
+        return "skype" in self.tokenExpiry and datetime.now() <= self.tokenExpiry["skype"] \
+               and "reg" in self.tokenExpiry and datetime.now() <= self.tokenExpiry["reg"]
 
-        The obvious implications are that no authenticated calls are possible, though this allows accessing some public
-        APIs such as join URL lookups.
+    def setUserPwd(self, user, pwd):
+        """
+        Replaces the stub :meth:`getSkypeToken` method with one that connects using the given credentials.  Avoids
+        storing the account password in an accessible way.
 
         Args:
-            method (str): HTTP request method
-            url (str): full URL to connect to
-            codes (int list): expected HTTP response codes for success
-            kwargs (dict): any extra parameters to pass to :func:`requests.request`
+            user (str): username of the connecting account
+            pwd (str): password of the connecting account
+        """
+        self.getSkypeToken = partial(self.login, user, pwd)
 
-        Returns:
-            requests.Response: response object provided by :mod:`requests`
+    def setTokenFile(self, path):
+        """
+        Enable reading and writing session tokens to a file at the given location.
+
+        Args:
+            path (str): path to file used for token storage
+        """
+        self.tokenFile = path
+
+    def readToken(self):
+        """
+        Attempt to re-establish a connection using previously acquired tokens.
+
+        If the Skype token is valid but the registration token is invalid, a new endpoint will be registered.
 
         Raises:
-            SkypeAuthException: if an authentication rate limit is reached
-            .SkypeApiException: if a successful status code is not received
+            SkypeAuthException: if the token file cannot be used to authenticate
         """
-        resp = self.sess.request(method, url, **kwargs)
-        if resp.status_code not in codes:
-            raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
-        return resp
+        if not self.tokenFile:
+            raise SkypeAuthException("No token file specified")
+        with open(self.tokenFile, "r") as f:
+            lines = f.read().splitlines()
+        try:
+            user, skypeToken, skypeExpiry, regToken, regExpiry, msgsHost = lines
+            skypeExpiry = datetime.fromtimestamp(int(skypeExpiry))
+            regExpiry = datetime.fromtimestamp(int(regExpiry))
+        except:
+            raise SkypeAuthException("Token file is malformed")
+        if datetime.now() >= skypeExpiry:
+            raise SkypeAuthException("Token file has expired")
+        self.userId = user
+        self.tokens["skype"] = skypeToken
+        self.tokenExpiry["skype"] = skypeExpiry
+        if datetime.now() < regExpiry:
+            self.tokens["reg"] = regToken
+            self.tokenExpiry["reg"] = regExpiry
+            self.msgsHost = msgsHost
+        else:
+            self.getRegToken()
+
+    def writeToken(self):
+        """
+        Store details of the current connection in the named file.
+
+        This can be used by :meth:`readToken` to re-authenticate at a later time.
+        """
+        # Write token file privately.
+        with os.fdopen(os.open(self.tokenFile, os.O_WRONLY | os.O_CREAT, 0o600), "w") as f:
+            f.write(self.userId + "\n")
+            f.write(self.tokens["skype"] + "\n")
+            f.write(str(int(time.mktime(self.tokenExpiry["skype"].timetuple()))) + "\n")
+            f.write(self.tokens["reg"] + "\n")
+            f.write(str(int(time.mktime(self.tokenExpiry["reg"].timetuple()))) + "\n")
+            f.write(self.msgsHost + "\n")
+
+    def verifyToken(self, auth):
+        """
+        Ensure the authentication token for the given auth method is still valid.
+
+        Args:
+            auth (Auth): authentication type to check
+
+        Raises:
+            SkypeAuthException: if Skype auth is required, and the current token has expired and can't be renewed
+        """
+        if auth in (self.Auth.SkypeToken, self.Auth.Authorize):
+            if "skype" not in self.tokenExpiry or datetime.now() >= self.tokenExpiry["skype"]:
+                if not hasattr(self, "getSkypeToken"):
+                    raise SkypeAuthException("Skype token expired, and no password specified")
+                self.getSkypeToken()
+        elif auth == self.Auth.RegToken:
+            if "reg" not in self.tokenExpiry or datetime.now() >= self.tokenExpiry["reg"]:
+                self.getRegToken()
 
     def login(self, user, pwd):
         """
         Obtain connection parameters from the Skype web login page, and perform a login with the given username and
-        password.  This emulates a login to Skype for Web (``web.skype.com``).
+        password.  This emulates a login to Skype for Web on ``login.skype.com``.
 
         Args:
             user (str): username of the connecting account
@@ -242,10 +298,23 @@ class SkypeConnection(SkypeObj):
         try:
             self.tokens["skype"] = loginRespPage.find("input", {"name": "skypetoken"}).get("value")
             length = int(loginRespPage.find("input", {"name": "expires_in"}).get("value"))
-            self.tokenExpiry["skype"] = datetime.fromtimestamp(secs + length)
-            self.user = user
         except AttributeError:
             raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
+        self.tokenExpiry["skype"] = datetime.fromtimestamp(secs + length)
+        self.userId = user
+        # Invalidate the registration token.
+        self.tokens.pop("reg", None)
+        self.tokenExpiry.pop("reg", None)
+        self.getRegToken()
+
+    def getSkypeToken(self):
+        """
+        A wrapper for :meth:`login` that applies the previously given username and password.
+
+        Raises:
+            SkypeAuthException: if credentials were never provided
+        """
+        raise SkypeAuthException("No username or password provided, and no valid token file")
 
     def getRegToken(self):
         """
@@ -265,38 +334,14 @@ class SkypeConnection(SkypeObj):
         endId = locParts[4]
         regTokenHead = endpointResp.headers["Set-RegistrationToken"]
         if not msgsHost == self.msgsHost:
+            # Skype is requiring the use of a different hostname.
             self.msgsHost = msgsHost
             return self.getRegToken()
         self.endpoints["main"] = SkypeEndpoint(self, endId)
         self.tokens["reg"] = re.search(r"(registrationToken=[a-z0-9\+/=]+)", regTokenHead, re.I).group(1)
         self.tokenExpiry["reg"] = datetime.fromtimestamp(int(re.search(r"expires=(\d+)", regTokenHead).group(1)))
         if self.tokenFile:
-            with os.fdopen(os.open(self.tokenFile, os.O_WRONLY | os.O_CREAT, 0o600), "w") as f:
-                f.write(self.user + "\n")
-                f.write(self.tokens["skype"] + "\n")
-                f.write(str(int(time.mktime(self.tokenExpiry["skype"].timetuple()))) + "\n")
-                f.write(self.tokens["reg"] + "\n")
-                f.write(str(int(time.mktime(self.tokenExpiry["reg"].timetuple()))) + "\n")
-                f.write(self.msgsHost + "\n")
-
-    def verifyToken(self, auth):
-        """
-        Ensure the authentication token for the given auth method is still valid.
-
-        Args:
-            auth (Auth): authentication type to check
-
-        Raises:
-            SkypeAuthException: if Skype auth is required, and the current token has expired and can't be renewed
-        """
-        if auth in (self.Auth.SkypeToken, self.Auth.Authorize):
-            if "skype" in self.tokenExpiry and datetime.now() >= self.tokenExpiry["skype"]:
-                if not hasattr(self, "getSkypeToken"):
-                    raise SkypeAuthException("Skype token expired, and no password specified")
-                self.getSkypeToken()
-        elif auth == self.Auth.RegToken:
-            if "reg" in self.tokenExpiry and datetime.now() >= self.tokenExpiry["reg"]:
-                self.getRegToken()
+            self.writeToken()
 
 
 class SkypeEndpoint(SkypeObj):
