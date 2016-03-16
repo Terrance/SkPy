@@ -1,7 +1,7 @@
 import os
 import re
 from functools import partial, wraps
-from datetime import datetime
+from datetime import datetime, timedelta
 import time
 import math
 import hashlib
@@ -306,6 +306,43 @@ class SkypeConnection(SkypeObj):
         self.tokens.pop("reg", None)
         self.tokenExpiry.pop("reg", None)
         self.getRegToken()
+
+    def guestLogin(self, url, name):
+        """
+        Connect to Skype as a guest, joining a given conversation.
+
+        In this state, some APIs (such as contacts) will return 401 status codes.  A guest can only communicate with
+        the conversation they originally joined.
+
+        Args:
+            url (str): public join URL for conversation, or identifier from it
+            name (str): display name as shown to other participants
+        """
+        urlId = url.split("/")[-1]
+        # Pretend to be Chrome on Windows (required to avoid "unsupported device" messages)..
+        agent = "Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) " \
+                "Chrome/33.0.1750.117 Safari/537.36"
+        cookies = self("GET", "https://join.skype.com/{0}".format(urlId), headers={"User-Agent": agent}).cookies
+        convUrl = "https://join.skype.com/api/v2/conversation/"
+        ids = self("POST", "https://join.skype.com/api/v2/conversation/", json={"shortId": urlId, "type": "wl"}).json()
+        headers = {
+            "csrf_token": cookies.get("csrf_token"),
+            "X-Skype-Request-Id": cookies.get("launcher_session_id")
+        }
+        json = {
+            "flowId": cookies.get("launcher_session_id"),
+            "shortId": urlId,
+            "longId": ids.get("Long"),
+            "threadId": ids.get("Resource"),
+            "name": name
+        }
+        self.tokens["skype"] = self("POST", "https://join.skype.com/api/v1/users/guests", headers=headers,
+                                    json=json).json().get("skypetoken")
+        # Assume the token lasts 24 hours, as a guest account only lasts that long anyway.
+        self.tokenExpiry["skype"] = datetime.now() + timedelta(days=1)
+        self.getRegToken()
+        self.userId = self("GET", "{0}/users/self/profile".format(self.API_USER),
+                           auth=self.Auth.SkypeToken).json().get("username")
 
     def getSkypeToken(self):
         """

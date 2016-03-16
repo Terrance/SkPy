@@ -471,18 +471,21 @@ class SkypeChats(SkypeObjs):
 
     @staticmethod
     @cacheResult
-    def urlToId(url):
+    def urlToIds(url):
         """
-        Resolves a ``join.skype.com`` URL and returns the group conversation identifier.
+        Resolves a ``join.skype.com`` URL and returns various identifiers for the group conversation.
 
         Args:
             url (str): public join URL, or identifier from it
 
         Returns:
-            str: related conversation's identifier
+            dict: related conversation's identifiers -- keys: ``id``, ``long``, ``blob``
         """
         urlId = url.split("/")[-1]
-        meetingUrl = "https://join.skype.com/api/v1/meetings/{0}".format(urlId)
-        longId = SkypeConnection.externalCall("GET", meetingUrl).json().get("longId")
-        chatUrl = "https://api.scheduler.skype.com/conversation/{0}".format(longId)
-        return SkypeConnection.externalCall("GET", chatUrl).json().get("ThreadId")
+        convUrl = "https://join.skype.com/api/v2/conversation/"
+        json = SkypeConnection.externalCall("POST", convUrl, json={"shortId": urlId, "type": "wl"}).json()
+        return {
+            "id": json.get("Resource"),
+            "long": json.get("Id"),
+            "blob": json.get("ChatBlob")
+        }
