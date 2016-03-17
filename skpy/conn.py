@@ -34,6 +34,8 @@ class SkypeConnection(SkypeObj):
             Container of :class:`SkypeEndpoint` instances for the current session.
         connected (bool):
             Whether the connection instance is ready to make API calls.
+        guest (bool):
+            Whether the connected account only has guest privileges.
     """
 
     class Auth:
@@ -116,7 +118,7 @@ class SkypeConnection(SkypeObj):
     API_CONTACTS = "https://contacts.skype.com/contacts/v1"
     API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1"
 
-    attrs = ("userId", "tokenFile", "connected")
+    attrs = ("userId", "tokenFile", "connected", "guest")
 
     extSess = requests.session()
 
@@ -176,6 +178,10 @@ class SkypeConnection(SkypeObj):
         return "skype" in self.tokenExpiry and datetime.now() <= self.tokenExpiry["skype"] \
                and "reg" in self.tokenExpiry and datetime.now() <= self.tokenExpiry["reg"]
 
+    @property
+    def guest(self):
+        return self.userId.startswith("guest:") if self.userId else None
+
     def setUserPwd(self, user, pwd):
         """
         Replaces the stub :meth:`getSkypeToken` method with one that connects using the given credentials.  Avoids
@@ -185,7 +191,9 @@ class SkypeConnection(SkypeObj):
             user (str): username of the connecting account
             pwd (str): password of the connecting account
         """
-        self.getSkypeToken = partial(self.login, user, pwd)
+        def getSkypeToken(self):
+            self.login(user, pwd)
+        self.getSkypeToken = getSkypeToken
 
     def setTokenFile(self, path):
         """
@@ -274,6 +282,8 @@ class SkypeConnection(SkypeObj):
             SkypeAuthException: if a captcha is required, or the login fails
             .SkypeApiException: if the login form can't be processed
         """
+        self.tokens.pop("skype", None)
+        self.tokenExpiry.pop("skype", None)
         loginResp = self("GET", self.API_LOGIN)
         loginPage = BeautifulSoup(loginResp.text, "html.parser")
         if loginPage.find(id="captcha"):
@@ -340,9 +350,9 @@ class SkypeConnection(SkypeObj):
                                     json=json).json().get("skypetoken")
         # Assume the token lasts 24 hours, as a guest account only lasts that long anyway.
         self.tokenExpiry["skype"] = datetime.now() + timedelta(days=1)
-        self.getRegToken()
         self.userId = self("GET", "{0}/users/self/profile".format(self.API_USER),
                            auth=self.Auth.SkypeToken).json().get("username")
+        self.getRegToken()
 
     def getSkypeToken(self):
         """
@@ -360,6 +370,8 @@ class SkypeConnection(SkypeObj):
         Once successful, all tokens and expiry times are written to the token file (if specified on initialisation).
         """
         self.verifyToken(self.Auth.SkypeToken)
+        self.tokens.pop("reg", None)
+        self.tokenExpiry.pop("reg", None)
         secs = int(time.time())
         hash = getMac256Hash(str(secs), "msmsgs@msnmsgr.com", "Q1P7W2E4J9R8U3S5")
         endpointResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), codes=[201, 301], headers={

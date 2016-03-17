@@ -30,7 +30,7 @@ def userToId(url):
     Returns:
         str: extracted identifier
     """
-    match = re.search(r"users(/ME/contacts)?/[0-9]+:([A-Za-z0-9\.,_-]+)", url)
+    match = re.search(r"users(/ME/contacts)?/[0-9]+:([A-Za-z0-9\.,:_\-]+)", url)
     return match.group(2) if match else None
 
 

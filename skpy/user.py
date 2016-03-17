@@ -100,7 +100,7 @@ class SkypeUser(SkypeObj):
             "country": raw.get("country")
         }
         location = SkypeUser.Location(city=locationParts.get("city"), region=locationParts.get("region"),
-                                      country=(locationParts.get("country", "").upper() or None))
+                                      country=((locationParts.get("country") or "").upper() or None))
         avatar = raw.get("avatar_url", raw.get("avatarUrl"))
         mood = None
         if raw.get("mood", raw.get("richMood")):
@@ -198,7 +198,7 @@ class SkypeContact(SkypeUser):
         except ValueError:
             birthday = None
         fields.update({
-            "language": raw.get("language", "").upper() or None,
+            "language": (raw.get("language") or "").upper() or None,
             "phones": phones,
             "birthday": birthday,
             "authorised": raw.get("authorized"),
