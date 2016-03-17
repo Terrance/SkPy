@@ -3,6 +3,7 @@ import re
 from functools import partial, wraps
 from datetime import datetime, timedelta
 import time
+from types import MethodType
 import math
 import hashlib
 
@@ -193,7 +194,7 @@ class SkypeConnection(SkypeObj):
         """
         def getSkypeToken(self):
             self.login(user, pwd)
-        self.getSkypeToken = getSkypeToken
+        self.getSkypeToken = MethodType(getSkypeToken, self)
 
     def setTokenFile(self, path):
         """
