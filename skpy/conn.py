@@ -1,6 +1,6 @@
 import os
 import re
-from functools import partial, wraps
+from functools import wraps
 from datetime import datetime, timedelta
 import time
 from types import MethodType
@@ -334,7 +334,6 @@ class SkypeConnection(SkypeObj):
         agent = "Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) " \
                 "Chrome/33.0.1750.117 Safari/537.36"
         cookies = self("GET", "https://join.skype.com/{0}".format(urlId), headers={"User-Agent": agent}).cookies
-        convUrl = "https://join.skype.com/api/v2/conversation/"
         ids = self("POST", "https://join.skype.com/api/v2/conversation/", json={"shortId": urlId, "type": "wl"}).json()
         headers = {
             "csrf_token": cookies.get("csrf_token"),
