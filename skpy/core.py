@@ -24,16 +24,15 @@ class Skype(SkypeObj):
 
     attrs = ("userId",)
 
-    def __init__(self, user=None, pwd=None, tokenFile=None, connect=True):
+    def __init__(self, user=None, pwd=None, tokenFile=None, connect=None):
         """
         Create a new Skype object and corresponding connection.
 
         If ``user`` and ``pwd`` are given, they will be passed to :meth:`.SkypeConnection.setUserPwd`.  If a token file
         path is present, it will be used if valid.  On a successful connection, the token file will also be written to.
 
-        By default, a connection attempt will be made based on the given parameters.  It is also possible to handle
-        authentication manually, by setting ``connect`` to ``False`` and omitting the other arguments, then work with
-        the underlying connection object instead.
+        By default, a connection attempt will be made if any of ``user``, ``pwd`` or ``tokenFile`` are specified.  It
+        is also possible to handle authentication manually, by working with the underlying connection object instead.
 
         Args:
             user (str): username of the connecting account
@@ -47,6 +46,8 @@ class Skype(SkypeObj):
             self.conn.setTokenFile(tokenFile)
         if user and pwd:
             self.conn.setUserPwd(user, pwd)
+        if connect is None:
+            connect = (user and pwd) or tokenFile
         if connect:
             try:
                 self.conn.readToken()
