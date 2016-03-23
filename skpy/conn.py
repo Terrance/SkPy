@@ -375,23 +375,28 @@ class SkypeConnection(SkypeObj):
         while "reg" not in self.tokens:
             secs = int(time.time())
             hash = getMac256Hash(str(secs), "msmsgs@msnmsgr.com", "Q1P7W2E4J9R8U3S5")
-            endpointResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), codes=(200, 404), headers={
+            endpointResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), codes=(200, 201, 404), headers={
                 "LockAndKey": "appId=msmsgs@msnmsgr.com; time={0}; lockAndKeyResponse={1}".format(secs, hash),
                 "Authentication": "skypetoken=" + self.tokens["skype"]
             }, json={"endpointFeatures": "Agent"})
             regTokenHead = endpointResp.headers.get("Set-RegistrationToken")
+            locHead = endpointResp.headers.get("Location")
             if regTokenHead:
                 self.tokens["reg"] = re.search(r"(registrationToken=[a-z0-9\+/=]+)", regTokenHead, re.I).group(1)
                 self.tokenExpiry["reg"] = datetime.fromtimestamp(int(re.search(r"expires=(\d+)", regTokenHead).group(1)))
                 regEndMatch = re.search(r"endpointId=({[a-z0-9\-]+})", regTokenHead)
                 if regEndMatch:
                     self.endpoints["main"] = SkypeEndpoint(self, regEndMatch.group(1))
+            if locHead:
+                locParts = re.search(r"(https://[^/]+/v1)/users/ME/endpoints(/(%7B[a-z0-9\-]+%7D))?", locHead).groups()
+                if not locParts[0] == self.msgsHost:
+                    # Skype is requiring the use of a different hostname.
+                    self.msgsHost = endpointResp.headers["Location"].rsplit("/", 4)[0]
+                if locParts[2]:
+                    self.endpoints["main"] = SkypeEndpoint(self, locParts[2])
             if endpointResp.status_code == 200 and "main" not in self.endpoints:
                 # Use the most recent endpoint listed in the JSON response.
                 self.endpoints["main"] = SkypeEndpoint(self, endpointResp.json()[0]["id"])
-            elif endpointResp.status_code == 404:
-                # Skype is requiring the use of a different hostname.
-                self.msgsHost = endpointResp.headers["Location"].rsplit("/", 4)[0]
         if self.tokenFile:
             self.writeToken()
 
