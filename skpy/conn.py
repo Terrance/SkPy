@@ -372,23 +372,26 @@ class SkypeConnection(SkypeObj):
         self.verifyToken(self.Auth.SkypeToken)
         self.tokens.pop("reg", None)
         self.tokenExpiry.pop("reg", None)
-        secs = int(time.time())
-        hash = getMac256Hash(str(secs), "msmsgs@msnmsgr.com", "Q1P7W2E4J9R8U3S5")
-        endpointResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), codes=[201, 301], headers={
-            "LockAndKey": "appId=msmsgs@msnmsgr.com; time={0}; lockAndKeyResponse={1}".format(secs, hash),
-            "Authentication": "skypetoken=" + self.tokens["skype"]
-        }, json={})
-        locParts = endpointResp.headers["Location"].rsplit("/", 4)
-        msgsHost = locParts[0]
-        endId = locParts[4]
-        regTokenHead = endpointResp.headers["Set-RegistrationToken"]
-        if not msgsHost == self.msgsHost:
-            # Skype is requiring the use of a different hostname.
-            self.msgsHost = msgsHost
-            return self.getRegToken()
-        self.endpoints["main"] = SkypeEndpoint(self, endId)
-        self.tokens["reg"] = re.search(r"(registrationToken=[a-z0-9\+/=]+)", regTokenHead, re.I).group(1)
-        self.tokenExpiry["reg"] = datetime.fromtimestamp(int(re.search(r"expires=(\d+)", regTokenHead).group(1)))
+        while "reg" not in self.tokens:
+            secs = int(time.time())
+            hash = getMac256Hash(str(secs), "msmsgs@msnmsgr.com", "Q1P7W2E4J9R8U3S5")
+            endpointResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), codes=(200, 404), headers={
+                "LockAndKey": "appId=msmsgs@msnmsgr.com; time={0}; lockAndKeyResponse={1}".format(secs, hash),
+                "Authentication": "skypetoken=" + self.tokens["skype"]
+            }, json={"endpointFeatures": "Agent"})
+            regTokenHead = endpointResp.headers.get("Set-RegistrationToken")
+            if regTokenHead:
+                self.tokens["reg"] = re.search(r"(registrationToken=[a-z0-9\+/=]+)", regTokenHead, re.I).group(1)
+                self.tokenExpiry["reg"] = datetime.fromtimestamp(int(re.search(r"expires=(\d+)", regTokenHead).group(1)))
+                regEndMatch = re.search(r"endpointId=({[a-z0-9\-]+})", regTokenHead)
+                if regEndMatch:
+                    self.endpoints["main"] = SkypeEndpoint(self, regEndMatch.group(1))
+            if endpointResp.status_code == 200 and "main" not in self.endpoints:
+                # Use the most recent endpoint listed in the JSON response.
+                self.endpoints["main"] = SkypeEndpoint(self, endpointResp.json()[0]["id"])
+            elif endpointResp.status_code == 404:
+                # Skype is requiring the use of a different hostname.
+                self.msgsHost = endpointResp.headers["Location"].rsplit("/", 4)[0]
         if self.tokenFile:
             self.writeToken()
 
