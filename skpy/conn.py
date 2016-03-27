@@ -287,31 +287,36 @@ class SkypeConnection(SkypeObj):
         self.tokenExpiry.pop("skype", None)
         loginResp = self("GET", self.API_LOGIN)
         loginPage = BeautifulSoup(loginResp.text, "html.parser")
-        if loginPage.find(id="captcha"):
-            raise SkypeAuthException("Captcha required", loginResp)
-        pie = loginPage.find(id="pie").get("value")
-        etm = loginPage.find(id="etm").get("value")
         secs = int(time.time())
-        frac, hour = math.modf(time.timezone)
-        timezone = "{0:+03d}|{1}".format(int(hour), int(frac * 60))
-        loginResp = self("POST", self.API_LOGIN, data={
-            "username": user,
-            "password": pwd,
-            "pie": pie,
-            "etm": etm,
-            "timezone_field": timezone,
-            "js_time": secs
-        })
-        loginRespPage = BeautifulSoup(loginResp.text, "html.parser")
-        errors = loginRespPage.select("div.messageBox.message_error span")
-        if errors:
-            raise SkypeAuthException(errors[0].text, loginResp)
-        try:
-            self.tokens["skype"] = loginRespPage.find("input", {"name": "skypetoken"}).get("value")
-            length = int(loginRespPage.find("input", {"name": "expires_in"}).get("value"))
-        except AttributeError:
+        tokenField = loginPage.find("input", {"name": "skypetoken"})
+        # If present, the previous auth is still valid and we can get a refreshed token without a password.
+        if not tokenField:
+            # Reached the login form page.
+            if loginPage.find(id="captcha"):
+                raise SkypeAuthException("Captcha required", loginResp)
+            pie = loginPage.find(id="pie").get("value")
+            etm = loginPage.find(id="etm").get("value")
+            frac, hour = math.modf(time.timezone)
+            timezone = "{0:+03d}|{1}".format(int(hour), int(frac * 60))
+            loginResp = self("POST", self.API_LOGIN, data={
+                "username": user,
+                "password": pwd,
+                "pie": pie,
+                "etm": etm,
+                "timezone_field": timezone,
+                "js_time": secs
+            })
+            loginPage = BeautifulSoup(loginResp.text, "html.parser")
+            errors = loginPage.select("div.messageBox.message_error span")
+            if errors:
+                raise SkypeAuthException(errors[0].text, loginResp)
+            tokenField = loginPage.find("input", {"name": "skypetoken"})
+        if not tokenField:
             raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
-        self.tokenExpiry["skype"] = datetime.fromtimestamp(secs + length)
+        self.tokens["skype"] = tokenField.get("value")
+        expiryField = loginPage.find("input", {"name": "expires_in"})
+        if expiryField:
+            self.tokenExpiry["skype"] = datetime.fromtimestamp(secs + int(expiryField.get("value")))
         self.userId = user
         # Invalidate the registration token.
         self.tokens.pop("reg", None)
