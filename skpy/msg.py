@@ -207,6 +207,8 @@ class SkypeMsg(SkypeObj):
     @classmethod
     def fromRaw(cls, skype=None, raw={}):
         msgCls = {
+            "Text": SkypeTextMsg,
+            "RichText": SkypeTextMsg,
             "RichText/Contacts": SkypeContactMsg,
             "RichText/Media_GenericFile": SkypeFileMsg,
             "RichText/UriObject": SkypeImageMsg,
@@ -270,6 +272,12 @@ class SkypeMsg(SkypeObj):
         Equivalent to calling :meth:`edit` with an empty ``content`` string.
         """
         self.edit("")
+
+
+class SkypeTextMsg(SkypeMsg):
+    """
+    A message containing rich or plain text.
+    """
 
 
 @initAttrs
