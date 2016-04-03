@@ -210,6 +210,7 @@ class SkypeMsg(SkypeObj):
             "Text": SkypeTextMsg,
             "RichText": SkypeTextMsg,
             "RichText/Contacts": SkypeContactMsg,
+            "RichText/Location": SkypeLocationMsg,
             "RichText/Media_GenericFile": SkypeFileMsg,
             "RichText/UriObject": SkypeImageMsg,
             "Event/Call": SkypeCallMsg,
@@ -306,6 +307,41 @@ class SkypeContactMsg(SkypeMsg):
         for tag in contactTags:
             fields["contactIds"].append(tag.get("s"))
             fields["contactNames"].append(tag.get("f"))
+        return fields
+
+
+@initAttrs
+class SkypeLocationMsg(SkypeMsg):
+    """
+    A message containing the sender's location.
+
+    Attributes:
+        latitude (float):
+            North-South coordinate of the user's location.
+        longitude (float):
+            East-West coordinate of the user's location.
+        altitude (int):
+            Vertical position from sea level.
+        address (str):
+            Geocoded address provided by the sender.
+        mapUrl (str):
+            Link to map displaying the location.
+   """
+
+    attrs = SkypeMsg.attrs + ("latitude", "longitude", "altitude", "address", "mapUrl")
+
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeLocationMsg, cls).rawToFields(raw)
+        locTag = BeautifulSoup(raw.get("content"), "html.parser").find("location")
+        fields.update({
+            # Exponent notation produces a float, meaning lat/long will always be floats too.
+            "latitude": int(locTag.get("latitude")) / 1e6,
+            "longitude": int(locTag.get("longitude")) / 1e6,
+            "altitude": int(locTag.get("altitude")),
+            "address": locTag.get("address"),
+            "mapUrl": locTag.find("a").get("href")
+        })
         return fields
 
 
