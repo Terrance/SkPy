@@ -215,6 +215,7 @@ class SkypeMsg(SkypeObj):
             "RichText/UriObject": SkypeImageMsg,
             "Event/Call": SkypeCallMsg,
             "ThreadActivity/AddMember": SkypeAddMemberMsg,
+            "ThreadActivity/RoleUpdate": SkypeChangeMemberMsg,
             "ThreadActivity/DeleteMember": SkypeRemoveMemberMsg
         }.get(raw.get("messagetype"), cls)
         return msgCls(skype, raw, **msgCls.rawToFields(raw))
@@ -473,10 +474,34 @@ class SkypeAddMemberMsg(SkypeMemberMsg):
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeAddMemberMsg, cls).rawToFields(raw)
-        addInfo = (BeautifulSoup(raw.get("content"), "html.parser").find("addmember") or {})
+        memInfo = (BeautifulSoup(raw.get("content"), "html.parser").find("addmember") or {})
         fields.update({
-            "userId": noPrefix(addInfo.find("initiator").text),
-            "memberId": noPrefix(addInfo.find("target").text)
+            "userId": noPrefix(memInfo.find("initiator").text),
+            "memberId": noPrefix(memInfo.find("target").text)
+        })
+        return fields
+
+
+@initAttrs
+class SkypeChangeMemberMsg(SkypeMemberMsg):
+    """
+    A message representing a user's role being changed within a group conversation.
+
+    Attributes:
+        admin (bool):
+            Whether the change now makes the user an admin.
+    """
+
+    attrs = SkypeMemberMsg.attrs + ("admin",)
+
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeChangeMemberMsg, cls).rawToFields(raw)
+        memInfo = (BeautifulSoup(raw.get("content"), "html.parser").find("roleupdate") or {})
+        fields.update({
+            "userId": noPrefix(memInfo.find("initiator").text),
+            "memberId": noPrefix(memInfo.find("target").find("id").text),
+            "admin": memInfo.find("target").find("role").text == "admin"
         })
         return fields
 
@@ -490,9 +515,9 @@ class SkypeRemoveMemberMsg(SkypeMemberMsg):
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeRemoveMemberMsg, cls).rawToFields(raw)
-        addInfo = (BeautifulSoup(raw.get("content"), "html.parser").find("deletemember") or {})
+        memInfo = (BeautifulSoup(raw.get("content"), "html.parser").find("deletemember") or {})
         fields.update({
-            "userId": noPrefix(addInfo.find("initiator").text),
-            "memberId": noPrefix(addInfo.find("target").text)
+            "userId": noPrefix(memInfo.find("initiator").text),
+            "memberId": noPrefix(memInfo.find("target").text)
         })
         return fields
