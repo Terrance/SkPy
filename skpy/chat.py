@@ -3,7 +3,7 @@ import time
 
 from .conn import SkypeConnection
 from .msg import SkypeMsg
-from .util import SkypeObj, SkypeObjs, noPrefix, initAttrs, convertIds, cacheResult, syncState
+from .util import SkypeObj, SkypeObjs, noPrefix, initAttrs, convertIds, cacheResult
 
 
 @initAttrs
@@ -28,7 +28,6 @@ class SkypeChat(SkypeObj):
             "id": raw.get("id")
         }
 
-    @syncState
     def getMsgs(self):
         """
         Retrieve a batch of messages from the conversation.
@@ -40,25 +39,17 @@ class SkypeChat(SkypeObj):
         Returns:
             :class:`.SkypeMsg` list: collection of messages
         """
-
         url = "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id)
         params = {
             "startTime": 0,
             "view": "msnp24Equivalent",
             "targetType": "Passport|Skype|Lync|Thread"
         }
-
-        def fetch(url, params):
-            resp = self.skype.conn("GET", url, auth=SkypeConnection.Auth.RegToken, params=params).json()
-            return resp, resp.get("_metadata", {}).get("syncState")
-
-        def process(resp):
-            msgs = []
-            for json in resp.get("messages", []):
-                msgs.append(SkypeMsg.fromRaw(self.skype, json))
-            return msgs
-
-        return url, params, fetch, process
+        resp = self.skype.conn.syncStateCall("GET", url, params, auth=SkypeConnection.Auth.RegToken).json()
+        msgs = []
+        for json in resp.get("messages", []):
+            msgs.append(SkypeMsg.fromRaw(self.skype, json))
+        return msgs
 
     def setTyping(self, active=True):
         """
@@ -389,7 +380,6 @@ class SkypeChats(SkypeObjs):
         except KeyError:
             return self.chat(key)
 
-    @syncState
     def recent(self):
         """
         Retrieve a selection of conversations with the most recent activity, and store them in the cache.
@@ -399,32 +389,24 @@ class SkypeChats(SkypeObjs):
         Returns:
             :class:`SkypeChat` list: collection of recent conversations
         """
-
         url = "{0}/users/ME/conversations".format(self.skype.conn.msgsHost)
         params = {
             "startTime": 0,
             "view": "msnp24Equivalent",
             "targetType": "Passport|Skype|Lync|Thread"
         }
-
-        def fetch(url, params):
-            resp = self.skype.conn("GET", url, auth=SkypeConnection.Auth.RegToken, params=params).json()
-            return resp, resp.get("_metadata", {}).get("syncState")
-
-        def process(resp):
-            chats = {}
-            for json in resp.get("conversations", []):
-                cls = SkypeSingleChat
-                if "threadProperties" in json:
-                    info = self.skype.conn("GET", "{0}/threads/{1}".format(self.skype.conn.msgsHost, json.get("id")),
-                                           auth=SkypeConnection.Auth.RegToken,
-                                           params={"view": "msnp24Equivalent"}).json()
-                    json.update(info)
-                    cls = SkypeGroupChat
-                chats[json.get("id")] = self.merge(cls.fromRaw(self.skype, json))
-            return chats
-
-        return url, params, fetch, process
+        resp = self.skype.conn.syncStateCall("GET", url, params, auth=SkypeConnection.Auth.RegToken).json()
+        chats = {}
+        for json in resp.get("conversations", []):
+            cls = SkypeSingleChat
+            if "threadProperties" in json:
+                info = self.skype.conn("GET", "{0}/threads/{1}".format(self.skype.conn.msgsHost, json.get("id")),
+                                       auth=SkypeConnection.Auth.RegToken,
+                                       params={"view": "msnp24Equivalent"}).json()
+                json.update(info)
+                cls = SkypeGroupChat
+            chats[json.get("id")] = self.merge(cls.fromRaw(self.skype, json))
+        return chats
 
     def chat(self, id):
         """

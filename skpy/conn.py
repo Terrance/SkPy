@@ -134,6 +134,16 @@ class SkypeConnection(SkypeObj):
         self.msgsHost = self.API_MSGSHOST
         self.sess = requests.Session()
         self.endpoints = {"self": SkypeEndpoint(self, "SELF")}
+        self.syncStates = {}
+
+    @property
+    def connected(self):
+        return "skype" in self.tokenExpiry and datetime.now() <= self.tokenExpiry["skype"] \
+               and "reg" in self.tokenExpiry and datetime.now() <= self.tokenExpiry["reg"]
+
+    @property
+    def guest(self):
+        return self.userId.startswith("guest:") if self.userId else None
 
     def __call__(self, method, url, codes=(200, 201, 207), auth=None, headers=None, **kwargs):
         """
@@ -174,14 +184,39 @@ class SkypeConnection(SkypeObj):
             raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
         return resp
 
-    @property
-    def connected(self):
-        return "skype" in self.tokenExpiry and datetime.now() <= self.tokenExpiry["skype"] \
-               and "reg" in self.tokenExpiry and datetime.now() <= self.tokenExpiry["reg"]
+    def syncStateCall(self, method, url, params={}, **kwargs):
+        """
+        Follow and track sync state URLs provided by an API endpoint, in order to implicitly handle pagination.
 
-    @property
-    def guest(self):
-        return self.userId.startswith("guest:") if self.userId else None
+        In the first call, ``url`` and ``params`` are used as-is.  If a ``syncState`` endpoint is provided in the
+        response, subsequent calls go to the latest URL instead.
+
+        Args:
+            method (str): HTTP request method
+            url (str): full URL to connect to
+            params (dict): query parameters to include in the URL
+            kwargs (dict): any extra parameters to pass to :meth:`__call__`
+        """
+        try:
+            states = self.syncStates[(method, url)]
+        except KeyError:
+            states = self.syncStates[(method, url)] = []
+        if states:
+            # We have a state link, use it to replace the URL and query string.
+            url = states[-1]
+            params = {}
+        resp = self(method, url, params=params, **kwargs)
+        try:
+            json = resp.json()
+        except:
+            # Don't do anything if not a JSON response.
+            pass
+        else:
+            # If a state link exists in the response, store it for later.
+            state = json.get("_metadata", {}).get("syncState")
+            if state:
+                states.append(state)
+        return resp
 
     def setUserPwd(self, user, pwd):
         """

@@ -171,42 +171,6 @@ def cacheResult(fn):
     return wrapper
 
 
-def syncState(fn):
-    """
-    Method decorator: follow state-sync links when provided by an API.
-
-    Functions implementing this flow must return a tuple containing the following:
-
-    - ``url`` (`str`): original URL to follow with no state
-    - ``params`` (`dict`): keyword parameters to add to the url
-    - ``fetch(url, params)`` (`method`): function to do the API request, returning the response and a new state URL
-    - ``process(resp)`` (`method`): function to handle the response returned from ``fetch``
-
-    Args:
-        fn (method): function to decorate
-
-    Returns:
-        method: wrapper function with state-syncing
-    """
-
-    @wraps(fn)
-    def wrapper(self, *args, **kwargs):
-        # The wrapped function should be defined to return these.
-        url, params, fetch, process = fn(self, *args, **kwargs)
-        if wrapper.state:
-            # We have a state link, use that instead of the default URL.
-            url = wrapper.state[-1]
-            params = {}
-        # Store the new state link.
-        resp, state = fetch(url, params)
-        wrapper.state.append(state)
-        return process(resp)
-
-    # Make state links accessible externally.
-    wrapper.state = []
-    return wrapper
-
-
 def exhaust(fn, transform=None, *args, **kwargs):
     """
     Repeatedly call a function, starting with init, until false-y, yielding each item in turn.
