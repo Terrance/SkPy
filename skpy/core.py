@@ -18,6 +18,8 @@ class Skype(SkypeObj):
             Container of contacts for the connected user.
         chats (:class:`.SkypeChats`):
             Container of conversations for the connected user.
+        translate (:class:`.SkypeTranslator`):
+            Connected instance of the translator service.
         conn (:class:`.SkypeConnection`):
             Underlying connection instance.
     """
@@ -55,6 +57,7 @@ class Skype(SkypeObj):
                 self.conn.getSkypeToken()
         self.contacts = SkypeContacts(self)
         self.chats = SkypeChats(self)
+        self.translate = SkypeTranslator(self)
 
     @property
     def userId(self):
@@ -150,3 +153,32 @@ class SkypeEventLoop(Skype):
             event (SkypeEvent): an incoming event
         """
         pass
+
+
+class SkypeTranslator(SkypeObj):
+    """
+    An interface to Skype's translation API.
+
+    Attributes:
+        languages (dict):
+            Known languages supported by the translator.
+    """
+
+    @property
+    @cacheResult
+    def languages(self):
+        return self.skype.conn("GET", "{0}/languages".format(SkypeConnection.API_TRANSLATE),
+                               auth=SkypeConnection.Auth.SkypeToken).json().get("text")
+
+    def __call__(self, text, toLang, fromLang=None):
+        """
+        Attempt translation of a string.  Supports automatic language detection if ``fromLang`` is not specified.
+
+        Args:
+            text (str): input text to be translated
+            toLang (str): country code of output language
+            fromLang (str): country code of input language
+        """
+        return self.skype.conn("GET", "{0}/skype/translate".format(SkypeConnection.API_TRANSLATE),
+                               params={"from": fromLang or "", "to": toLang, "text": text},
+                               auth=SkypeConnection.Auth.SkypeToken).json()
