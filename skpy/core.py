@@ -18,6 +18,8 @@ class Skype(SkypeObj):
             Container of contacts for the connected user.
         chats (:class:`.SkypeChats`):
             Container of conversations for the connected user.
+        services (dict):
+            Skype credit and other paid services for the connected account.
         translate (:class:`.SkypeTranslator`):
             Connected instance of the translator service.
         conn (:class:`.SkypeConnection`):
@@ -69,6 +71,12 @@ class Skype(SkypeObj):
         json = self.conn("GET", "{0}/users/self/profile".format(SkypeConnection.API_USER),
                          auth=SkypeConnection.Auth.SkypeToken).json()
         return SkypeContact.fromRaw(self, json)
+
+    @property
+    @cacheResult
+    def services(self):
+        return self.conn("GET", "{0}/users/{1}/services".format(SkypeConnection.API_ENTITLEMENT, self.userId),
+                         auth=SkypeConnection.Auth.SkypeToken, headers={"Accept": "application/json; ver=3.0"}).json()
 
     @SkypeConnection.handle(404, regToken=True)
     def getEvents(self):

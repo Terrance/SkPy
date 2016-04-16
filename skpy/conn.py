@@ -125,6 +125,7 @@ class SkypeConnection(SkypeObj):
 
     API_LOGIN = "https://login.skype.com/login?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com"
     API_USER = "https://api.skype.com"
+    API_ENTITLEMENT = "https://consumer.entitlement.skype.com"
     API_SCHEDULE = "https://api.scheduler.skype.com"
     API_TRANSLATE = "https://dev.microsofttranslator.com/api"
     API_CONTACTS = "https://contacts.skype.com/contacts/v1"
