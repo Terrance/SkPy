@@ -352,7 +352,7 @@ class SkypeFileMsg(SkypeMsg):
     A message containing a file shared in a conversation.
 
     Attributes:
-        file (File):
+        file (:class:`File`):
             File object embedded in the message.
         fileContent (bytes):
             Raw content of the file.

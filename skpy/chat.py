@@ -46,30 +46,7 @@ class SkypeChat(SkypeObj):
             "targetType": "Passport|Skype|Lync|Thread"
         }
         resp = self.skype.conn.syncStateCall("GET", url, params, auth=SkypeConnection.Auth.RegToken).json()
-        msgs = []
-        for json in resp.get("messages", []):
-            msgs.append(SkypeMsg.fromRaw(self.skype, json))
-        return msgs
-
-    def setTyping(self, active=True):
-        """
-        Send a typing presence notification to the conversation.  This will typically show the "*<name> is typing...*"
-        message in others clients.
-
-        .. note:: A user's event stream will not receive any events for their own typing notifications.
-
-        It may be necessary to send this type of message continuously, as each typing presence usually expires after a
-        few seconds.  Set ``active`` to ``False`` to clear a current presence.
-
-        Args:
-            active (bool): whether to show as currently typing
-        """
-        msg = {
-            "messagetype": "Control/{0}Typing".format("" if active else "Clear"),
-            "content": None
-        }
-        self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id),
-                        auth=SkypeConnection.Auth.RegToken, json=msg)
+        return [SkypeMsg.fromRaw(self.skype, json) for json in resp.get("messages", [])]
 
     def sendRaw(self, editId=None, **kwargs):
         """
@@ -119,6 +96,21 @@ class SkypeChat(SkypeObj):
             arriveDate = datetime.fromtimestamp(arriveTime / 1000)
             msg["originalarrivaltime"] = datetime.strftime(arriveDate, "%Y-%m-%dT%H:%M:%S.%fZ")
         return SkypeMsg.fromRaw(self.skype, msg)
+
+    def setTyping(self, active=True):
+        """
+        Send a typing presence notification to the conversation.  This will typically show the "*<name> is typing...*"
+        message in others clients.
+
+        .. note:: A user's event stream will not receive any events for their own typing notifications.
+
+        It may be necessary to send this type of message continuously, as each typing presence usually expires after a
+        few seconds.  Set ``active`` to ``False`` to clear a current presence.
+
+        Args:
+            active (bool): whether to show as currently typing
+        """
+        return self.sendRaw(messagetype="Control/{0}Typing".format("" if active else "Clear"), content=None)
 
     def sendMsg(self, content, me=False, rich=False, edit=None):
         """
@@ -413,7 +405,7 @@ class SkypeChats(SkypeObjs):
         Get a single conversation by identifier.
 
         Args:
-            id (str): user identifier to retrieve chat for
+            id (str): single or group chat identifier
         """
         json = self.skype.conn("GET", "{0}/users/ME/conversations/{1}".format(self.skype.conn.msgsHost, id),
                                auth=SkypeConnection.Auth.RegToken, params={"view": "msnp24Equivalent"}).json()

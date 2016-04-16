@@ -277,7 +277,7 @@ class SkypeObj(object):
 
     def __str__(self):
         """
-        Pretty print the object, based on the class' attrs parameter.  Produces output something like::
+        Pretty print the object, based on the class' :attr:`attrs`.  Produces output something like::
 
             [<class name>]
             <attribute>: <value>
@@ -293,7 +293,7 @@ class SkypeObj(object):
 
     def __repr__(self):
         """
-        Dump properties of the object into a Python-like statement, based on the class' attrs parameter.
+        Dump properties of the object into a Python-like statement, based on the class' :attr:`attrs`.
 
         The resulting string is an expression that should evaluate to a similar object, minus Skype connection.
         """
