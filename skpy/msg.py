@@ -254,6 +254,12 @@ class SkypeMsg(SkypeObj):
             # It's already plain, or it's something we can't handle.
             return self.content
 
+    def read(self):
+        """
+        Mark this message as read by sending an updated consumption horizon.
+        """
+        self.chat.setConsumption("{0};{1};{0}".format(self.clientId, int(time.time() * 1000)))
+
     def edit(self, content, me=False, rich=False):
         """
         Send an edit of this message.  Arguments are passed to :meth:`.SkypeChat.sendMsg`.

@@ -197,7 +197,7 @@ class SkypeChatUpdateEvent(SkypeEvent):
         chat (:class:`.SkypeChat`):
             Conversation that emitted an update.
         horizon (str):
-            Raw list of timestamps, as provided by the API.
+            Updated horizon string, in the form ``<id>,<timestamp>,<id>``.
     """
 
     attrs = SkypeEvent.attrs + ("chatId", "horizon")

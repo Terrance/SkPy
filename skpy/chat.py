@@ -192,6 +192,19 @@ class SkypeChat(SkypeObj):
         content = """<contacts>{0}</contacts>""".format("".join(contactTags))
         return self.sendRaw(content=content, messagetype="RichText/Contacts")
 
+    def setConsumption(self, horizon):
+        """
+        Update the user's consumption horizon for this conversation, i.e. where it has been read up to.
+
+        To consume up to a given message, call :meth:`.SkypeMsg.read` instead.
+
+        Args:
+            horizon (str): new horizon string, of the form ``<id>,<timestamp>,<id>``
+        """
+        self.skype.conn("PUT", "{0}/users/ME/conversations/{1}/properties".format(self.skype.conn.msgsHost, self.id),
+                        auth=SkypeConnection.Auth.RegToken, params={"name": "consumptionhorizon"},
+                        json={"consumptionhorizon": horizon})
+
     def delete(self):
         """
         Delete the conversation and all message history.
