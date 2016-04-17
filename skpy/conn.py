@@ -71,6 +71,7 @@ class SkypeConnection(SkypeObj):
         """
 
         regToken = kwargs.get("regToken", False)
+        subscribe = kwargs.get("subscribe")
 
         def decorator(fn):
             @wraps(fn)
@@ -82,6 +83,8 @@ class SkypeConnection(SkypeObj):
                         conn = self if isinstance(self, SkypeConnection) else self.conn
                         if regToken:
                             conn.getRegToken()
+                        if subscribe:
+                            conn.endpoints[subscribe].subscribe()
                         return fn(self, *args, **kwargs)
                     raise
             return wrapper

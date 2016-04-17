@@ -79,6 +79,7 @@ class Skype(SkypeObj):
                          auth=SkypeConnection.Auth.SkypeToken, headers={"Accept": "application/json; ver=3.0"}).json()
 
     @SkypeConnection.handle(404, regToken=True)
+    @SkypeConnection.handle(404, subscribe="self")
     def getEvents(self):
         """
         Retrieve a list of events since the last poll.  Multiple calls may be needed to retrieve all events.
