@@ -46,7 +46,7 @@ def chatToId(url):
     Returns:
         str: extracted identifier
     """
-    match = re.search(r"conversations/([0-9]+:[A-Za-z0-9\.,_-]+(@thread\.skype)?)", url)
+    match = re.search(r"conversations/([0-9]+:[A-Za-z0-9\.,:_-]+(@thread\.skype)?)", url)
     return match.group(1) if match else None
 
 
