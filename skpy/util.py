@@ -15,7 +15,9 @@ def noPrefix(s):
     Returns:
         str: unprefixed string
     """
-    return s if s is None else s.split(":", 1)[1]
+    if s is None:
+        return ""
+    return ":".join(s.split(":", 1)[1:])
 
 
 def userToId(url):
