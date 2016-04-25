@@ -71,7 +71,7 @@ def initAttrs(cls):
         if unknown:
             unknownDesc = "an unexpected keyword argument" if len(unknown) == 1 else "unexpected keyword arguments"
             unknownList = ", ".join("'{0}'".format(k) for k in sorted(unknown))
-            raise TypeError("TypeError: __init__() got {0} {1}".format(unknownDesc, unknownList))
+            raise TypeError("__init__() got {0} {1}".format(unknownDesc, unknownList))
         # Set each attribute from kwargs, or use the default if not specified.
         for k in cls.attrs:
             setattr(self, k, kwargs.get(k, cls.defaults.get(k)))
@@ -331,6 +331,8 @@ class SkypeObjs(SkypeObj):
         """
         Provide key lookups for items in the cache.  Subclasses may override this to handle not-yet-cached objects.
         """
+        if key in self.cache:
+            return self.cache[key]
         if not self.synced:
             self.sync()
         return self.cache[key]

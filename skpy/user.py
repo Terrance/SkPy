@@ -206,6 +206,11 @@ class SkypeContact(SkypeUser):
         })
         return fields
 
+    @classmethod
+    def fromRaw(cls, skype=None, raw={}):
+        usrCls = SkypeBotUser if raw.get("type") == "agent" else cls
+        return usrCls(skype, raw, **usrCls.rawToFields(raw))
+
     def delete(self):
         """
         Remove the user from your contacts.
@@ -244,17 +249,18 @@ class SkypeBotUser(SkypeUser):
 
     attrs = SkypeUser.attrs + ("developer", "trusted", "locales", "rating", "description", "extra",
                                "siteUrl", "termsUrl", "privacyUrl")
+    defaults = {"name": None, "location": None}
 
     @classmethod
     def rawToFields(cls, raw={}):
         # Bot users don't really share any common fields with normal users, but we still want a subclass.
         return {
-            "id": raw.get("agentId"),
-            "name": raw.get("displayName"),
+            "id": raw.get("agentId", raw.get("id")),
+            "name": raw.get("displayName", raw.get("display_name", raw.get("name", {}).get("first"))),
             "location": None,
-            "avatar": raw.get("userTileStaticUrl", raw.get("userTileExtraLargeUrl")),
+            "avatar": raw.get("userTileStaticUrl", raw.get("userTileExtraLargeUrl", raw.get("avatar_url"))),
             "mood": None,
-            "developer": raw.get("developer"),
+            "developer": raw.get("developer", raw.get("name", {}).get("company")),
             "trusted": raw.get("isTrusted"),
             "locales": raw.get("supportedLocales"),
             "rating": raw.get("starRating"),
@@ -306,9 +312,14 @@ class SkypeContacts(SkypeObjs):
             yield self.cache[id]
 
     def sync(self):
-        for json in self.skype.conn("GET", "{0}/users/{1}/contacts"
-                                           .format(SkypeConnection.API_CONTACTS, self.skype.userId),
-                                    auth=SkypeConnection.Auth.SkypeToken).json().get("contacts", []):
+        params = {
+            "delta": "",
+            "$filter": "type eq 'skype' or type eq 'msn' or type eq 'pstn' or type eq 'agent' or type eq 'lync'",
+            "reason": "default"
+        }
+        for json in self.skype.conn("GET", "{0}/users/{1}/contacts".format(SkypeConnection.API_CONTACTS,
+                                                                           self.skype.userId),
+                                    auth=SkypeConnection.Auth.SkypeToken, params=params).json().get("contacts", []):
             self.merge(SkypeContact.fromRaw(self.skype, json))
             if not json.get("suggested"):
                 self.contactIds.append(json.get("id"))
@@ -354,17 +365,15 @@ class SkypeContacts(SkypeObjs):
                                auth=SkypeConnection.Auth.SkypeToken, data={"contacts[]": id}).json()
         return self.merge(SkypeUser.fromRaw(self.skype, json[0])) if json else None
 
-    def bots(self, id=None):
+    @cacheResult
+    def bots(self):
         """
         Retrieve a list of all known bots.
-
-        Args:
-            id (str): UUID or username of a specific bot
 
         Returns:
             SkypeBotUser list: resulting bot user objects
         """
-        json = self.skype.conn("GET", "{0}/agents".format(SkypeConnection.API_BOT), params={"agentId": id},
+        json = self.skype.conn("GET", "{0}/agents".format(SkypeConnection.API_BOT),
                                auth=SkypeConnection.Auth.SkypeToken).json().get("agentDescriptions", [])
         return [self.merge(SkypeBotUser.fromRaw(self.skype, raw)) for raw in json]
 
@@ -378,10 +387,9 @@ class SkypeContacts(SkypeObjs):
         Returns:
             SkypeBotUser: resulting bot user object
         """
-        try:
-            return self.bots(id)[0]
-        except IndexError:
-            return None
+        json = self.skype.conn("GET", "{0}/agents".format(SkypeConnection.API_BOT), params={"agentId": id},
+                               auth=SkypeConnection.Auth.SkypeToken).json().get("agentDescriptions", [])
+        return self.merge(SkypeBotUser.fromRaw(self.skype, json[0])) if json else None
 
     @cacheResult
     def search(self, query):
