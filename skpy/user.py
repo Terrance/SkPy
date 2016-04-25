@@ -213,6 +213,64 @@ class SkypeContact(SkypeUser):
         self.skype.conn("DELETE", "{0}/users/self/contacts/{1}".format(SkypeConnection.API_USER, self.id))
 
 
+@initAttrs
+class SkypeBotUser(SkypeUser):
+    """
+    A server-side bot account.  In most cases, they act like a normal user -- they can be added as contacts, interacted
+    with in one-to-one conversations, or invited to groups if the bot supports it.
+
+    Attributes:
+        name (str):
+            Display name of the bot.
+        developer (str):
+            Display name of the bot's developer.
+        trusted (bool):
+            Whether the bot is official and provided by Skype or Microsoft.
+        locales (str list):
+            Country-language codes supported by the bot.
+        rating (float):
+            User-provided rating of the bot.
+        description (str):
+            Information about what the bot does.
+        extra (str):
+            Footer info, such as hyperlinks to privacy and terms.
+        siteUrl (str):
+            URL for the bot's website.
+        termsUrl (str):
+            URL for the bot's terms of service.
+        privacyUrl (str):
+            URL for the bot's privacy policy.
+    """
+
+    attrs = SkypeUser.attrs + ("developer", "trusted", "locales", "rating", "description", "extra",
+                               "siteUrl", "termsUrl", "privacyUrl")
+
+    @classmethod
+    def rawToFields(cls, raw={}):
+        # Bot users don't really share any common fields with normal users, but we still want a subclass.
+        return {
+            "id": raw.get("agentId"),
+            "name": raw.get("displayName"),
+            "location": None,
+            "avatar": raw.get("userTileStaticUrl", raw.get("userTileExtraLargeUrl")),
+            "mood": None,
+            "developer": raw.get("developer"),
+            "trusted": raw.get("isTrusted"),
+            "locales": raw.get("supportedLocales"),
+            "rating": raw.get("starRating"),
+            "description": raw.get("description"),
+            "extra": raw.get("extra"),
+            "siteUrl": raw.get("webpage"),
+            "termsUrl": raw.get("tos"),
+            "privacyUrl": raw.get("privacyStatement")
+        }
+
+    @property
+    @cacheResult
+    def chat(self):
+        return self.skype.chats["28:" + self.id]
+
+
 class SkypeContacts(SkypeObjs):
     """
     A container of contacts, providing caching of user info to reduce API requests.
@@ -294,7 +352,36 @@ class SkypeContacts(SkypeObjs):
         """
         json = self.skype.conn("POST", "{0}/users/self/contacts/profiles".format(SkypeConnection.API_USER),
                                auth=SkypeConnection.Auth.SkypeToken, data={"contacts[]": id}).json()
-        return self.merge(SkypeUser.fromRaw(self.skype, json[0]))
+        return self.merge(SkypeUser.fromRaw(self.skype, json[0])) if json else None
+
+    def bots(self, id=None):
+        """
+        Retrieve a list of all known bots.
+
+        Args:
+            id (str): UUID or username of a specific bot
+
+        Returns:
+            SkypeBotUser list: resulting bot user objects
+        """
+        json = self.skype.conn("GET", "{0}/agents".format(SkypeConnection.API_BOT), params={"agentId": id},
+                               auth=SkypeConnection.Auth.SkypeToken).json().get("agentDescriptions", [])
+        return [self.merge(SkypeBotUser.fromRaw(self.skype, raw)) for raw in json]
+
+    def bot(self, id):
+        """
+        Retrieve a single bot.
+
+        Args:
+            id (str): UUID or username of the bot
+
+        Returns:
+            SkypeBotUser: resulting bot user object
+        """
+        try:
+            return self.bots(id)[0]
+        except IndexError:
+            return None
 
     @cacheResult
     def search(self, query):
