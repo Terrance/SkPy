@@ -2,7 +2,7 @@
 Root of the SkPy module.  Classes from all submodules are imported here for convenience.
 """
 
-from skpy.core import Skype, SkypeEventLoop, SkypeTranslator
+from skpy.core import Skype, SkypeEventLoop, SkypeSettings, SkypeTranslator
 from skpy.conn import SkypeConnection, SkypeEndpoint, SkypeAuthException
 from skpy.user import SkypeUser, SkypeContact, SkypeContacts, SkypeRequest
 from skpy.chat import SkypeChat, SkypeSingleChat, SkypeGroupChat, SkypeChats

@@ -18,6 +18,8 @@ class Skype(SkypeObj):
             Container of contacts for the connected user.
         chats (:class:`.SkypeChats`):
             Container of conversations for the connected user.
+        settings (:class:`.SkypeSettings`):
+            Read/write access to server-side account options.
         services (dict):
             Skype credit and other paid services for the connected account.
         translate (:class:`.SkypeTranslator`):
@@ -59,6 +61,7 @@ class Skype(SkypeObj):
                 self.conn.getSkypeToken()
         self.contacts = SkypeContacts(self)
         self.chats = SkypeChats(self)
+        self.settings = SkypeSettings(self)
         self.translate = SkypeTranslator(self)
 
     @property
@@ -162,6 +165,125 @@ class SkypeEventLoop(Skype):
             event (SkypeEvent): an incoming event
         """
         pass
+
+
+class SkypeSettings(SkypeObj):
+    """
+    An interface for getting and setting server options for the connected account.
+
+    All attributes are read/write, with values fetched on each access, and implicit server writes when changed.
+
+    Attributes:
+        webLinkPreviews (bool):
+            Skype for Web: replace URLs in messages with rich previews.
+
+            *Web link previews: Show me a preview of websites I send or receive on Skype.*
+        youtubePlayer (bool):
+            Skype for Web: replace YouTube URLs with an inline player.
+
+            *YouTube player: Use YouTube player directly to preview videos I send or receive.*
+        mentionNotifs (bool):
+            Skype for Web: trigger notifications when mentioned in a message.
+
+            *@mention notifications: Always notify me when someone mentions me on Skype. (@<username>)*
+        imagePaste (bool):
+            Skype for Web: support sending image files by pasting into a conversation input field.
+
+            *Enable image paste: Enable pasting of images from clipboard directly into the chat.*
+        callPrivacy (:class:`Privacy`):
+            Who to accept incoming audio calls from.
+        videoPrivacy (:class:`Privacy`):
+            Who to accept incoming video and screen-share requests from.
+    """
+
+    attrs = ("webLinkPreviews", "youtubePlayer", "mentionNotifs", "imagePaste", "callPrivacy", "videoPrivacy")
+
+    class Privacy:
+        """
+        Enum: privacy option values for incoming audio and video calls.
+        """
+        Anyone = 0
+        """
+        Allow from all Skype users.
+        """
+        Contacts = 1
+        """
+        Only allow from Skype users on the connected account's contact list.
+        """
+        Nobody = 2
+        """
+        Deny from all Skype users.
+        """
+
+    @property
+    def flags(self):
+        # Retrieve a list of all enabled flags.
+        return self.skype.conn("GET", SkypeConnection.API_FLAGS, auth=SkypeConnection.Auth.SkypeToken).json()
+
+    def flagProp(id, invert=False):
+        @property
+        def flag(self):
+            return (id in self.flags) ^ invert
+
+        @flag.setter
+        def flag(self, val):
+            val = bool(val) ^ invert
+            if not val == (id in self.flags):
+                self.skype.conn("PUT" if val else "DELETE", "{0}/{1}".format(SkypeConnection.API_FLAGS, id),
+                                auth=SkypeConnection.Auth.SkypeToken)
+        return flag
+
+    def optProp(id):
+        @property
+        def opt(self):
+            json = self.skype.conn("GET", "{0}/users/{1}/options/{2}".format(SkypeConnection.API_USER,
+                                                                             self.skype.userId, id),
+                                   auth=SkypeConnection.Auth.SkypeToken).json()
+            return json.get("optionInt", json.get("optionStr", json.get("optionBin")))
+
+        @opt.setter
+        def opt(self, val):
+            self.skype.conn("POST", "{0}/users/{1}/options/{2}".format(SkypeConnection.API_USER,
+                                                                       self.skype.userId, id),
+                            auth=SkypeConnection.Auth.SkypeToken, data={"integerValue": val})
+        return opt
+
+    webLinkPreviews = flagProp(11, True)
+    youtubePlayer = flagProp(12)
+    mentionNotifs = flagProp(13, True)
+    imagePaste = flagProp(14)
+
+    # Hidden options, which are abstracted below to avoid the flag nonsense.
+    callPrivacyOpt = optProp("OPT_SKYPE_CALL_POLICY")
+    videoPrivacyContacts = flagProp(15)
+    videoPrivacyNobody = flagProp(16)
+
+    @property
+    def callPrivacy(self):
+        # Behaviour here is consistent with Skype for Web (neither 0 nor 1 displays as contacts only).
+        return self.Privacy.Anyone if self.callPrivacyOpt == 0 else self.Privacy.Contacts
+
+    @callPrivacy.setter
+    def callPrivacy(self, val):
+        self.callPrivacyOpt = 0 if val == self.Privacy.Anyone else 2
+
+    @property
+    def videoPrivacy(self):
+        if self.videoPrivacyNobody:
+            return self.Privacy.Nobody
+        elif self.videoPrivacyContacts:
+            return self.Privacy.Contacts
+        else:
+            return self.Privacy.Anyone
+
+    @videoPrivacy.setter
+    def videoPrivacy(self, val):
+        self.videoPrivacyContacts = (val == self.Privacy.Contacts)
+        self.videoPrivacyNobody = (val == self.Privacy.Nobody)
+
+    # Now make these static methods so they can be used outside of the class.
+    flagProp = staticmethod(flagProp)
+    optProp = staticmethod(optProp)
 
 
 class SkypeTranslator(SkypeObj):
