@@ -133,6 +133,7 @@ class SkypeConnection(SkypeObj):
     API_ENTITLEMENT = "https://consumer.entitlement.skype.com"
     API_SCHEDULE = "https://api.scheduler.skype.com"
     API_TRANSLATE = "https://dev.microsofttranslator.com/api"
+    API_URL = "https://urlp.asm.skype.com/v1/url/info"
     API_CONTACTS = "https://contacts.skype.com/contacts/v1"
     API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1"
 

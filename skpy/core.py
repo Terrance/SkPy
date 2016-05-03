@@ -118,6 +118,19 @@ class Skype(SkypeObj):
         self.conn("PUT", "{0}/users/{1}/profile/avatar".format(SkypeConnection.API_USER, self.userId),
                   auth=SkypeConnection.Auth.SkypeToken, data=image.read())
 
+    def getUrlMeta(self, url):
+        """
+        Retrieve various metadata associated with a URL, as seen by Skype.
+
+        Args:
+            url (str): address to ping for info
+
+        Returns:
+            dict: metadata for the website queried
+        """
+        return self.conn("GET", SkypeConnection.API_URL, params={"url": url},
+                         auth=SkypeConnection.Auth.Authorize).json()
+
 
 class SkypeEventLoop(Skype):
     """
