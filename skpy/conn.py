@@ -619,13 +619,13 @@ def getMac256Hash(challenge, appId, key):
     for i in range(cchClearText):
         pClearText = pClearText[:i] + [0] + pClearText[i:]
         for pos in range(4):
-            pClearText[i] += ord(clearText[pos]) * (256 ** pos)
+            pClearText[i] += ord(clearText[4 * i + pos]) * (256 ** pos)
     sha256Hash = [0, 0, 0, 0]
     hash = hashlib.sha256((challenge + key).encode("utf-8")).hexdigest().upper()
     for i in range(len(sha256Hash)):
         sha256Hash[i] = 0
         for pos in range(4):
-            dpos = pos * 2
+            dpos = 8 * i + pos * 2
             sha256Hash[i] += int(hash[dpos:dpos + 2], 16) * (256 ** pos)
     macHash = cS64(pClearText, sha256Hash)
     macParts = [macHash[0], macHash[1], macHash[0], macHash[1]]
