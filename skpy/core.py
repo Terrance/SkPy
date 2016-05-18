@@ -203,13 +203,18 @@ class SkypeSettings(SkypeObj):
             Skype for Web: support sending image files by pasting into a conversation input field.
 
             *Enable image paste: Enable pasting of images from clipboard directly into the chat.*
+        shareTyping (bool):
+            Skype for Web: send typing notifications to contacts when active in conversations.
+
+            *Typing indicator: Show when I am typing.*
         callPrivacy (:class:`Privacy`):
             Who to accept incoming audio calls from.
         videoPrivacy (:class:`Privacy`):
             Who to accept incoming video and screen-share requests from.
     """
 
-    attrs = ("webLinkPreviews", "youtubePlayer", "mentionNotifs", "imagePaste", "callPrivacy", "videoPrivacy")
+    attrs = ("webLinkPreviews", "youtubePlayer", "mentionNotifs", "imagePaste", "shareTyping",
+             "callPrivacy", "videoPrivacy")
 
     class Privacy:
         """
@@ -265,6 +270,7 @@ class SkypeSettings(SkypeObj):
     youtubePlayer = flagProp(12)
     mentionNotifs = flagProp(13, True)
     imagePaste = flagProp(14)
+    shareTyping = flagProp(20, True)
 
     # Hidden options, which are abstracted below to avoid the flag nonsense.
     callPrivacyOpt = optProp("OPT_SKYPE_CALL_POLICY")
