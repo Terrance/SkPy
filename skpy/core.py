@@ -28,6 +28,27 @@ class Skype(SkypeObj):
             Underlying connection instance.
     """
 
+    class Status:
+        """
+        Enum: types of user availability.
+        """
+        Offline = 0
+        """
+        User is not connected.  For the authenticated user, this is used to appear hidden from others.
+        """
+        Busy = 1
+        """
+        User wishes not to be disturbed.  Disables notifications on some clients (e.g. on the desktop).
+        """
+        Away = 2
+        """
+        User is online but not active.  Messages will likely be delivered as normal, though may not be read.
+        """
+        Online = 3
+        """
+        User is available to talk.
+        """
+
     attrs = ("userId",)
 
     def __init__(self, user=None, pwd=None, tokenFile=None, connect=None):
@@ -98,15 +119,16 @@ class Skype(SkypeObj):
             events.append(SkypeEvent.fromRaw(self, json))
         return events
 
-    def setPresence(self, online=True):
+    def setPresence(self, status=Status.Online):
         """
-        Set the user's presence (either *Online* or *Hidden*.
+        Set the current user's online presence.
 
         Args:
-            online (bool): whether to appear online or not
+            status (.Status): new availability to display to contacts
         """
+        statusStr = ("Hidden", "Busy", "Idle", "Online")[status]
         self.conn("PUT", "{0}/users/ME/presenceDocs/messagingService".format(self.conn.msgsHost),
-                  auth=SkypeConnection.Auth.RegToken, json={"status": "Online" if online else "Hidden"})
+                  auth=SkypeConnection.Auth.RegToken, json={"status": statusStr})
 
     def setAvatar(self, image):
         """

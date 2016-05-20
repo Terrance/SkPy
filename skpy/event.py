@@ -74,7 +74,7 @@ class SkypePresenceEvent(SkypeEvent):
             User whose presence changed.
         online (bool):
             Whether the user is now connected.
-        status (str):
+        status (:class:`.Status`):
             Chosen availability status.
     """
 
@@ -87,7 +87,7 @@ class SkypePresenceEvent(SkypeEvent):
         fields.update({
             "userId": userToId(res.get("selfLink")),
             "online": res.get("availability") == "Online",
-            "status": res.get("status")
+            "status": ("Offline", "Busy", "Idle", "Online").index(res.get("status"))
         })
         return fields
 
