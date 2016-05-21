@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from .conn import SkypeConnection
-from .util import SkypeObj, SkypeObjs, SkypeApiException, initAttrs, convertIds, cacheResult
+from .util import SkypeObj, SkypeObjs, SkypeEnum, SkypeApiException, initAttrs, convertIds, cacheResult
 
 
 @initAttrs
@@ -152,22 +152,19 @@ class SkypeContact(SkypeUser):
         """
         The phone number of a contact.
         """
-        class Type:
-            """
-            Enum: types of phone number.
-            """
-            Home = 0
-            """
-            A home phone number.
-            """
-            Work = 1
-            """
-            An office or work phone number.
-            """
-            Mobile = 2
-            """
-            A mobile phone number.
-            """
+
+        Type = SkypeEnum("SkypeContact.Phone.Type", ("Home", "Work", "Mobile"))
+        """
+        :class:`.SkypeEnum`: Types of phone number.
+
+        Attributes:
+            Home:
+                A home phone number.
+            Work:
+                An office or work phone number.
+            Mobile:
+                A mobile phone number.
+        """
 
         attrs = ("type", "number")
 

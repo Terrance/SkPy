@@ -305,7 +305,7 @@ class SkypeObj(object):
         return "{0}({1})".format(self.__class__.__name__, ", ".join(reprs))
 
 
-class SkypeObjs(SkypeObj):
+class SkypeObjs(object):
     """
     A basic Skype collection.  Acts as a container for objects of a given type.
 
@@ -323,7 +323,7 @@ class SkypeObjs(SkypeObj):
         Args:
             skype (Skype): parent Skype instance
         """
-        super(SkypeObjs, self).__init__(skype)
+        self.skype = skype
         self.synced = False
         self.cache = {}
 
@@ -364,6 +364,55 @@ class SkypeObjs(SkypeObj):
         else:
             self.cache[obj.id] = obj
         return self.cache[obj.id]
+
+    def __str__(self):
+        return "[{0}]".format(self.__class__.__name__)
+
+    def __repr__(self):
+        return "{0}()".format(self.__class__.__name__)
+
+
+class SkypeEnum(object):
+    """
+    A basic implementation for an enum.
+    """
+
+    def __init__(self, label, names=()):
+        """
+        Create a new enumeration.  The parent enum creates an instance for each item.
+
+        Args:
+            label (str): enum name
+            names (list): item labels
+        """
+        self.label = label
+        self.names = names
+        for name in names:
+            setattr(self, name, self.__class__("{0}.{1}".format(label, name)))
+
+    def __getitem__(self, item):
+        """
+        Provide list-style index lookups for each item.
+        """
+        return getattr(self, self.names[item])
+
+    def __str__(self):
+        """
+        Show a list of items for the parent, or just the qualified name for each item.
+        """
+        if self.names:
+            return "[{0}<{1}>]\n{2}".format(self.__class__.__name__, self.label, "\n".join(self.names))
+        else:
+            return self.label
+
+    def __repr__(self):
+        """
+        Show constructor for the parent, or just the qualified name for each item.
+        """
+        if self.names:
+            return "{0}({1}, {2})".format(self.__class__.__name__, repr(self.label), repr(self.names))
+        else:
+            return self.label
 
 
 class SkypeException(Exception):

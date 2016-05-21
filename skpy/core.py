@@ -4,7 +4,7 @@ from .conn import SkypeConnection
 from .user import SkypeContact, SkypeContacts
 from .chat import SkypeChats
 from .event import SkypeEvent
-from .util import SkypeObj, cacheResult
+from .util import SkypeObj, SkypeEnum, cacheResult
 
 
 class Skype(SkypeObj):
@@ -28,26 +28,20 @@ class Skype(SkypeObj):
             Underlying connection instance.
     """
 
-    class Status:
-        """
-        Enum: types of user availability.
-        """
-        Offline = 0
-        """
-        User is not connected.  For the authenticated user, this is used to appear hidden from others.
-        """
-        Busy = 1
-        """
-        User wishes not to be disturbed.  Disables notifications on some clients (e.g. on the desktop).
-        """
-        Away = 2
-        """
-        User is online but not active.  Messages will likely be delivered as normal, though may not be read.
-        """
-        Online = 3
-        """
-        User is available to talk.
-        """
+    Status = SkypeEnum("Skype.Status", ("Offline", "Busy", "Away", "Online"))
+    """
+    :class:`.SkypeEnum`: Types of user availability.
+
+    Attributes:
+        Offline:
+            User is not connected.  For the authenticated user, this is used to appear hidden from others.
+        Busy:
+            User wishes not to be disturbed.  Disables notifications on some clients (e.g. on the desktop).
+        Away:
+            User is online but not active.  Messages will likely be delivered as normal, though may not be read.
+        Online:
+            User is available to talk.
+    """
 
     attrs = ("userId",)
 

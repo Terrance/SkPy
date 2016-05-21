@@ -11,4 +11,4 @@ from skpy.msg import SkypeMsg, SkypeTextMsg, SkypeContactMsg, SkypeLocationMsg, 
 from skpy.event import SkypeEvent, SkypePresenceEvent, SkypeEndpointEvent, SkypeTypingEvent, \
                        SkypeMessageEvent, SkypeNewMessageEvent, SkypeEditMessageEvent, SkypeCallEvent, \
                        SkypeChatUpdateEvent, SkypeChatMemberEvent
-from skpy.util import SkypeException, SkypeApiException
+from skpy.util import SkypeObj, SkypeObjs, SkypeEnum, SkypeException, SkypeApiException

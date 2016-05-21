@@ -6,7 +6,7 @@ from bs4 import BeautifulSoup
 
 from .conn import SkypeConnection
 from .static import emoticons
-from .util import SkypeObj, noPrefix, userToId, chatToId, initAttrs, convertIds, cacheResult
+from .util import SkypeObj, SkypeEnum, noPrefix, userToId, chatToId, initAttrs, convertIds, cacheResult
 
 
 @initAttrs
@@ -431,18 +431,16 @@ class SkypeCallMsg(SkypeMsg):
             New state of the call.
     """
 
-    class State:
-        """
-        Enum: possible call states (either started and incoming, or ended).
-        """
-        Started = 0
-        """
-        The call has just begun.
-        """
-        Ended = 1
-        """
-        All call participants have hung up.
-        """
+    State = SkypeEnum("SkypeCallMsg.State", ("Started", "Ended"))
+    """
+    :class:`.SkypeEnum`: Possible call states (either started and incoming, or ended).
+
+    Attributes:
+        Started:
+            New call has just begun.
+        Ended:
+            All call participants have hung up.
+    """
 
     attrs = SkypeMsg.attrs + ("state",)
 

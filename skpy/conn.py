@@ -11,7 +11,7 @@ from pprint import pformat
 from bs4 import BeautifulSoup
 import requests
 
-from .util import SkypeObj, SkypeException, SkypeApiException
+from .util import SkypeObj, SkypeEnum, SkypeException, SkypeApiException
 
 
 class SkypeConnection(SkypeObj):
@@ -40,22 +40,18 @@ class SkypeConnection(SkypeObj):
             Whether the connected account only has guest privileges.
     """
 
-    class Auth:
-        """
-        Enum: authentication types for different API calls.
-        """
-        SkypeToken = 0
-        """
-        Add an ``X-SkypeToken`` header with the Skype token.
-        """
-        Authorize = 1
-        """
-        Add an ``Authorization`` header with the Skype token.
-        """
-        RegToken = 2
-        """
-        Add a ``RegistrationToken`` header with the registration token.
-        """
+    Auth = SkypeEnum("SkypeConnection.Auth", ("SkypeToken", "Authorize", "RegToken"))
+    """
+    :class:`.SkypeEnum`: Authentication types for different API calls.
+
+    Attributes:
+        SkypeToken:
+            Add an ``X-SkypeToken`` header with the Skype token.
+        Authorize:
+            Add an ``Authorization`` header with the Skype token.
+        RegToken:
+            Add a ``RegistrationToken`` header with the registration token.
+    """
 
     @staticmethod
     def handle(*codes, **kwargs):
