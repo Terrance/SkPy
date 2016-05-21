@@ -4,13 +4,14 @@ import time
 
 from bs4 import BeautifulSoup
 
+from .core import SkypeObj, SkypeEnum
+from .util import SkypeUtils
 from .conn import SkypeConnection
 from .static import emoticons
-from .util import SkypeObj, SkypeEnum, noPrefix, userToId, chatToId, initAttrs, convertIds, cacheResult
 
 
-@initAttrs
-@convertIds("user", "chat")
+@SkypeUtils.initAttrs
+@SkypeUtils.convertIds("user", "chat")
 class SkypeMsg(SkypeObj):
     """
     A message either sent or received in a conversation.
@@ -154,7 +155,7 @@ class SkypeMsg(SkypeObj):
             str: tag to display the excerpt as a quote
         """
         # Single conversations lose their prefix here.
-        chatId = chat.id if chat.id.split(":")[0] == "19" else noPrefix(chat.id)
+        chatId = chat.id if chat.id.split(":")[0] == "19" else SkypeUtils.noPrefix(chat.id)
         # Legacy timestamp includes the date if the quote is not from today.
         unixTime = int(time.mktime(timestamp.timetuple()))
         legacyTime = timestamp.strftime("{0}%H:%M:%S".format("" if timestamp.date() == date.today() else "%d/%m/%Y "))
@@ -199,8 +200,8 @@ class SkypeMsg(SkypeObj):
             "type": raw.get("messagetype"),
             "time": msgTime,
             "clientId": raw.get("clientmessageid", raw.get("skypeeditedid")),
-            "userId": userToId(raw.get("from", "")),
-            "chatId": chatToId(raw.get("conversationLink", "")),
+            "userId": SkypeUtils.userToId(raw.get("from", "")),
+            "chatId": SkypeUtils.chatToId(raw.get("conversationLink", "")),
             "content": raw.get("content")
         }
 
@@ -288,8 +289,8 @@ class SkypeTextMsg(SkypeMsg):
     """
 
 
-@initAttrs
-@convertIds(users=("contact",))
+@SkypeUtils.initAttrs
+@SkypeUtils.convertIds(users=("contact",))
 class SkypeContactMsg(SkypeMsg):
     """
     A message containing one or more shared contacts.
@@ -317,7 +318,7 @@ class SkypeContactMsg(SkypeMsg):
         return fields
 
 
-@initAttrs
+@SkypeUtils.initAttrs
 class SkypeLocationMsg(SkypeMsg):
     """
     A message containing the sender's location.
@@ -352,7 +353,7 @@ class SkypeLocationMsg(SkypeMsg):
         return fields
 
 
-@initAttrs
+@SkypeUtils.initAttrs
 class SkypeFileMsg(SkypeMsg):
     """
     A message containing a file shared in a conversation.
@@ -364,7 +365,7 @@ class SkypeFileMsg(SkypeMsg):
             Raw content of the file.
     """
 
-    @initAttrs
+    @SkypeUtils.initAttrs
     class File(SkypeObj):
         """
         Details about a file contained within a message.
@@ -402,32 +403,32 @@ class SkypeFileMsg(SkypeMsg):
         return fields
 
     @property
-    @cacheResult
+    @SkypeUtils.cacheResult
     def fileContent(self):
         return self.skype.conn("GET", "{0}/views/original".format(self.file.urlFull),
                                auth=SkypeConnection.Auth.Authorize).content
 
 
-@initAttrs
+@SkypeUtils.initAttrs
 class SkypeImageMsg(SkypeFileMsg):
     """
     A message containing a picture shared in a conversation.
     """
 
     @property
-    @cacheResult
+    @SkypeUtils.cacheResult
     def fileContent(self):
         return self.skype.conn("GET", "{0}/views/imgpsh_fullsize".format(self.file.urlFull),
                                auth=SkypeConnection.Auth.Authorize).content
 
 
-@initAttrs
+@SkypeUtils.initAttrs
 class SkypeCallMsg(SkypeMsg):
     """
     A message representing a change in state to a voice or video call inside the conversation.
 
     Attributes:
-        state (:class:`State`):
+        state (:class:`.State`):
             New state of the call.
     """
 
@@ -452,8 +453,8 @@ class SkypeCallMsg(SkypeMsg):
         return fields
 
 
-@initAttrs
-@convertIds(user=("member",))
+@SkypeUtils.initAttrs
+@SkypeUtils.convertIds(user=("member",))
 class SkypeMemberMsg(SkypeMsg):
     """
     A message representing a change in a group conversation's participants.
@@ -469,7 +470,7 @@ class SkypeMemberMsg(SkypeMsg):
     attrs = SkypeMsg.attrs + ("memberId",)
 
 
-@initAttrs
+@SkypeUtils.initAttrs
 class SkypeAddMemberMsg(SkypeMemberMsg):
     """
     A message representing a user added to a group conversation.
@@ -480,13 +481,13 @@ class SkypeAddMemberMsg(SkypeMemberMsg):
         fields = super(SkypeAddMemberMsg, cls).rawToFields(raw)
         memInfo = (BeautifulSoup(raw.get("content"), "html.parser").find("addmember") or {})
         fields.update({
-            "userId": noPrefix(memInfo.find("initiator").text),
-            "memberId": noPrefix(memInfo.find("target").text)
+            "userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
+            "memberId": SkypeUtils.noPrefix(memInfo.find("target").text)
         })
         return fields
 
 
-@initAttrs
+@SkypeUtils.initAttrs
 class SkypeChangeMemberMsg(SkypeMemberMsg):
     """
     A message representing a user's role being changed within a group conversation.
@@ -503,14 +504,14 @@ class SkypeChangeMemberMsg(SkypeMemberMsg):
         fields = super(SkypeChangeMemberMsg, cls).rawToFields(raw)
         memInfo = (BeautifulSoup(raw.get("content"), "html.parser").find("roleupdate") or {})
         fields.update({
-            "userId": noPrefix(memInfo.find("initiator").text),
-            "memberId": noPrefix(memInfo.find("target").find("id").text),
+            "userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
+            "memberId": SkypeUtils.noPrefix(memInfo.find("target").find("id").text),
             "admin": memInfo.find("target").find("role").text == "admin"
         })
         return fields
 
 
-@initAttrs
+@SkypeUtils.initAttrs
 class SkypeRemoveMemberMsg(SkypeMemberMsg):
     """
     A message representing a user removed from a group conversation.
@@ -521,7 +522,7 @@ class SkypeRemoveMemberMsg(SkypeMemberMsg):
         fields = super(SkypeRemoveMemberMsg, cls).rawToFields(raw)
         memInfo = (BeautifulSoup(raw.get("content"), "html.parser").find("deletemember") or {})
         fields.update({
-            "userId": noPrefix(memInfo.find("initiator").text),
-            "memberId": noPrefix(memInfo.find("target").text)
+            "userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
+            "memberId": SkypeUtils.noPrefix(memInfo.find("target").text)
         })
         return fields

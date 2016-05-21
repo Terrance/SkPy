@@ -1,10 +1,11 @@
 from datetime import datetime
 
+from .core import SkypeObj, SkypeObjs, SkypeEnum, SkypeApiException
+from .util import SkypeUtils
 from .conn import SkypeConnection
-from .util import SkypeObj, SkypeObjs, SkypeEnum, SkypeApiException, initAttrs, convertIds, cacheResult
 
 
-@initAttrs
+@SkypeUtils.initAttrs
 class SkypeUser(SkypeObj):
     """
     A user on Skype -- the current one, a contact, or someone else.
@@ -28,7 +29,7 @@ class SkypeUser(SkypeObj):
             One-to-one conversation with this user.
     """
 
-    @initAttrs
+    @SkypeUtils.initAttrs
     class Name(SkypeObj):
         """
         The name of a user or contact.
@@ -45,7 +46,7 @@ class SkypeUser(SkypeObj):
         def __str__(self):
             return " ".join(filter(None, (self.first, self.last)))
 
-    @initAttrs
+    @SkypeUtils.initAttrs
     class Location(SkypeObj):
         """
         The location of a user or contact.
@@ -66,7 +67,7 @@ class SkypeUser(SkypeObj):
         def __str__(self):
             return ", ".join(filter(None, (self.city, self.region, self.country)))
 
-    @initAttrs
+    @SkypeUtils.initAttrs
     class Mood(SkypeObj):
         """
         The mood message set by a user or contact.
@@ -114,7 +115,7 @@ class SkypeUser(SkypeObj):
         }
 
     @property
-    @cacheResult
+    @SkypeUtils.cacheResult
     def chat(self):
         return self.skype.chats["8:" + self.id]
 
@@ -129,7 +130,7 @@ class SkypeUser(SkypeObj):
                         json={"greeting": greeting})
 
 
-@initAttrs
+@SkypeUtils.initAttrs
 class SkypeContact(SkypeUser):
     """
     A user on Skype that the logged-in account is a contact of.  Allows access to contacts-only properties.
@@ -147,7 +148,7 @@ class SkypeContact(SkypeUser):
             Whether the logged-in account has blocked this user.
     """
 
-    @initAttrs
+    @SkypeUtils.initAttrs
     class Phone(SkypeObj):
         """
         The phone number of a contact.
@@ -215,7 +216,7 @@ class SkypeContact(SkypeUser):
         self.skype.conn("DELETE", "{0}/users/self/contacts/{1}".format(SkypeConnection.API_USER, self.id))
 
 
-@initAttrs
+@SkypeUtils.initAttrs
 class SkypeBotUser(SkypeUser):
     """
     A server-side bot account.  In most cases, they act like a normal user -- they can be added as contacts, interacted
@@ -269,7 +270,7 @@ class SkypeBotUser(SkypeUser):
         }
 
     @property
-    @cacheResult
+    @SkypeUtils.cacheResult
     def chat(self):
         return self.skype.chats["28:" + self.id]
 
@@ -362,7 +363,7 @@ class SkypeContacts(SkypeObjs):
                                auth=SkypeConnection.Auth.SkypeToken, data={"contacts[]": id}).json()
         return self.merge(SkypeUser.fromRaw(self.skype, json[0])) if json else None
 
-    @cacheResult
+    @SkypeUtils.cacheResult
     def bots(self):
         """
         Retrieve a list of all known bots.
@@ -388,7 +389,7 @@ class SkypeContacts(SkypeObjs):
                                auth=SkypeConnection.Auth.SkypeToken).json().get("agentDescriptions", [])
         return self.merge(SkypeBotUser.fromRaw(self.skype, json[0])) if json else None
 
-    @cacheResult
+    @SkypeUtils.cacheResult
     def search(self, query):
         """
         Search the Skype Directory for a user.
@@ -428,8 +429,8 @@ class SkypeContacts(SkypeObjs):
         return requests
 
 
-@initAttrs
-@convertIds("user")
+@SkypeUtils.initAttrs
+@SkypeUtils.convertIds("user")
 class SkypeRequest(SkypeObj):
     """
     A contact request.  Use :meth:`accept` or :meth:`reject` to act on it.

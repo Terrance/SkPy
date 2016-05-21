@@ -1,17 +1,19 @@
 import os
 import re
-from functools import wraps
+import functools
 from datetime import datetime, timedelta
 import time
 from types import MethodType
 import math
 import hashlib
-from pprint import pformat
 
 from bs4 import BeautifulSoup
 import requests
 
-from .util import SkypeObj, SkypeEnum, SkypeException, SkypeApiException
+from .core import SkypeObj, SkypeEnum, SkypeException, SkypeApiException
+
+if os.getenv("SKPY_DEBUG_HTTP"):
+    from pprint import pformat
 
 
 class SkypeConnection(SkypeObj):
@@ -70,7 +72,7 @@ class SkypeConnection(SkypeObj):
         subscribe = kwargs.get("subscribe")
 
         def decorator(fn):
-            @wraps(fn)
+            @functools.wraps(fn)
             def wrapper(self, *args, **kwargs):
                 try:
                     return fn(self, *args, **kwargs)
@@ -438,15 +440,18 @@ class SkypeConnection(SkypeObj):
         while "reg" not in self.tokens:
             secs = int(time.time())
             hash = getMac256Hash(str(secs), "msmsgs@msnmsgr.com", "Q1P7W2E4J9R8U3S5")
-            endpointResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), codes=(200, 201, 404), headers={
+            headers = {
                 "LockAndKey": "appId=msmsgs@msnmsgr.com; time={0}; lockAndKeyResponse={1}".format(secs, hash),
                 "Authentication": "skypetoken=" + self.tokens["skype"]
-            }, json={"endpointFeatures": "Agent"})
+            }
+            endpointResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), codes=(200, 201, 404),
+                                headers=headers, json={"endpointFeatures": "Agent"})
             regTokenHead = endpointResp.headers.get("Set-RegistrationToken")
             locHead = endpointResp.headers.get("Location")
             if regTokenHead:
                 self.tokens["reg"] = re.search(r"(registrationToken=[a-z0-9\+/=]+)", regTokenHead, re.I).group(1)
-                self.tokenExpiry["reg"] = datetime.fromtimestamp(int(re.search(r"expires=(\d+)", regTokenHead).group(1)))
+                regExpiry = re.search(r"expires=(\d+)", regTokenHead).group(1)
+                self.tokenExpiry["reg"] = datetime.fromtimestamp(int(regExpiry))
                 regEndMatch = re.search(r"endpointId=({[a-z0-9\-]+})", regTokenHead)
                 if regEndMatch:
                     self.endpoints["main"] = SkypeEndpoint(self, regEndMatch.group(1))

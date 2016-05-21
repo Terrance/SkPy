@@ -1,350 +1,229 @@
-import requests
-
-from .conn import SkypeConnection
-from .user import SkypeContact, SkypeContacts
-from .chat import SkypeChats
-from .event import SkypeEvent
-from .util import SkypeObj, SkypeEnum, cacheResult
-
-
-class Skype(SkypeObj):
+class SkypeObj(object):
     """
-    The main Skype instance.  Provides methods for retrieving various other object types.
+    A basic Skype object.  Holds references to the parent :class:`.Skype` instance, and a raw object from the API.
 
     Attributes:
-        user (:class:`.SkypeContact`):
-            Contact information for the connected account.
-        contacts (:class:`.SkypeContacts`):
-            Container of contacts for the connected user.
-        chats (:class:`.SkypeChats`):
-            Container of conversations for the connected user.
-        settings (:class:`.SkypeSettings`):
-            Read/write access to server-side account options.
-        services (dict):
-            Skype credit and other paid services for the connected account.
-        translate (:class:`.SkypeTranslator`):
-            Connected instance of the translator service.
-        conn (:class:`.SkypeConnection`):
-            Underlying connection instance.
+        attrs (tuple):
+            List of defined fields for the class.  Used by :meth:`initAttrs` to create an :meth:`__init__` method.
+        defaults (dict):
+            Collection of default values when any keyword arguments are omitted from the constructor.
+        skype (:class:`.Skype`):
+            Parent Skype instance.
+        raw (dict):
+            Raw object, as provided by the API.
     """
 
-    Status = SkypeEnum("Skype.Status", ("Offline", "Busy", "Away", "Online"))
-    """
-    :class:`.SkypeEnum`: Types of user availability.
+    attrs = ()
+    defaults = {}
 
-    Attributes:
-        Offline:
-            User is not connected.  For the authenticated user, this is used to appear hidden from others.
-        Busy:
-            User wishes not to be disturbed.  Disables notifications on some clients (e.g. on the desktop).
-        Away:
-            User is online but not active.  Messages will likely be delivered as normal, though may not be read.
-        Online:
-            User is available to talk.
-    """
-
-    attrs = ("userId",)
-
-    def __init__(self, user=None, pwd=None, tokenFile=None, connect=None):
+    def __init__(self, skype=None, raw=None):
         """
-        Create a new Skype object and corresponding connection.
+        Instantiate a plain instance of this class, and store a reference to the Skype object for later API calls.
 
-        If ``user`` and ``pwd`` are given, they will be passed to :meth:`.SkypeConnection.setUserPwd`.  If a token file
-        path is present, it will be used if valid.  On a successful connection, the token file will also be written to.
+        Normally this method won't be called or implemented directly.
 
-        By default, a connection attempt will be made if any of ``user``, ``pwd`` or ``tokenFile`` are specified.  It
-        is also possible to handle authentication manually, by working with the underlying connection object instead.
+        Implementers should make use of :meth:`fromRaw` and the :meth:`initAttrs` decorator instead.
 
         Args:
-            user (str): username of the connecting account
-            pwd (str): password of the connecting account
-            tokenFile (str): path to file used for token storage
-            connect (bool): whether to try and connect straight away
+            skype (Skype): parent Skype instance
+            raw (dict): raw object, as provided by the API
         """
-        super(Skype, self).__init__(self)
-        self.conn = SkypeConnection()
-        if tokenFile:
-            self.conn.setTokenFile(tokenFile)
-        if user and pwd:
-            self.conn.setUserPwd(user, pwd)
-        if connect is None:
-            connect = (user and pwd) or tokenFile
-        if connect:
-            try:
-                self.conn.readToken()
-            except:
-                self.conn.getSkypeToken()
-        self.contacts = SkypeContacts(self)
-        self.chats = SkypeChats(self)
-        self.settings = SkypeSettings(self)
-        self.translate = SkypeTranslator(self)
+        self.skype = skype
+        self.raw = raw
 
-    @property
-    def userId(self):
-        return self.conn.userId
-
-    @property
-    @cacheResult
-    def user(self):
-        json = self.conn("GET", "{0}/users/self/profile".format(SkypeConnection.API_USER),
-                         auth=SkypeConnection.Auth.SkypeToken).json()
-        return SkypeContact.fromRaw(self, json)
-
-    @property
-    @cacheResult
-    def services(self):
-        return self.conn("GET", "{0}/users/{1}/services".format(SkypeConnection.API_ENTITLEMENT, self.userId),
-                         auth=SkypeConnection.Auth.SkypeToken, headers={"Accept": "application/json; ver=3.0"}).json()
-
-    @SkypeConnection.handle(404, regToken=True)
-    @SkypeConnection.handle(404, subscribe="self")
-    def getEvents(self):
+    @classmethod
+    def rawToFields(cls, raw={}):
         """
-        Retrieve a list of events since the last poll.  Multiple calls may be needed to retrieve all events.
+        Convert the raw properties of an API response into class fields.  Override to process additional values.
 
-        If no events occur, the API will block for up to 30 seconds, after which an empty list is returned.  As soon as
-        an event is received in this time, it is returned immediately.
+        Args:
+            raw (dict): raw object, as provided by the API
 
         Returns:
-            :class:`.SkypeEvent` list: a list of events, possibly empty
+            dict: a collection of fields, with keys matching :attr:`attrs`
         """
-        events = []
-        for json in self.conn.endpoints["self"].getEvents():
-            events.append(SkypeEvent.fromRaw(self, json))
-        return events
+        return {}
 
-    def setPresence(self, status=Status.Online):
+    @classmethod
+    def fromRaw(cls, skype=None, raw={}):
         """
-        Set the current user's online presence.
+        Create a new instance based on the raw properties of an API response.
 
-        Args:
-            status (.Status): new availability to display to contacts
-        """
-        statusStr = ("Hidden", "Busy", "Idle", "Online")[status]
-        self.conn("PUT", "{0}/users/ME/presenceDocs/messagingService".format(self.conn.msgsHost),
-                  auth=SkypeConnection.Auth.RegToken, json={"status": statusStr})
-
-    def setAvatar(self, image):
-        """
-        Update the profile picture for the current user.
+        This can be overridden to automatically create subclass instances based on the raw content.
 
         Args:
-            image (file): a file-like object to read the image from
-        """
-        self.conn("PUT", "{0}/users/{1}/profile/avatar".format(SkypeConnection.API_USER, self.userId),
-                  auth=SkypeConnection.Auth.SkypeToken, data=image.read())
-
-    def getUrlMeta(self, url):
-        """
-        Retrieve various metadata associated with a URL, as seen by Skype.
-
-        Args:
-            url (str): address to ping for info
+            skype (Skype): parent Skype instance
+            raw (dict): raw object, as provided by the API
 
         Returns:
-            dict: metadata for the website queried
+            SkypeObj: the new class instance
         """
-        return self.conn("GET", SkypeConnection.API_URL, params={"url": url},
-                         auth=SkypeConnection.Auth.Authorize).json()
+        return cls(skype, raw, **cls.rawToFields(raw))
 
-
-class SkypeEventLoop(Skype):
-    """
-    A skeleton class for producing event processing programs.
-
-    Attributes:
-        autoAck (bool):
-            Whether to automatically acknowledge all incoming events.
-    """
-
-    def __init__(self, user=None, pwd=None, tokenFile=None, autoAck=True):
+    def merge(self, other):
         """
-        Create a new event loop and the underlying connection.
-
-        The ``user``, ``pwd`` and ``tokenFile``  arguments are passed to the :class:`.SkypeConnection` instance.
+        Copy properties from other into self, skipping ``None`` values.  Also merges the raw data.
 
         Args:
-            user (str): the connecting user's username
-            pwd (str): the connecting user's account password
-            tokenFile (str): path to a file, used to cache session tokens
-            autoAck (bool): whether to automatically acknowledge all incoming events
+            other (SkypeObj): second object to copy fields from
         """
-        super(SkypeEventLoop, self).__init__(user, pwd, tokenFile)
-        self.autoAck = autoAck
+        for attr in self.attrs:
+            if not getattr(other, attr, None) is None:
+                setattr(self, attr, getattr(other, attr))
+        if other.raw:
+            if not self.raw:
+                self.raw = {}
+            self.raw.update(other.raw)
 
-    def loop(self):
+    def __str__(self):
         """
-        Handle any incoming events, by calling out to :meth:`onEvent` for each one.  This method does not return.
+        Pretty print the object, based on the class' :attr:`attrs`.  Produces output something like::
+
+            [<class name>]
+            <attribute>: <value>
+
+        Nested objects are indented as needed.
         """
-        while True:
-            try:
-                events = self.getEvents()
-            except requests.ConnectionError:
-                continue
-            for event in events:
-                self.onEvent(event)
-                if self.autoAck:
-                    event.ack()
+        out = "[{0}]".format(self.__class__.__name__)
+        for attr in self.attrs:
+            value = getattr(self, attr)
+            valStr = ("\n".join(str(i) for i in value) if isinstance(value, list) else str(value))
+            out += "\n{0}{1}: {2}".format(attr[0].upper(), attr[1:], valStr.replace("\n", "\n  " + (" " * len(attr))))
+        return out
 
-    def onEvent(self, event):
+    def __repr__(self):
         """
-        Subclasses should implement this method to react to messages and status changes.
+        Dump properties of the object into a Python-like statement, based on the class' :attr:`attrs`.
 
-        Args:
-            event (SkypeEvent): an incoming event
+        The resulting string is an expression that should evaluate to a similar object, minus Skype connection.
         """
-        pass
+        reprs = []
+        for attr in self.attrs:
+            val = getattr(self, attr)
+            if not val == self.defaults.get(attr):
+                reprs.append("{0}={1}".format(attr, repr(val)))
+        return "{0}({1})".format(self.__class__.__name__, ", ".join(reprs))
 
 
-class SkypeSettings(SkypeObj):
+class SkypeObjs(object):
     """
-    An interface for getting and setting server options for the connected account.
-
-    All attributes are read/write, with values fetched on each access, and implicit server writes when changed.
+    A basic Skype collection.  Acts as a container for objects of a given type.
 
     Attributes:
-        webLinkPreviews (bool):
-            Skype for Web: replace URLs in messages with rich previews.
-
-            *Web link previews: Show me a preview of websites I send or receive on Skype.*
-        youtubePlayer (bool):
-            Skype for Web: replace YouTube URLs with an inline player.
-
-            *YouTube player: Use YouTube player directly to preview videos I send or receive.*
-        mentionNotifs (bool):
-            Skype for Web: trigger notifications when mentioned in a message.
-
-            *@mention notifications: Always notify me when someone mentions me on Skype. (@<username>)*
-        imagePaste (bool):
-            Skype for Web: support sending image files by pasting into a conversation input field.
-
-            *Enable image paste: Enable pasting of images from clipboard directly into the chat.*
-        shareTyping (bool):
-            Skype for Web: send typing notifications to contacts when active in conversations.
-
-            *Typing indicator: Show when I am typing.*
-        callPrivacy (:class:`Privacy`):
-            Who to accept incoming audio calls from.
-        videoPrivacy (:class:`Privacy`):
-            Who to accept incoming video and screen-share requests from.
+        synced (bool):
+            Whether an initial set of objects has been cached.
+        cache (dict):
+            Storage of objects by identifier key.
     """
 
-    attrs = ("webLinkPreviews", "youtubePlayer", "mentionNotifs", "imagePaste", "shareTyping",
-             "callPrivacy", "videoPrivacy")
-
-    class Privacy:
+    def __init__(self, skype=None):
         """
-        Enum: privacy option values for incoming audio and video calls.
+        Create a new container object.  The :attr:`synced` state and internal :attr:`cache` are initialised here.
+
+        Args:
+            skype (Skype): parent Skype instance
         """
-        Anyone = 0
+        self.skype = skype
+        self.synced = False
+        self.cache = {}
+
+    def __getitem__(self, key):
         """
-        Allow from all Skype users.
+        Provide key lookups for items in the cache.  Subclasses may override this to handle not-yet-cached objects.
         """
-        Contacts = 1
+        if key in self.cache:
+            return self.cache[key]
+        if not self.synced:
+            self.sync()
+        return self.cache[key]
+
+    def __iter__(self):
         """
-        Only allow from Skype users on the connected account's contact list.
+        Create an iterator for all objects (not their keys) in this collection.
         """
-        Nobody = 2
+        if not self.synced:
+            self.sync()
+        for id in sorted(self.cache):
+            yield self.cache[id]
+
+    def sync(self):
         """
-        Deny from all Skype users.
+        Subclasses can implement this method to retrieve an initial set of objects.
         """
+        self.synced = True
 
-    @property
-    def flags(self):
-        # Retrieve a list of all enabled flags.
-        return self.skype.conn("GET", SkypeConnection.API_FLAGS, auth=SkypeConnection.Auth.SkypeToken).json()
+    def merge(self, obj):
+        """
+        Add a given object to the cache, or update an existing entry to include more fields.
 
-    def flagProp(id, invert=False):
-        @property
-        def flag(self):
-            return (id in self.flags) ^ invert
-
-        @flag.setter
-        def flag(self, val):
-            val = bool(val) ^ invert
-            if not val == (id in self.flags):
-                self.skype.conn("PUT" if val else "DELETE", "{0}/{1}".format(SkypeConnection.API_FLAGS, id),
-                                auth=SkypeConnection.Auth.SkypeToken)
-        return flag
-
-    def optProp(id):
-        @property
-        def opt(self):
-            json = self.skype.conn("GET", "{0}/users/{1}/options/{2}".format(SkypeConnection.API_USER,
-                                                                             self.skype.userId, id),
-                                   auth=SkypeConnection.Auth.SkypeToken).json()
-            return json.get("optionInt", json.get("optionStr", json.get("optionBin")))
-
-        @opt.setter
-        def opt(self, val):
-            self.skype.conn("POST", "{0}/users/{1}/options/{2}".format(SkypeConnection.API_USER,
-                                                                       self.skype.userId, id),
-                            auth=SkypeConnection.Auth.SkypeToken, data={"integerValue": val})
-        return opt
-
-    webLinkPreviews = flagProp(11, True)
-    youtubePlayer = flagProp(12)
-    mentionNotifs = flagProp(13, True)
-    imagePaste = flagProp(14)
-    shareTyping = flagProp(20, True)
-
-    # Hidden options, which are abstracted below to avoid the flag nonsense.
-    callPrivacyOpt = optProp("OPT_SKYPE_CALL_POLICY")
-    videoPrivacyContacts = flagProp(15)
-    videoPrivacyNobody = flagProp(16)
-
-    @property
-    def callPrivacy(self):
-        # Behaviour here is consistent with Skype for Web (neither 0 nor 1 displays as contacts only).
-        return self.Privacy.Anyone if self.callPrivacyOpt == 0 else self.Privacy.Contacts
-
-    @callPrivacy.setter
-    def callPrivacy(self, val):
-        self.callPrivacyOpt = 0 if val == self.Privacy.Anyone else 2
-
-    @property
-    def videoPrivacy(self):
-        if self.videoPrivacyNobody:
-            return self.Privacy.Nobody
-        elif self.videoPrivacyContacts:
-            return self.Privacy.Contacts
+        Args:
+            obj (SkypeObj): object to add to the cache
+        """
+        if obj.id in self.cache:
+            self.cache[obj.id].merge(obj)
         else:
-            return self.Privacy.Anyone
+            self.cache[obj.id] = obj
+        return self.cache[obj.id]
 
-    @videoPrivacy.setter
-    def videoPrivacy(self, val):
-        self.videoPrivacyContacts = (val == self.Privacy.Contacts)
-        self.videoPrivacyNobody = (val == self.Privacy.Nobody)
+    def __str__(self):
+        return "[{0}]".format(self.__class__.__name__)
 
-    # Now make these static methods so they can be used outside of the class.
-    flagProp = staticmethod(flagProp)
-    optProp = staticmethod(optProp)
+    def __repr__(self):
+        return "{0}()".format(self.__class__.__name__)
 
 
-class SkypeTranslator(SkypeObj):
+class SkypeEnum(object):
     """
-    An interface to Skype's translation API.
-
-    Attributes:
-        languages (dict):
-            Known languages supported by the translator.
+    A basic implementation for an enum.
     """
 
-    @property
-    @cacheResult
-    def languages(self):
-        return self.skype.conn("GET", "{0}/languages".format(SkypeConnection.API_TRANSLATE),
-                               auth=SkypeConnection.Auth.SkypeToken).json().get("text")
-
-    def __call__(self, text, toLang, fromLang=None):
+    def __init__(self, label, names=()):
         """
-        Attempt translation of a string.  Supports automatic language detection if ``fromLang`` is not specified.
+        Create a new enumeration.  The parent enum creates an instance for each item.
 
         Args:
-            text (str): input text to be translated
-            toLang (str): country code of output language
-            fromLang (str): country code of input language
+            label (str): enum name
+            names (list): item labels
         """
-        return self.skype.conn("GET", "{0}/skype/translate".format(SkypeConnection.API_TRANSLATE),
-                               params={"from": fromLang or "", "to": toLang, "text": text},
-                               auth=SkypeConnection.Auth.SkypeToken).json()
+        self.label = label
+        self.names = names
+        for name in names:
+            setattr(self, name, self.__class__("{0}.{1}".format(label, name)))
+
+    def __getitem__(self, item):
+        """
+        Provide list-style index lookups for each item.
+        """
+        return getattr(self, self.names[item])
+
+    def __str__(self):
+        """
+        Show a list of items for the parent, or just the qualified name for each item.
+        """
+        if self.names:
+            return "[{0}<{1}>]\n{2}".format(self.__class__.__name__, self.label, "\n".join(self.names))
+        else:
+            return self.label
+
+    def __repr__(self):
+        """
+        Show constructor for the parent, or just the qualified name for each item.
+        """
+        if self.names:
+            return "{0}({1}, {2})".format(self.__class__.__name__, repr(self.label), repr(self.names))
+        else:
+            return self.label
+
+
+class SkypeException(Exception):
+    """
+    A generic Skype-related exception.
+    """
+
+
+class SkypeApiException(SkypeException):
+    """
+    An exception thrown for errors specific to external API calls.
+
+    Arguments will usually be of the form (``message``, ``response``).
+    """

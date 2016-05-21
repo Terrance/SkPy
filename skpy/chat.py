@@ -1,12 +1,13 @@
 from datetime import datetime
 import time
 
+from .core import SkypeObj, SkypeObjs
+from .util import SkypeUtils
 from .conn import SkypeConnection
 from .msg import SkypeMsg
-from .util import SkypeObj, SkypeObjs, noPrefix, initAttrs, convertIds, cacheResult
 
 
-@initAttrs
+@SkypeUtils.initAttrs
 class SkypeChat(SkypeObj):
     """
     A conversation within Skype.
@@ -213,8 +214,8 @@ class SkypeChat(SkypeObj):
                         auth=SkypeConnection.Auth.RegToken)
 
 
-@initAttrs
-@convertIds("user", "users")
+@SkypeUtils.initAttrs
+@SkypeUtils.convertIds("user", "users")
 class SkypeSingleChat(SkypeChat):
     """
     A one-to-one conversation within Skype.
@@ -229,7 +230,7 @@ class SkypeSingleChat(SkypeChat):
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeSingleChat, cls).rawToFields(raw)
-        fields["userId"] = noPrefix(fields.get("id"))
+        fields["userId"] = SkypeUtils.noPrefix(fields.get("id"))
         return fields
 
     @property
@@ -238,8 +239,8 @@ class SkypeSingleChat(SkypeChat):
         return [self.userId]
 
 
-@initAttrs
-@convertIds("users", user=("creator",), users=("admin",))
+@SkypeUtils.initAttrs
+@SkypeUtils.convertIds("users", user=("creator",), users=("admin",))
 class SkypeGroupChat(SkypeChat):
     """
     A group conversation within Skype.  Compared to single chats, groups have a topic and participant list.
@@ -272,13 +273,13 @@ class SkypeGroupChat(SkypeChat):
         userIds = []
         adminIds = []
         for obj in raw.get("members", []):
-            id = noPrefix(obj.get("id"))
+            id = SkypeUtils.noPrefix(obj.get("id"))
             userIds.append(id)
             if obj.get("role") == "Admin":
                 adminIds.append(id)
         fields.update({
             "topic": raw.get("threadProperties", {}).get("topic"),
-            "creatorId": noPrefix(props.get("creator")),
+            "creatorId": SkypeUtils.noPrefix(props.get("creator")),
             "userIds": userIds,
             "adminIds": adminIds,
             "open": props.get("joiningenabled", "") == "true",
@@ -288,7 +289,7 @@ class SkypeGroupChat(SkypeChat):
         return fields
 
     @property
-    @cacheResult
+    @SkypeUtils.cacheResult
     def joinUrl(self):
         query = {
             "baseDomain": "https://join.skype.com/launch/",
@@ -457,7 +458,7 @@ class SkypeChats(SkypeObjs):
         return self.chat(resp.headers["Location"].rsplit("/", 1)[1])
 
     @staticmethod
-    @cacheResult
+    @SkypeUtils.cacheResult
     def urlToIds(url):
         """
         Resolves a ``join.skype.com`` URL and returns various identifiers for the group conversation.
