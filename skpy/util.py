@@ -1,7 +1,6 @@
 from __future__ import unicode_literals
 
 import re
-from collections import Hashable
 import functools
 
 from .core import SkypeEnum
@@ -183,12 +182,18 @@ class SkypeUtils:
 
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            key = args + (str(kwargs),)
-            if not all(isinstance(x, Hashable) for x in key):
-                # Can't cache with non-hashable args (e.g. a list).
+            # Imperfect key generation (args may be passed as kwargs, so multiple ways to represent one key).
+            key = args + tuple(kwargs.items())
+            # Order of operations here tries to minimise use of exceptions.
+            try:
+                # Don't call the function here, as it may throw a TypeError itself (or from incorrect arguments).
+                if key in cache:
+                    return cache[key]
+            except TypeError:
+                # Key is not hashable, so we can't cache with these args -- just return the result.
                 return fn(*args, **kwargs)
-            if key not in cache:
-                cache[key] = fn(*args, **kwargs)
+            # Not yet cached, so generate the result and store it.
+            cache[key] = fn(*args, **kwargs)
             return cache[key]
 
         # Make cache accessible externally.
