@@ -3,6 +3,7 @@ Root of the SkPy module.  Classes from all submodules are imported here for conv
 """
 
 from skpy.core import SkypeObj, SkypeObjs, SkypeEnum, SkypeException, SkypeApiException
+from skpy.util import SkypeUtils
 from skpy.main import Skype, SkypeEventLoop, SkypeSettings, SkypeTranslator
 from skpy.conn import SkypeConnection, SkypeEndpoint, SkypeAuthException
 from skpy.user import SkypeUser, SkypeContact, SkypeContacts, SkypeRequest
