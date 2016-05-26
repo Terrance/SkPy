@@ -77,9 +77,11 @@ class SkypePresenceEvent(SkypeEvent):
             Whether the user is now connected.
         status (:class:`.Status`):
             Chosen availability status.
+        capabilities (str list):
+            Features currently available from this user, across all endpoints.
     """
 
-    attrs = SkypeEvent.attrs + ("userId", "online", "status")
+    attrs = SkypeEvent.attrs + ("userId", "online", "status", "capabilities")
 
     @classmethod
     def rawToFields(cls, raw={}):
@@ -88,7 +90,8 @@ class SkypePresenceEvent(SkypeEvent):
         fields.update({
             "userId": SkypeUtils.userToId(res.get("selfLink")),
             "online": res.get("availability") == "Online",
-            "status": getattr(SkypeUtils.Status, res.get("status"))
+            "status": getattr(SkypeUtils.Status, res.get("status")),
+            "capabilities": list(filter(None, res.get("capabilities", "").split(" | ")))
         })
         return fields
 
@@ -102,14 +105,23 @@ class SkypeEndpointEvent(SkypeEvent):
     Attributes:
         user (:class:`.SkypeUser`):
             User whose endpoint emitted an event.
+        name (str):
+            Name of the device connected with this endpoint.
+        capabilities (str list):
+            Features available on the device.
     """
 
-    attrs = SkypeEvent.attrs + ("userId",)
+    attrs = SkypeEvent.attrs + ("userId", "name", "capabilities")
 
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeEndpointEvent, cls).rawToFields(raw)
-        fields["userId"] = SkypeUtils.userToId(raw.get("resource", {}).get("selfLink"))
+        res = raw.get("resource", {})
+        fields.update({
+            "userId": SkypeUtils.userToId(res.get("selfLink")),
+            "name": res.get("privateInfo", {}).get("epname"),
+            "capabilities": list(filter(None, res.get("publicInfo", {}).get("capabilities", "").split(" | ")))
+        })
         return fields
 
 
