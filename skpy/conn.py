@@ -111,15 +111,15 @@ class SkypeConnection(SkypeObj):
             .SkypeApiException: if a successful status code is not received
         """
         if os.getenv("SKPY_DEBUG_HTTP"):
-            print("=> {0} {1}".format(method, url))
-            print("   {0}".format(pformat(kwargs)))
+            print("<= [{0}] {1} {2}".format(datetime.now().strftime("%d/%m %H:%M:%S"), method, url))
+            print(pformat(kwargs))
         resp = cls.extSess.request(method, url, **kwargs)
         if os.getenv("SKPY_DEBUG_HTTP"):
-            print("<= {0}".format(resp.status_code))
+            print("=> [{0}] {1}".format(datetime.now().strftime("%d/%m %H:%M:%S"), resp.status_code))
             try:
-                print("   {0}".format(pformat(resp.json())))
+                print(pformat(resp.json()))
             except:
-                print("   {0}".format(resp.text))
+                print(resp.text)
         if resp.status_code not in codes:
             raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
         return resp
@@ -194,15 +194,15 @@ class SkypeConnection(SkypeObj):
         elif auth == self.Auth.RegToken:
             headers["RegistrationToken"] = self.tokens["reg"]
         if os.getenv("SKPY_DEBUG_HTTP"):
-            print("=> {0} {1}".format(method, url))
-            print("   {0}".format(pformat(kwargs).replace("\n", "\n   ")))
+            print("<= [{0}] {1} {2}".format(datetime.now().strftime("%d/%m %H:%M:%S"), method, url))
+            print(pformat(kwargs))
         resp = self.sess.request(method, url, headers=headers, **kwargs)
         if os.getenv("SKPY_DEBUG_HTTP"):
-            print("<= {0}".format(resp.status_code))
+            print("=> [{0}] {1}".format(datetime.now().strftime("%d/%m %H:%M:%S"), resp.status_code))
             try:
-                print("   {0}".format(pformat(resp.json()).replace("\n", "\n   ")))
+                print(pformat(resp.json()))
             except:
-                print("   {0}".format(resp.text.replace("\n", "\n   ")))
+                print(resp.text)
         if resp.status_code not in codes:
             if resp.status_code == 429:
                 raise SkypeAuthException("Auth rate limit exceeded", resp)
