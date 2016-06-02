@@ -11,7 +11,7 @@ class SkypeUtils:
     A collection of miscellaneous static methods used throughout the library.
     """
 
-    Status = SkypeEnum("Status", ("Offline", "Hidden", "Busy", "Idle", "Online"))
+    Status = SkypeEnum("SkypeUtils.Status", ("Offline", "Hidden", "Busy", "Idle", "Online"))
     """
     :class:`.SkypeEnum`: Types of user availability.
 

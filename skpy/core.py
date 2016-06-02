@@ -177,18 +177,20 @@ class SkypeEnum(object):
     A basic implementation for an enum.
     """
 
-    def __init__(self, label, names=()):
+    def __init__(self, label, names=(), path=None):
         """
         Create a new enumeration.  The parent enum creates an instance for each item.
 
         Args:
             label (str): enum name
             names (list): item labels
+            path (list): qualified parent name, for :func:`repr` output
         """
         self.label = label
         self.names = names
+        self.path = path
         for name in names:
-            setattr(self, name, self.__class__("{0}.{1}".format(label, name)))
+            setattr(self, name, self.__class__(name, path="{0}.{1}".format(path, label) if path else label))
 
     def __getitem__(self, item):
         """
@@ -198,7 +200,7 @@ class SkypeEnum(object):
 
     def __str__(self):
         """
-        Show a list of items for the parent, or just the qualified name for each item.
+        Show a list of items for the parent, or just the label for each item.
         """
         if self.names:
             return "[{0}<{1}>]\n{2}".format(self.__class__.__name__, self.label, "\n".join(self.names))
@@ -212,7 +214,7 @@ class SkypeEnum(object):
         if self.names:
             return "{0}({1}, {2})".format(self.__class__.__name__, repr(self.label), repr(self.names))
         else:
-            return self.label
+            return "{0}.{1}".format(self.path, self.label) if self.path else self.label
 
 
 class SkypeException(Exception):
