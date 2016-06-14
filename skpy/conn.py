@@ -459,7 +459,7 @@ class SkypeConnection(SkypeObj):
                 locParts = re.search(r"(https://[^/]+/v1)/users/ME/endpoints(/(%7B[a-z0-9\-]+%7D))?", locHead).groups()
                 if not locParts[0] == self.msgsHost:
                     # Skype is requiring the use of a different hostname.
-                    self.msgsHost = endpointResp.headers["Location"].rsplit("/", 4)[0]
+                    self.msgsHost = locHead.rsplit("/", 4 if locParts[2] else 3)[0]
                 if locParts[2]:
                     self.endpoints["main"] = SkypeEndpoint(self, locParts[2])
             if endpointResp.status_code == 200 and "main" not in self.endpoints:
