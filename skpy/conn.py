@@ -124,8 +124,9 @@ class SkypeConnection(SkypeObj):
             raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
         return resp
 
-    API_LOGIN = "https://login.skype.com/login?client_id=578134&redirect_uri=https%3A%2F%2Fweb.skype.com"
+    API_LOGIN = "https://login.skype.com/login"
     API_USER = "https://api.skype.com"
+    API_JOIN = "https://join.skype.com"
     API_BOT = "https://api.aps.skype.com/v1"
     API_FLAGS = "https://flagsapi.skype.com/flags/v1"
     API_ENTITLEMENT = "https://consumer.entitlement.skype.com"
@@ -345,7 +346,8 @@ class SkypeConnection(SkypeObj):
         """
         self.tokens.pop("skype", None)
         self.tokenExpiry.pop("skype", None)
-        loginResp = self("GET", self.API_LOGIN)
+        loginResp = self("GET", self.API_LOGIN,
+                         params={"client_id": "578134", "redirect_uri": "https://web.skype.com"})
         loginPage = BeautifulSoup(loginResp.text, "html.parser")
         secs = int(time.time())
         tokenField = loginPage.find("input", {"name": "skypetoken"})
@@ -358,14 +360,16 @@ class SkypeConnection(SkypeObj):
             etm = loginPage.find(id="etm").get("value")
             frac, hour = math.modf(time.timezone)
             timezone = "{0:+03d}|{1}".format(int(hour), int(frac * 60))
-            loginResp = self("POST", self.API_LOGIN, data={
+            data = {
                 "username": user,
                 "password": pwd,
                 "pie": pie,
                 "etm": etm,
                 "timezone_field": timezone,
                 "js_time": secs
-            })
+            }
+            loginResp = self("POST", self.API_LOGIN, data=data,
+                             params={"client_id": "578134", "redirect_uri": "https://web.skype.com"})
             loginPage = BeautifulSoup(loginResp.text, "html.parser")
             errors = loginPage.select("div.messageBox.message_error span")
             if errors:
@@ -398,8 +402,9 @@ class SkypeConnection(SkypeObj):
         # Pretend to be Chrome on Windows (required to avoid "unsupported device" messages)..
         agent = "Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) " \
                 "Chrome/33.0.1750.117 Safari/537.36"
-        cookies = self("GET", "https://join.skype.com/{0}".format(urlId), headers={"User-Agent": agent}).cookies
-        ids = self("POST", "https://join.skype.com/api/v2/conversation/", json={"shortId": urlId, "type": "wl"}).json()
+        cookies = self("GET", "{0}/{1}".format(self.API_JOIN, urlId), headers={"User-Agent": agent}).cookies
+        ids = self("POST", "{0}/api/v2/conversation/".format(self.API_JOIN),
+                   json={"shortId": urlId, "type": "wl"}).json()
         headers = {
             "csrf_token": cookies.get("csrf_token"),
             "X-Skype-Request-Id": cookies.get("launcher_session_id")
@@ -411,8 +416,8 @@ class SkypeConnection(SkypeObj):
             "threadId": ids.get("Resource"),
             "name": name
         }
-        self.tokens["skype"] = self("POST", "https://join.skype.com/api/v1/users/guests", headers=headers,
-                                    json=json).json().get("skypetoken")
+        self.tokens["skype"] = self("POST", "{0}/api/v1/users/guests".format(self.API_JOIN),
+                                    headers=headers, json=json).json().get("skypetoken")
         # Assume the token lasts 24 hours, as a guest account only lasts that long anyway.
         self.tokenExpiry["skype"] = datetime.now() + timedelta(days=1)
         self.userId = self("GET", "{0}/users/self/profile".format(self.API_USER),
