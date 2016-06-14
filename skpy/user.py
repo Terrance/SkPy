@@ -95,24 +95,23 @@ class SkypeUser(SkypeObj):
         if not lastName and firstName and " " in firstName:
             firstName, lastName = firstName.rsplit(" ", 1)
         name = SkypeUser.Name(first=firstName, last=lastName)
-        locationParts = raw.get("locations")[0] if "locations" in raw else {
-            "city": raw.get("city"),
-            "region": raw.get("province"),
-            "country": raw.get("country")
-        }
-        location = SkypeUser.Location(city=locationParts.get("city"), region=locationParts.get("region"),
-                                      country=((locationParts.get("country") or "").upper() or None))
+        if "locations" in raw:
+            locParts = raw.get("locations")[0]
+        else:
+            locParts = {"city": raw.get("city"),
+                        "region": raw.get("province"),
+                        "country": raw.get("country")}
+        location = SkypeUser.Location(city=locParts.get("city"), region=locParts.get("region"),
+                                      country=((locParts.get("country") or "").upper() or None))
         avatar = raw.get("avatar_url", raw.get("avatarUrl"))
         mood = None
         if raw.get("mood", raw.get("richMood")):
             mood = SkypeUser.Mood(plain=raw.get("mood"), rich=raw.get("richMood"))
-        return {
-            "id": raw.get("id", raw.get("username")),
-            "name": name,
-            "location": location,
-            "avatar": avatar,
-            "mood": mood
-        }
+        return {"id": raw.get("id", raw.get("username")),
+                "name": name,
+                "location": location,
+                "avatar": avatar,
+                "mood": mood}
 
     @property
     @SkypeUtils.cacheResult
@@ -178,30 +177,23 @@ class SkypeContact(SkypeUser):
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeContact, cls).rawToFields(raw)
-        phonesMap = {
-            "Home": SkypeContact.Phone.Type.Home,
-            "Office": SkypeContact.Phone.Type.Work,
-            "Mobile": SkypeContact.Phone.Type.Mobile
-        }
+        phonesMap = {"Home": SkypeContact.Phone.Type.Home,
+                     "Office": SkypeContact.Phone.Type.Work,
+                     "Mobile": SkypeContact.Phone.Type.Mobile}
         phonesParts = raw.get("phones", [])
         for k in phonesMap:
             if raw.get("phone" + k):
-                phonesParts.append({
-                    "type": phonesMap[k],
-                    "number": raw.get("phone" + k)
-                })
+                phonesParts.append({"type": phonesMap[k], "number": raw.get("phone" + k)})
         phones = [SkypeContact.Phone(type=p["type"], number=p["number"]) for p in phonesParts]
         try:
             birthday = datetime.strptime(raw.get("birthday") or "", "%Y-%m-%d").date()
         except ValueError:
             birthday = None
-        fields.update({
-            "language": (raw.get("language") or "").upper() or None,
-            "phones": phones,
-            "birthday": birthday,
-            "authorised": raw.get("authorized"),
-            "blocked": raw.get("blocked")
-        })
+        fields.update({"language": (raw.get("language") or "").upper() or None,
+                       "phones": phones,
+                       "birthday": birthday,
+                       "authorised": raw.get("authorized"),
+                       "blocked": raw.get("blocked")})
         return fields
 
     @classmethod
@@ -252,22 +244,20 @@ class SkypeBotUser(SkypeUser):
     @classmethod
     def rawToFields(cls, raw={}):
         # Bot users don't really share any common fields with normal users, but we still want a subclass.
-        return {
-            "id": raw.get("agentId", raw.get("id")),
-            "name": raw.get("displayName", raw.get("display_name", raw.get("name", {}).get("first"))),
-            "location": None,
-            "avatar": raw.get("userTileStaticUrl", raw.get("userTileExtraLargeUrl", raw.get("avatar_url"))),
-            "mood": None,
-            "developer": raw.get("developer", raw.get("name", {}).get("company")),
-            "trusted": raw.get("isTrusted"),
-            "locales": raw.get("supportedLocales"),
-            "rating": raw.get("starRating"),
-            "description": raw.get("description"),
-            "extra": raw.get("extra"),
-            "siteUrl": raw.get("webpage"),
-            "termsUrl": raw.get("tos"),
-            "privacyUrl": raw.get("privacyStatement")
-        }
+        return {"id": raw.get("agentId", raw.get("id")),
+                "name": raw.get("displayName", raw.get("display_name", raw.get("name", {}).get("first"))),
+                "location": None,
+                "avatar": raw.get("userTileStaticUrl", raw.get("userTileExtraLargeUrl", raw.get("avatar_url"))),
+                "mood": None,
+                "developer": raw.get("developer", raw.get("name", {}).get("company")),
+                "trusted": raw.get("isTrusted"),
+                "locales": raw.get("supportedLocales"),
+                "rating": raw.get("starRating"),
+                "description": raw.get("description"),
+                "extra": raw.get("extra"),
+                "siteUrl": raw.get("webpage"),
+                "termsUrl": raw.get("tos"),
+                "privacyUrl": raw.get("privacyStatement")}
 
     @property
     @SkypeUtils.cacheResult
@@ -310,11 +300,9 @@ class SkypeContacts(SkypeObjs):
             yield self.cache[id]
 
     def sync(self):
-        params = {
-            "delta": "",
-            "$filter": "type eq 'skype' or type eq 'msn' or type eq 'pstn' or type eq 'agent' or type eq 'lync'",
-            "reason": "default"
-        }
+        params = {"delta": "",
+                  "$filter": "type eq 'skype' or type eq 'msn' or type eq 'pstn' or type eq 'agent' or type eq 'lync'",
+                  "reason": "default"}
         for json in self.skype.conn("GET", "{0}/users/{1}/contacts".format(SkypeConnection.API_CONTACTS,
                                                                            self.skype.userId),
                                     auth=SkypeConnection.Auth.SkypeToken, params=params).json().get("contacts", []):
@@ -400,12 +388,9 @@ class SkypeContacts(SkypeObjs):
         Returns:
             list: collection of possible results
         """
-        search = {
-            "keyWord": query,
-            "contactTypes[]": "skype"
-        }
         json = self.skype.conn("GET", "{0}/search/users/any".format(SkypeConnection.API_USER),
-                               auth=SkypeConnection.Auth.SkypeToken, params=search).json()
+                               auth=SkypeConnection.Auth.SkypeToken,
+                               params={"keyWord": query, "contactTypes[]": "skype"}).json()
         results = []
         for obj in json:
             res = obj.get("ContactCards", {}).get("Skype")
@@ -446,10 +431,7 @@ class SkypeRequest(SkypeObj):
 
     @classmethod
     def rawToFields(cls, raw={}):
-        return {
-            "userId": raw.get("sender"),
-            "greeting": raw.get("greeting")
-        }
+        return {"userId": raw.get("sender"), "greeting": raw.get("greeting")}
 
     def accept(self):
         """

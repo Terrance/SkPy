@@ -25,9 +25,7 @@ class SkypeChat(SkypeObj):
 
     @classmethod
     def rawToFields(cls, raw={}):
-        return {
-            "id": raw.get("id")
-        }
+        return {"id": raw.get("id")}
 
     def getMsgs(self):
         """
@@ -41,11 +39,9 @@ class SkypeChat(SkypeObj):
             :class:`.SkypeMsg` list: collection of messages
         """
         url = "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id)
-        params = {
-            "startTime": 0,
-            "view": "msnp24Equivalent",
-            "targetType": "Passport|Skype|Lync|Thread"
-        }
+        params = {"startTime": 0,
+                  "view": "msnp24Equivalent",
+                  "targetType": "Passport|Skype|Lync|Thread"}
         resp = self.skype.conn.syncStateCall("GET", url, params, auth=SkypeConnection.Auth.RegToken).json()
         return [SkypeMsg.fromRaw(self.skype, json) for json in resp.get("messages", [])]
 
@@ -71,10 +67,7 @@ class SkypeChat(SkypeObj):
         Returns:
             .SkypeMsg: copy of the sent message object
         """
-        msg = {
-            "contenttype": "text",
-            "messagetype": "Text"
-        }
+        msg = {"contenttype": "text", "messagetype": "Text"}
         # Skype timestamps are integers and in milliseconds, whereas Python's are floats and in seconds.
         clientTime = int(time.time() * 1000)
         clientDate = datetime.fromtimestamp(clientTime / 1000)
@@ -84,15 +77,13 @@ class SkypeChat(SkypeObj):
                                              .format(self.skype.conn.msgsHost, self.id),
                                      auth=SkypeConnection.Auth.RegToken, json=msg).json().get("OriginalArrivalTime")
         arriveDate = datetime.fromtimestamp(arriveTime / 1000) if arriveTime else datetime.now()
-        msg.update({
-            "composetime": datetime.strftime(clientDate, "%Y-%m-%dT%H:%M:%S.%fZ"),
-            "conversationLink": "{0}/users/ME/conversations/{1}".format(self.skype.conn.msgsHost, self.id),
-            "from": "{0}/users/ME/contacts/8:{1}".format(self.skype.conn.msgsHost, self.skype.userId),
-            "imdisplayname": self.skype.user.name,
-            "isactive": True,
-            "originalarrivaltime": datetime.strftime(arriveDate, "%Y-%m-%dT%H:%M:%S.%fZ"),
-            "type": "Message"
-        })
+        msg.update({"composetime": datetime.strftime(clientDate, "%Y-%m-%dT%H:%M:%S.%fZ"),
+                    "conversationLink": "{0}/users/ME/conversations/{1}".format(self.skype.conn.msgsHost, self.id),
+                    "from": "{0}/users/ME/contacts/8:{1}".format(self.skype.conn.msgsHost, self.skype.userId),
+                    "imdisplayname": self.skype.user.name,
+                    "isactive": True,
+                    "originalarrivaltime": datetime.strftime(arriveDate, "%Y-%m-%dT%H:%M:%S.%fZ"),
+                    "type": "Message"})
         if arriveTime:
             arriveDate = datetime.fromtimestamp(arriveTime / 1000)
             msg["originalarrivaltime"] = datetime.strftime(arriveDate, "%Y-%m-%dT%H:%M:%S.%fZ")
@@ -155,10 +146,8 @@ class SkypeChat(SkypeObj):
         Returns:
             .SkypeFileMsg: copy of the sent message object
         """
-        meta = {
-            "type": "pish/image" if image else "sharing/file",
-            "permissions": dict(("8:{0}".format(id), ["read"]) for id in self.userIds)
-        }
+        meta = {"type": "pish/image" if image else "sharing/file",
+                "permissions": dict(("8:{0}".format(id), ["read"]) for id in self.userIds)}
         if not image:
             meta["filename"] = name
         objId = self.skype.conn("POST", "https://api.asm.skype.com/v1/objects",
@@ -277,26 +266,22 @@ class SkypeGroupChat(SkypeChat):
             userIds.append(id)
             if obj.get("role") == "Admin":
                 adminIds.append(id)
-        fields.update({
-            "topic": raw.get("threadProperties", {}).get("topic"),
-            "creatorId": SkypeUtils.noPrefix(props.get("creator")),
-            "userIds": userIds,
-            "adminIds": adminIds,
-            "open": props.get("joiningenabled", "") == "true",
-            "history": props.get("historydisclosed", "") == "true",
-            "picture": props.get("picture", "")[4:] or None
-        })
+        fields.update({"topic": raw.get("threadProperties", {}).get("topic"),
+                       "creatorId": SkypeUtils.noPrefix(props.get("creator")),
+                       "userIds": userIds,
+                       "adminIds": adminIds,
+                       "open": props.get("joiningenabled", "") == "true",
+                       "history": props.get("historydisclosed", "") == "true",
+                       "picture": props.get("picture", "")[4:] or None})
         return fields
 
     @property
     @SkypeUtils.cacheResult
     def joinUrl(self):
-        query = {
-            "baseDomain": "https://join.skype.com/launch/",
-            "threadId": self.id
-        }
         return self.skype.conn("POST", "{0}/threads".format(SkypeConnection.API_SCHEDULE),
-                               auth=SkypeConnection.Auth.SkypeToken, json=query).json()["JoinUrl"]
+                               auth=SkypeConnection.Auth.SkypeToken,
+                               json={"baseDomain": "https://join.skype.com/launch/",
+                                     "threadId": self.id}).json().get("JoinUrl")
 
     def setTopic(self, topic):
         """
@@ -396,11 +381,9 @@ class SkypeChats(SkypeObjs):
             :class:`SkypeChat` list: collection of recent conversations
         """
         url = "{0}/users/ME/conversations".format(self.skype.conn.msgsHost)
-        params = {
-            "startTime": 0,
-            "view": "msnp24Equivalent",
-            "targetType": "Passport|Skype|Lync|Thread"
-        }
+        params = {"startTime": 0,
+                  "view": "msnp24Equivalent",
+                  "targetType": "Passport|Skype|Lync|Thread"}
         resp = self.skype.conn.syncStateCall("GET", url, params, auth=SkypeConnection.Auth.RegToken).json()
         chats = {}
         for json in resp.get("conversations", []):
@@ -442,17 +425,11 @@ class SkypeChats(SkypeObjs):
             members (str list): user identifiers to initially join the conversation
             admins (str list): user identifiers to gain admin privileges
         """
-        memberObjs = [{
-            "id": "8:{0}".format(self.skype.userId),
-            "role": "Admin"
-        }]
+        memberObjs = [{"id": "8:{0}".format(self.skype.userId), "role": "Admin"}]
         for id in members:
             if id == self.skype.userId:
                 continue
-            memberObjs.append({
-                "id": "8:{0}".format(id),
-                "role": "Admin" if id in admins else "User"
-            })
+            memberObjs.append({"id": "8:{0}".format(id), "role": "Admin" if id in admins else "User"})
         resp = self.skype.conn("POST", "{0}/threads".format(self.skype.conn.msgsHost),
                                auth=SkypeConnection.Auth.RegToken, json={"members": memberObjs})
         return self.chat(resp.headers["Location"].rsplit("/", 1)[1])
@@ -472,8 +449,6 @@ class SkypeChats(SkypeObjs):
         urlId = url.split("/")[-1]
         convUrl = "https://join.skype.com/api/v2/conversation/"
         json = SkypeConnection.externalCall("POST", convUrl, json={"shortId": urlId, "type": "wl"}).json()
-        return {
-            "id": json.get("Resource"),
-            "long": json.get("Id"),
-            "blob": json.get("ChatBlob")
-        }
+        return {"id": json.get("Resource"),
+                "long": json.get("Id"),
+                "blob": json.get("ChatBlob")}

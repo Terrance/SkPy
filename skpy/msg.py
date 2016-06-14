@@ -195,30 +195,26 @@ class SkypeMsg(SkypeObj):
             msgTime = datetime.strptime(raw.get("originalarrivaltime", ""), "%Y-%m-%dT%H:%M:%S.%fZ")
         except ValueError:
             msgTime = datetime.now()
-        return {
-            "id": raw.get("id"),
-            "type": raw.get("messagetype"),
-            "time": msgTime,
-            "clientId": raw.get("clientmessageid", raw.get("skypeeditedid")),
-            "userId": SkypeUtils.userToId(raw.get("from", "")),
-            "chatId": SkypeUtils.chatToId(raw.get("conversationLink", "")),
-            "content": raw.get("content")
-        }
+        return {"id": raw.get("id"),
+                "type": raw.get("messagetype"),
+                "time": msgTime,
+                "clientId": raw.get("clientmessageid", raw.get("skypeeditedid")),
+                "userId": SkypeUtils.userToId(raw.get("from", "")),
+                "chatId": SkypeUtils.chatToId(raw.get("conversationLink", "")),
+                "content": raw.get("content")}
 
     @classmethod
     def fromRaw(cls, skype=None, raw={}):
-        msgCls = {
-            "Text": SkypeTextMsg,
-            "RichText": SkypeTextMsg,
-            "RichText/Contacts": SkypeContactMsg,
-            "RichText/Location": SkypeLocationMsg,
-            "RichText/Media_GenericFile": SkypeFileMsg,
-            "RichText/UriObject": SkypeImageMsg,
-            "Event/Call": SkypeCallMsg,
-            "ThreadActivity/AddMember": SkypeAddMemberMsg,
-            "ThreadActivity/RoleUpdate": SkypeChangeMemberMsg,
-            "ThreadActivity/DeleteMember": SkypeRemoveMemberMsg
-        }.get(raw.get("messagetype"), cls)
+        msgCls = {"Text": SkypeTextMsg,
+                  "RichText": SkypeTextMsg,
+                  "RichText/Contacts": SkypeContactMsg,
+                  "RichText/Location": SkypeLocationMsg,
+                  "RichText/Media_GenericFile": SkypeFileMsg,
+                  "RichText/UriObject": SkypeImageMsg,
+                  "Event/Call": SkypeCallMsg,
+                  "ThreadActivity/AddMember": SkypeAddMemberMsg,
+                  "ThreadActivity/RoleUpdate": SkypeChangeMemberMsg,
+                  "ThreadActivity/DeleteMember": SkypeRemoveMemberMsg}.get(raw.get("messagetype"), cls)
         return msgCls(skype, raw, **msgCls.rawToFields(raw))
 
     def plain(self, entities=False):
@@ -307,10 +303,7 @@ class SkypeContactMsg(SkypeMsg):
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeContactMsg, cls).rawToFields(raw)
-        fields.update({
-            "contactIds": [],
-            "contactNames": []
-        })
+        fields.update({"contactIds": [], "contactNames": []})
         contactTags = BeautifulSoup(raw.get("content"), "html.parser").find_all("c")
         for tag in contactTags:
             fields["contactIds"].append(tag.get("s"))
@@ -342,14 +335,12 @@ class SkypeLocationMsg(SkypeMsg):
     def rawToFields(cls, raw={}):
         fields = super(SkypeLocationMsg, cls).rawToFields(raw)
         locTag = BeautifulSoup(raw.get("content"), "html.parser").find("location")
-        fields.update({
-            # Exponent notation produces a float, meaning lat/long will always be floats too.
-            "latitude": int(locTag.get("latitude")) / 1e6,
-            "longitude": int(locTag.get("longitude")) / 1e6,
-            "altitude": int(locTag.get("altitude")),
-            "address": locTag.get("address"),
-            "mapUrl": locTag.find("a").get("href")
-        })
+        # Exponent notation produces a float, meaning lat/long will always be floats too.
+        fields.update({"latitude": int(locTag.get("latitude")) / 1e6,
+                       "longitude": int(locTag.get("longitude")) / 1e6,
+                       "altitude": int(locTag.get("altitude")),
+                       "address": locTag.get("address"),
+                       "mapUrl": locTag.find("a").get("href")})
         return fields
 
 
@@ -392,13 +383,11 @@ class SkypeFileMsg(SkypeMsg):
         # BeautifulSoup converts tag names to lower case, and find() is case-sensitive.
         file = BeautifulSoup(raw.get("content"), "html.parser").find("uriobject")
         if file:
-            fileFields = {
-                "name": (file.find("originalname") or {}).get("v"),
-                "size": (file.find("filesize") or {}).get("v"),
-                "urlFull": file.get("uri"),
-                "urlThumb": file.get("url_thumbnail"),
-                "urlView": (file.find("a") or {}).get("href")
-            }
+            fileFields = {"name": (file.find("originalname") or {}).get("v"),
+                          "size": (file.find("filesize") or {}).get("v"),
+                          "urlFull": file.get("uri"),
+                          "urlThumb": file.get("url_thumbnail"),
+                          "urlView": (file.find("a") or {}).get("href")}
             fields["file"] = SkypeFileMsg.File(**fileFields)
         return fields
 
@@ -480,10 +469,8 @@ class SkypeAddMemberMsg(SkypeMemberMsg):
     def rawToFields(cls, raw={}):
         fields = super(SkypeAddMemberMsg, cls).rawToFields(raw)
         memInfo = (BeautifulSoup(raw.get("content"), "html.parser").find("addmember") or {})
-        fields.update({
-            "userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
-            "memberId": SkypeUtils.noPrefix(memInfo.find("target").text)
-        })
+        fields.update({"userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
+                       "memberId": SkypeUtils.noPrefix(memInfo.find("target").text)})
         return fields
 
 
@@ -503,11 +490,9 @@ class SkypeChangeMemberMsg(SkypeMemberMsg):
     def rawToFields(cls, raw={}):
         fields = super(SkypeChangeMemberMsg, cls).rawToFields(raw)
         memInfo = (BeautifulSoup(raw.get("content"), "html.parser").find("roleupdate") or {})
-        fields.update({
-            "userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
-            "memberId": SkypeUtils.noPrefix(memInfo.find("target").find("id").text),
-            "admin": memInfo.find("target").find("role").text == "admin"
-        })
+        fields.update({"userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
+                       "memberId": SkypeUtils.noPrefix(memInfo.find("target").find("id").text),
+                       "admin": memInfo.find("target").find("role").text == "admin"})
         return fields
 
 
@@ -521,8 +506,6 @@ class SkypeRemoveMemberMsg(SkypeMemberMsg):
     def rawToFields(cls, raw={}):
         fields = super(SkypeRemoveMemberMsg, cls).rawToFields(raw)
         memInfo = (BeautifulSoup(raw.get("content"), "html.parser").find("deletemember") or {})
-        fields.update({
-            "userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
-            "memberId": SkypeUtils.noPrefix(memInfo.find("target").text)
-        })
+        fields.update({"userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
+                       "memberId": SkypeUtils.noPrefix(memInfo.find("target").text)})
         return fields

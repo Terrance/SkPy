@@ -28,23 +28,19 @@ class SkypeEvent(SkypeObj):
             evtTime = datetime.strptime(raw.get("time", ""), "%Y-%m-%dT%H:%M:%SZ")
         except ValueError:
             evtTime = datetime.now()
-        return {
-            "id": raw.get("id"),
-            "type": raw.get("resourceType"),
-            "time": evtTime
-        }
+        return {"id": raw.get("id"),
+                "type": raw.get("resourceType"),
+                "time": evtTime}
 
     @classmethod
     def fromRaw(cls, skype=None, raw={}):
         res = raw.get("resource", {})
         resType = raw.get("resourceType")
-        evtCls = {
-            "UserPresence": SkypePresenceEvent,
-            "EndpointPresence": SkypeEndpointEvent,
-            "NewMessage": SkypeMessageEvent,
-            "ConversationUpdate": SkypeChatUpdateEvent,
-            "ThreadUpdate": SkypeChatMemberEvent
-        }.get(resType, cls)
+        evtCls = {"UserPresence": SkypePresenceEvent,
+                  "EndpointPresence": SkypeEndpointEvent,
+                  "NewMessage": SkypeMessageEvent,
+                  "ConversationUpdate": SkypeChatUpdateEvent,
+                  "ThreadUpdate": SkypeChatMemberEvent}.get(resType, cls)
         if evtCls is SkypeMessageEvent:
             msgType = res.get("messagetype")
             if msgType in ("Text", "RichText", "RichText/Contacts", "RichText/Media_GenericFile", "RichText/UriObject"):
@@ -87,12 +83,10 @@ class SkypePresenceEvent(SkypeEvent):
     def rawToFields(cls, raw={}):
         fields = super(SkypePresenceEvent, cls).rawToFields(raw)
         res = raw.get("resource", {})
-        fields.update({
-            "userId": SkypeUtils.userToId(res.get("selfLink")),
-            "online": res.get("availability") == "Online",
-            "status": getattr(SkypeUtils.Status, res.get("status")),
-            "capabilities": list(filter(None, res.get("capabilities", "").split(" | ")))
-        })
+        fields.update({"userId": SkypeUtils.userToId(res.get("selfLink")),
+                       "online": res.get("availability") == "Online",
+                       "status": getattr(SkypeUtils.Status, res.get("status")),
+                       "capabilities": list(filter(None, res.get("capabilities", "").split(" | ")))})
         return fields
 
 
@@ -117,11 +111,10 @@ class SkypeEndpointEvent(SkypeEvent):
     def rawToFields(cls, raw={}):
         fields = super(SkypeEndpointEvent, cls).rawToFields(raw)
         res = raw.get("resource", {})
-        fields.update({
-            "userId": SkypeUtils.userToId(res.get("selfLink")),
-            "name": res.get("privateInfo", {}).get("epname"),
-            "capabilities": list(filter(None, res.get("publicInfo", {}).get("capabilities", "").split(" | ")))
-        })
+        fields.update({"userId": SkypeUtils.userToId(res.get("selfLink")),
+                       "name": res.get("privateInfo", {}).get("epname"),
+                       "capabilities": list(filter(None, res.get("publicInfo", {})
+                                                            .get("capabilities", "").split(" | ")))})
         return fields
 
 
@@ -146,11 +139,9 @@ class SkypeTypingEvent(SkypeEvent):
     def rawToFields(cls, raw={}):
         fields = super(SkypeTypingEvent, cls).rawToFields(raw)
         res = raw.get("resource", {})
-        fields.update({
-            "userId": SkypeUtils.userToId(res.get("from", "")),
-            "chatId": SkypeUtils.chatToId(res.get("conversationLink", "")),
-            "active": (res.get("messagetype") == "Control/Typing")
-        })
+        fields.update({"userId": SkypeUtils.userToId(res.get("from", "")),
+                       "chatId": SkypeUtils.chatToId(res.get("conversationLink", "")),
+                       "active": (res.get("messagetype") == "Control/Typing")})
         return fields
 
 
@@ -219,10 +210,8 @@ class SkypeChatUpdateEvent(SkypeEvent):
     def rawToFields(cls, raw={}):
         fields = super(SkypeChatUpdateEvent, cls).rawToFields(raw)
         res = raw.get("resource", {})
-        fields.update({
-            "chatId": res.get("id"),
-            "horizon": res.get("properties", {}).get("consumptionhorizon")
-        })
+        fields.update({"chatId": res.get("id"),
+                       "horizon": res.get("properties", {}).get("consumptionhorizon")})
         return fields
 
     def consume(self):
@@ -254,8 +243,6 @@ class SkypeChatMemberEvent(SkypeEvent):
     def rawToFields(cls, raw={}):
         fields = super(SkypeChatMemberEvent, cls).rawToFields(raw)
         res = raw.get("resource", {})
-        fields.update({
-            "userIds": filter(None, [SkypeUtils.noPrefix(m.get("id")) for m in res.get("members")]),
-            "chatId": res.get("id")
-        })
+        fields.update({"userIds": filter(None, [SkypeUtils.noPrefix(m.get("id")) for m in res.get("members")]),
+                       "chatId": res.get("id")})
         return fields

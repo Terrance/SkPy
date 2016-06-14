@@ -360,14 +360,12 @@ class SkypeConnection(SkypeObj):
             etm = loginPage.find(id="etm").get("value")
             frac, hour = math.modf(time.timezone)
             timezone = "{0:+03d}|{1}".format(int(hour), int(frac * 60))
-            data = {
-                "username": user,
-                "password": pwd,
-                "pie": pie,
-                "etm": etm,
-                "timezone_field": timezone,
-                "js_time": secs
-            }
+            data = {"username": user,
+                    "password": pwd,
+                    "pie": pie,
+                    "etm": etm,
+                    "timezone_field": timezone,
+                    "js_time": secs}
             loginResp = self("POST", self.API_LOGIN, data=data,
                              params={"client_id": "578134", "redirect_uri": "https://web.skype.com"})
             loginPage = BeautifulSoup(loginResp.text, "html.parser")
@@ -405,17 +403,13 @@ class SkypeConnection(SkypeObj):
         cookies = self("GET", "{0}/{1}".format(self.API_JOIN, urlId), headers={"User-Agent": agent}).cookies
         ids = self("POST", "{0}/api/v2/conversation/".format(self.API_JOIN),
                    json={"shortId": urlId, "type": "wl"}).json()
-        headers = {
-            "csrf_token": cookies.get("csrf_token"),
-            "X-Skype-Request-Id": cookies.get("launcher_session_id")
-        }
-        json = {
-            "flowId": cookies.get("launcher_session_id"),
-            "shortId": urlId,
-            "longId": ids.get("Long"),
-            "threadId": ids.get("Resource"),
-            "name": name
-        }
+        headers = {"csrf_token": cookies.get("csrf_token"),
+                   "X-Skype-Request-Id": cookies.get("launcher_session_id")}
+        json = {"flowId": cookies.get("launcher_session_id"),
+                "shortId": urlId,
+                "longId": ids.get("Long"),
+                "threadId": ids.get("Resource"),
+                "name": name}
         self.tokens["skype"] = self("POST", "{0}/api/v1/users/guests".format(self.API_JOIN),
                                     headers=headers, json=json).json().get("skypetoken")
         # Assume the token lasts 24 hours, as a guest account only lasts that long anyway.
@@ -445,10 +439,8 @@ class SkypeConnection(SkypeObj):
         while "reg" not in self.tokens:
             secs = int(time.time())
             hash = getMac256Hash(str(secs), "msmsgs@msnmsgr.com", "Q1P7W2E4J9R8U3S5")
-            headers = {
-                "LockAndKey": "appId=msmsgs@msnmsgr.com; time={0}; lockAndKeyResponse={1}".format(secs, hash),
-                "Authentication": "skypetoken=" + self.tokens["skype"]
-            }
+            headers = {"LockAndKey": "appId=msmsgs@msnmsgr.com; time={0}; lockAndKeyResponse={1}".format(secs, hash),
+                       "Authentication": "skypetoken=" + self.tokens["skype"]}
             endpointResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), codes=(200, 201, 404),
                                 headers=headers, json={"endpointFeatures": "Agent"})
             regTokenHead = endpointResp.headers.get("Set-RegistrationToken")
@@ -512,16 +504,12 @@ class SkypeEndpoint(SkypeObj):
         """
         Subscribe to contact and conversation events.  These are accessible through :meth:`getEvents`.
         """
-        meta = {
-            "interestedResources": [
-                "/v1/threads/ALL",
-                "/v1/users/ME/contacts/ALL",
-                "/v1/users/ME/conversations/ALL/messages",
-                "/v1/users/ME/conversations/ALL/properties"
-            ],
-            "template": "raw",
-            "channelType": "httpLongPoll"
-        }
+        meta = {"interestedResources": ["/v1/threads/ALL",
+                                        "/v1/users/ME/contacts/ALL",
+                                        "/v1/users/ME/conversations/ALL/messages",
+                                        "/v1/users/ME/conversations/ALL/properties"],
+                "template": "raw",
+                "channelType": "httpLongPoll"}
         self.conn("POST", "{0}/users/ME/endpoints/{1}/subscriptions".format(self.conn.msgsHost, self.id),
                   auth=SkypeConnection.Auth.RegToken, json=meta)
         self.subscribed = True
