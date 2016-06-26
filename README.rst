@@ -63,3 +63,8 @@ Make your class a subclass of ``SkypeEventLoop``, then override the ``onEvent(ev
                 event.msg.chat.sendMsg("Pong!")
 
 Create an instance and call its ``loop()`` method to start processing events. For programs with a frontend (e.g. a custom client), you'll likely want to put the event loop in its own thread.
+
+Running tests
+-------------
+
+Unit tests can be found in ``test.py`` -- these are designed to test the library's behaviour and parsing of API responses, not the Skype API itself.  You'll need to ``pip install responses`` first.
