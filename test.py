@@ -8,7 +8,7 @@ import unittest
 from requests import Response
 import responses
 
-from skpy import Skype, SkypeConnection
+from skpy import Skype, SkypeConnection, SkypeUser, SkypeContact
 
 class Data:
     """
@@ -24,6 +24,8 @@ class Data:
     chatLongId = "c" * 32
     chatThreadId = "19:{0}@thread.skype".format(chatLongId)
     guestId = "guest:name_gggggggg"
+    contactId = "joe.4"
+    nonContactId = "anna.7"
 
 
 def registerMocks(regTokenRedirect=False, guest=False):
@@ -69,6 +71,29 @@ def registerMocks(regTokenRedirect=False, guest=False):
     responses.add(responses.GET, "{0}/users/self/profile".format(SkypeConnection.API_USER),
                   status=200, content_type="application/json",
                   json={"username": Data.guestId if guest else Data.userId})
+    # Retrieve a list of contacts.
+    responses.add(responses.GET, "{0}/users/{1}/contacts".format(SkypeConnection.API_CONTACTS, Data.userId),
+                  status=200, content_type="application/json",
+                  json={"contacts": [{"authorized": True,
+                                      "avatar_url": "https://api.skype.com/users/{0}/profile/avatar?auth_key=..."
+                                                    .format(Data.contactId),
+                                      "blocked": False,
+                                      "display_name": "Joe Bloggs",
+                                      "id": Data.contactId,
+                                      "locations": [{"city": "London", "state": None, "country": "GB"}],
+                                      "mood": "Happy <ss type=\"laugh\">:D</ss>",
+                                      "name": {"first": "Joe", "surname": "Bloggs", "nickname": "Joe Bloggs"},
+                                      "phones": [{"number": "+442099887766", "type": 0},
+                                                 {"number": "+442020900900", "type": 1},
+                                                 {"number": "+447711223344", "type": 2}],
+                                      "type": "skype"},
+                                     {"authorized": False,
+                                      "blocked": False,
+                                      "display_name": "Anna Cooper",
+                                      "id": Data.nonContactId,
+                                      "name": {"first": "Anna", "surname": "Cooper"},
+                                      "suggested": True,
+                                      "type": "skype"}]})
 
 
 def mockSkype():
@@ -139,6 +164,23 @@ class SkypeTest(unittest.TestCase):
         self.assertTrue(sk.conn.connected)
         self.assertTrue(sk.conn.guest)
         self.assertEqual(sk.userId, Data.guestId)
+
+    @responses.activate
+    def testContacts(self):
+        """
+        Collect a list of contacts for the current user.
+        """
+        sk = mockSkype()
+        self.assertEqual(len(sk.contacts), 1)
+        con = sk.contacts[Data.contactId]
+        self.assertTrue(isinstance(con, SkypeContact))
+        self.assertEqual(con.id, Data.contactId)
+        self.assertEqual(len(con.phones), 3)
+        self.assertEqual(con.authorised, True)
+        nonCon = sk.contacts[Data.nonContactId]
+        self.assertTrue(isinstance(con, SkypeContact))
+        self.assertEqual(nonCon.id, Data.nonContactId)
+        self.assertEqual(nonCon.authorised, False)
 
 
 if __name__ == "__main__":
