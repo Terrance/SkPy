@@ -5,10 +5,10 @@ import time
 import re
 import unittest
 
-from requests import Response
 import responses
 
-from skpy import Skype, SkypeConnection, SkypeUser, SkypeContact
+from skpy import Skype, SkypeConnection, SkypeContact
+
 
 class Data:
     """
@@ -26,6 +26,7 @@ class Data:
     guestId = "guest:name_gggggggg"
     contactId = "joe.4"
     nonContactId = "anna.7"
+    asmId = "0-weu-aa-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
 
 def registerMocks(regTokenRedirect=False, guest=False):
@@ -75,7 +76,7 @@ def registerMocks(regTokenRedirect=False, guest=False):
     responses.add(responses.GET, "{0}/users/{1}/contacts".format(SkypeConnection.API_CONTACTS, Data.userId),
                   status=200, content_type="application/json",
                   json={"contacts": [{"authorized": True,
-                                      "avatar_url": "https://api.skype.com/users/{0}/profile/avatar?auth_key=..."
+                                      "avatar_url": "https://api.skype.com/users/{0}/profile/avatar"
                                                     .format(Data.contactId),
                                       "blocked": False,
                                       "display_name": "Joe Bloggs",
@@ -94,6 +95,104 @@ def registerMocks(regTokenRedirect=False, guest=False):
                                       "name": {"first": "Anna", "surname": "Cooper"},
                                       "suggested": True,
                                       "type": "skype"}]})
+    # Retrieve a list of conversations.
+    userFmt = (SkypeConnection.API_MSGSHOST, Data.userId)
+    conFmt = (SkypeConnection.API_MSGSHOST, Data.contactId)
+    nonConFmt = (SkypeConnection.API_MSGSHOST, Data.nonContactId)
+    chatFmt = (SkypeConnection.API_MSGSHOST, Data.chatThreadId)
+    responses.add(responses.GET, "{0}/users/ME/conversations".format(SkypeConnection.API_MSGSHOST),
+                  status=200, content_type="application/json",
+                  json={"conversations": [{"id": "8:{0}".format(Data.contactId),
+                                           "lastMessage": {"clientmessageid": "1451606399999",
+                                                           "composetime": "2016-01-01T00:00:00.000Z",
+                                                           "content": "Hi!",
+                                                           "conversationLink": "{0}/users/ME/conversations/8:{1}"
+                                                                               .format(*conFmt),
+                                                           "from": "{0}/users/ME/contacts/8:{1}".format(*conFmt),
+                                                           "id": "1451606400000",
+                                                           "messagetype": "Text",
+                                                           "originalarrivaltime": "2016-01-01T00:00:00.000Z",
+                                                           "type": "Message",
+                                                           "version": "1451606400000"},
+                                           "messages": "{0}/users/ME/conversations/8:{1}/messages".format(*conFmt),
+                                           "properties": {"clearedat": "1451606400000",
+                                                          "consumptionhorizon": "0;0;0"},
+                                           "targetLink": "{0}/users/ME/contacts/8:{1}".format(*conFmt),
+                                           "type": "Conversation",
+                                           "version": 1451606400000},
+                                          {"id": Data.chatThreadId,
+                                           "lastMessage": {"clientmessageid": "1451606399999",
+                                                           "composetime": "2016-01-01T00:00:00.000Z",
+                                                           "content": "A message for the team.",
+                                                           "conversationLink": "{0}/users/ME/conversations/{1}"
+                                                                               .format(*chatFmt),
+                                                           "from": "{0}/users/ME/contacts/8:{1}".format(*nonConFmt),
+                                                           "id": "1451606400000",
+                                                           "messagetype": "Text",
+                                                           "originalarrivaltime": "2016-01-01T00:00:00.000Z",
+                                                           "type": "Message",
+                                                           "version": "1451606400000"},
+                                           "messages": "{0}/users/ME/conversations/{1}/messages".format(*chatFmt),
+                                           "properties": {"consumptionhorizon": "0;0;0"},
+                                           "targetLink": "{0}/threads/{1}".format(*chatFmt),
+                                           "threadProperties": {"lastjoinat": "1451606400000",
+                                                                "topic": "Team chat",
+                                                                "version": "1451606400000"},
+                                           "type": "Conversation",
+                                           "version": 1451606400000}]})
+    # Request more information about the group conversation.
+    responses.add(responses.GET, "{0}/threads/{1}".format(*chatFmt), status=200, content_type="application/json",
+                  json={"id": Data.chatThreadId,
+                        "members": [{"capabilities": [],
+                                     "cid": 0,
+                                     "friendlyName": "",
+                                     "id": "8:{0}".format(Data.nonContactId),
+                                     "linkedMri": "",
+                                     "role": "Admin",
+                                     "type": "ThreadMember",
+                                     "userLink": "{0}/users/8:{1}".format(*nonConFmt),
+                                     "userTile": ""},
+                                    {"capabilities": [],
+                                     "cid": 0,
+                                     "friendlyName": "",
+                                     "id": "8:{0}".format(Data.contactId),
+                                     "linkedMri": "",
+                                     "role": "User",
+                                     "type": "ThreadMember",
+                                     "userLink": "{0}/users/8:{1}".format(*conFmt),
+                                     "userTile": ""},
+                                    {"capabilities": [],
+                                     "cid": 0,
+                                     "friendlyName": "",
+                                     "id": "8:{0}".format(Data.userId),
+                                     "linkedMri": "",
+                                     "role": "User",
+                                     "type": "ThreadMember",
+                                     "userLink": "{0}/users/8:{1}".format(*userFmt),
+                                     "userTile": ""}],
+                        "messages": "{0}/users/ME/conversations/{1}/messages".format(*chatFmt),
+                        "properties": {"capabilities": ["AddMember",
+                                                        "ChangeTopic",
+                                                        "ChangePicture",
+                                                        "EditMsg",
+                                                        "CallP2P",
+                                                        "SendText",
+                                                        "SendSms",
+                                                        "SendFileP2P",
+                                                        "SendContacts",
+                                                        "SendVideoMsg",
+                                                        "SendMediaMsg",
+                                                        "ChangeModerated"],
+                                       "createdat": "1451606400000",
+                                       "creator": "8:{0}".format(Data.nonContactId),
+                                       "creatorcid": "0",
+                                       "historydisclosed": "true",
+                                       "joiningenabled": "true",
+                                       "picture": "URL@https://api.asm.skype.com/v1/objects/"
+                                                  "{0}/views/avatar_fullsize".format(Data.asmId),
+                                       "topic": "Team chat"},
+                        "type": "Thread",
+                        "version": 1451606400000})
 
 
 def mockSkype():
@@ -166,7 +265,7 @@ class SkypeTest(unittest.TestCase):
         self.assertEqual(sk.userId, Data.guestId)
 
     @responses.activate
-    def testContacts(self):
+    def testContactList(self):
         """
         Collect a list of contacts for the current user.
         """
@@ -175,12 +274,35 @@ class SkypeTest(unittest.TestCase):
         con = sk.contacts[Data.contactId]
         self.assertTrue(isinstance(con, SkypeContact))
         self.assertEqual(con.id, Data.contactId)
+        self.assertEqual(str(con.name), "Joe Bloggs")
         self.assertEqual(len(con.phones), 3)
         self.assertEqual(con.authorised, True)
+        self.assertEqual(con.blocked, False)
         nonCon = sk.contacts[Data.nonContactId]
         self.assertTrue(isinstance(con, SkypeContact))
         self.assertEqual(nonCon.id, Data.nonContactId)
         self.assertEqual(nonCon.authorised, False)
+
+    @responses.activate
+    def testChatList(self):
+        """
+        Collect a list of conversations for the current user.
+        """
+        sk = mockSkype()
+        recent = sk.chats.recent()
+        self.assertEqual(len(recent), 2)
+        chat = recent["8:{0}".format(Data.contactId)]
+        self.assertEqual(chat.userId, Data.contactId)
+        self.assertEqual(chat.userIds, [Data.contactId])
+        groupChat = recent[Data.chatThreadId]
+        self.assertEqual(groupChat.creatorId, Data.nonContactId)
+        self.assertEqual(groupChat.adminIds, [Data.nonContactId])
+        self.assertTrue(Data.userId in groupChat.userIds)
+        self.assertTrue(Data.contactId in groupChat.userIds)
+        self.assertTrue(Data.nonContactId in groupChat.userIds)
+        self.assertEqual(groupChat.topic, "Team chat")
+        self.assertTrue(groupChat.open)
+        self.assertTrue(groupChat.history)
 
 
 if __name__ == "__main__":
