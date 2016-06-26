@@ -299,6 +299,11 @@ class SkypeContacts(SkypeObjs):
         for id in sorted(self.contactIds):
             yield self.cache[id]
 
+    def __len__(self):
+        if not self.synced:
+            self.sync()
+        return len(self.contactIds)
+
     def sync(self):
         params = {"delta": "",
                   "$filter": "type eq 'skype' or type eq 'msn' or type eq 'pstn' or type eq 'agent' or type eq 'lync'",
