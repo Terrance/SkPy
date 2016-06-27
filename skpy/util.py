@@ -84,7 +84,6 @@ class SkypeUtils:
         Returns:
             class: same, but modified, class
         """
-
         def __init__(self, skype=None, raw=None, *args, **kwargs):
             super(cls, self).__init__(skype, raw)
             # Merge args into kwargs based on cls.attrs.
@@ -118,7 +117,6 @@ class SkypeUtils:
         Returns:
             method: decorator function, ready to apply to other methods
         """
-
         user = kwargs.get("user", ())
         users = kwargs.get("users", ())
         chat = kwargs.get("chat", ())
@@ -177,7 +175,6 @@ class SkypeUtils:
         Returns:
             method: wrapper function with caching
         """
-
         cache = {}
 
         @functools.wraps(fn)

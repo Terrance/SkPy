@@ -438,7 +438,7 @@ class SkypeChats(SkypeObjs):
     @SkypeUtils.cacheResult
     def urlToIds(url):
         """
-        Resolves a ``join.skype.com`` URL and returns various identifiers for the group conversation.
+        Resolve a ``join.skype.com`` URL and returns various identifiers for the group conversation.
 
         Args:
             url (str): public join URL, or identifier from it

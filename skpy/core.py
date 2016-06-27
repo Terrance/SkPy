@@ -148,7 +148,7 @@ class SkypeObjs(object):
 
     def sync(self):
         """
-        Subclasses can implement this method to retrieve an initial set of objects.
+        A stub method that subclasses can implement to retrieve an initial set of objects.
         """
         self.synced = True
 

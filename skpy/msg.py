@@ -327,7 +327,7 @@ class SkypeLocationMsg(SkypeMsg):
             Geocoded address provided by the sender.
         mapUrl (str):
             Link to map displaying the location.
-   """
+    """
 
     attrs = SkypeMsg.attrs + ("latitude", "longitude", "altitude", "address", "mapUrl")
 
@@ -373,6 +373,7 @@ class SkypeFileMsg(SkypeMsg):
             urlView (str):
                 URL for the user to access the file outside of the API.
         """
+
         attrs = ("name", "size", "urlFull", "urlThumb", "urlView")
 
     attrs = SkypeMsg.attrs + ("file",)

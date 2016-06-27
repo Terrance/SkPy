@@ -174,7 +174,7 @@ class SkypeEventLoop(Skype):
 
     def onEvent(self, event):
         """
-        Subclasses should implement this method to react to messages and status changes.
+        A stub method that subclasses should implement to react to messages and status changes.
 
         Args:
             event (SkypeEvent): an incoming event
@@ -222,6 +222,7 @@ class SkypeSettings(SkypeObj):
         """
         Enum: privacy option values for incoming audio and video calls.
         """
+
         Anyone = 0
         """
         Allow from all Skype users.

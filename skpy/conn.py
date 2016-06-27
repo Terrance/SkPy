@@ -67,7 +67,6 @@ class SkypeConnection(SkypeObj):
         Returns:
             method: decorator function, ready to apply to other methods
         """
-
         regToken = kwargs.get("regToken", False)
         subscribe = kwargs.get("subscribe")
 
@@ -142,7 +141,7 @@ class SkypeConnection(SkypeObj):
 
     def __init__(self):
         """
-        Creates a new, unconnected instance.
+        Create a new, unconnected instance.
         """
         self.userId = None
         self.tokens = {}
@@ -246,7 +245,7 @@ class SkypeConnection(SkypeObj):
 
     def setUserPwd(self, user, pwd):
         """
-        Replaces the stub :meth:`getSkypeToken` method with one that connects using the given credentials.  Avoids
+        Replace the stub :meth:`getSkypeToken` method with one that connects using the given credentials.  Avoids
         storing the account password in an accessible way.
 
         Args:
@@ -544,6 +543,8 @@ def getMac256Hash(challenge, appId, key):
     """
     Method to generate the lock-and-key response, needed to acquire registration tokens.
     """
+    clearText = challenge + appId
+    clearText += "0" * (8 - len(clearText) % 8)
 
     def int32ToHexString(n):
         hexChars = "0123456789abcdef"
@@ -606,8 +607,6 @@ def getMac256Hash(challenge, appId, key):
         qwSum = qwSum % MODULUS
         return [qwMAC, qwSum]
 
-    clearText = challenge + appId
-    clearText += "0" * (8 - len(clearText) % 8)
     cchClearText = len(clearText) // 4
     pClearText = []
     for i in range(cchClearText):
