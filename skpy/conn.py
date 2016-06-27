@@ -47,11 +47,11 @@ class SkypeConnection(SkypeObj):
     :class:`.SkypeEnum`: Authentication types for different API calls.
 
     Attributes:
-        SkypeToken:
+        Auth.SkypeToken:
             Add an ``X-SkypeToken`` header with the Skype token.
-        Authorize:
+        Auth.Authorize:
             Add an ``Authorization`` header with the Skype token.
-        RegToken:
+        Auth.RegToken:
             Add a ``RegistrationToken`` header with the registration token.
     """
 

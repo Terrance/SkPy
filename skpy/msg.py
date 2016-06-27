@@ -426,9 +426,9 @@ class SkypeCallMsg(SkypeMsg):
     :class:`.SkypeEnum`: Possible call states (either started and incoming, or ended).
 
     Attributes:
-        Started:
+        State.Started:
             New call has just begun.
-        Ended:
+        State.Ended:
             All call participants have hung up.
     """
 

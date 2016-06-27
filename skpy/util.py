@@ -16,15 +16,15 @@ class SkypeUtils:
     :class:`.SkypeEnum`: Types of user availability.
 
     Attributes:
-        Offline:
+        Status.Offline:
             User is not connected.
-        Hidden:
+        Status.Hidden:
             User is pretending to be offline.  Shows as hidden to the current user, offline to anyone else.
-        Busy:
+        Status.Busy:
             User wishes not to be disturbed.  Disables notifications on some clients (e.g. on the desktop).
-        Idle:
+        Status.Idle:
             User is online but not active.  Messages will likely be delivered as normal, though may not be read.
-        Online:
+        Status.Online:
             User is available to talk.
     """
 

@@ -158,11 +158,11 @@ class SkypeContact(SkypeUser):
         :class:`.SkypeEnum`: Types of phone number.
 
         Attributes:
-            Home:
+            Type.Home:
                 A home phone number.
-            Work:
+            Type.Work:
                 An office or work phone number.
-            Mobile:
+            Type.Mobile:
                 A mobile phone number.
         """
 
