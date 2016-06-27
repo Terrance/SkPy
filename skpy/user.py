@@ -145,6 +145,8 @@ class SkypeContact(SkypeUser):
             Whether the user has accepted an invite to become a contact.
         blocked (bool):
             Whether the logged-in account has blocked this user.
+        favourite (bool):
+            Whether the contact is marked as a favourite by the logged-in user.
     """
 
     @SkypeUtils.initAttrs
@@ -171,7 +173,7 @@ class SkypeContact(SkypeUser):
         def __str__(self):
             return self.number or ""
 
-    attrs = SkypeUser.attrs + ("language", "phones", "birthday", "authorised", "blocked")
+    attrs = SkypeUser.attrs + ("language", "phones", "birthday", "authorised", "blocked", "favourite")
     defaults = dict(SkypeUser.defaults, phones=[])
 
     @classmethod
@@ -193,7 +195,8 @@ class SkypeContact(SkypeUser):
                        "phones": phones,
                        "birthday": birthday,
                        "authorised": raw.get("authorized"),
-                       "blocked": raw.get("blocked")})
+                       "blocked": raw.get("blocked"),
+                       "favourite": raw.get("favorite")})
         return fields
 
     @classmethod
@@ -311,6 +314,8 @@ class SkypeContacts(SkypeObjs):
         for json in self.skype.conn("GET", "{0}/users/{1}/contacts".format(SkypeConnection.API_CONTACTS,
                                                                            self.skype.userId),
                                     auth=SkypeConnection.Auth.SkypeToken, params=params).json().get("contacts", []):
+            # Favourite property only exists if true, else default it to false (doesn't appear in other API requests).
+            json["favorite"] = json.get("favorite", False)
             self.merge(SkypeContact.fromRaw(self.skype, json))
             if not json.get("suggested"):
                 self.contactIds.append(json.get("id"))
