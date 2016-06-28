@@ -7,13 +7,14 @@ import unittest
 
 import responses
 
-from skpy import Skype, SkypeConnection, SkypeContact
+from skpy import Skype, SkypeConnection, SkypeContact, SkypeMsg
 
 
 class Data:
     """
     Dummy representations of data normally retrieved from Skype.
     """
+
     userId = "fred.2"
     skypeToken = "s" * 424
     regToken = "r" * 886
@@ -27,6 +28,10 @@ class Data:
     contactId = "joe.4"
     nonContactId = "anna.7"
     asmId = "0-weu-aa-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    msgTime = 1451606400000
+    msgTimeStr = "{0}".format(msgTime)
+    msgTimeFmt = "2016-01-01T00:00:00.000Z"
+    msgId = "1451606399999"
 
 
 def registerMocks(regTokenRedirect=False, guest=False):
@@ -103,43 +108,66 @@ def registerMocks(regTokenRedirect=False, guest=False):
     responses.add(responses.GET, "{0}/users/ME/conversations".format(SkypeConnection.API_MSGSHOST),
                   status=200, content_type="application/json",
                   json={"conversations": [{"id": "8:{0}".format(Data.contactId),
-                                           "lastMessage": {"clientmessageid": "1451606399999",
-                                                           "composetime": "2016-01-01T00:00:00.000Z",
+                                           "lastMessage": {"clientmessageid": Data.msgId,
+                                                           "composetime": Data.msgTimeFmt,
                                                            "content": "Hi!",
                                                            "conversationLink": "{0}/users/ME/conversations/8:{1}"
                                                                                .format(*conFmt),
                                                            "from": "{0}/users/ME/contacts/8:{1}".format(*conFmt),
-                                                           "id": "1451606400000",
+                                                           "id": Data.msgTimeStr,
                                                            "messagetype": "Text",
-                                                           "originalarrivaltime": "2016-01-01T00:00:00.000Z",
+                                                           "originalarrivaltime": Data.msgTimeFmt,
                                                            "type": "Message",
-                                                           "version": "1451606400000"},
+                                                           "version": Data.msgTimeStr},
                                            "messages": "{0}/users/ME/conversations/8:{1}/messages".format(*conFmt),
-                                           "properties": {"clearedat": "1451606400000",
+                                           "properties": {"clearedat": Data.msgTimeStr,
                                                           "consumptionhorizon": "0;0;0"},
                                            "targetLink": "{0}/users/ME/contacts/8:{1}".format(*conFmt),
                                            "type": "Conversation",
-                                           "version": 1451606400000},
+                                           "version": Data.msgTime},
                                           {"id": Data.chatThreadId,
-                                           "lastMessage": {"clientmessageid": "1451606399999",
-                                                           "composetime": "2016-01-01T00:00:00.000Z",
+                                           "lastMessage": {"clientmessageid": Data.msgId,
+                                                           "composetime": Data.msgTimeFmt,
                                                            "content": "A message for the team.",
                                                            "conversationLink": "{0}/users/ME/conversations/{1}"
                                                                                .format(*chatFmt),
                                                            "from": "{0}/users/ME/contacts/8:{1}".format(*nonConFmt),
-                                                           "id": "1451606400000",
+                                                           "id": Data.msgTimeStr,
                                                            "messagetype": "Text",
-                                                           "originalarrivaltime": "2016-01-01T00:00:00.000Z",
+                                                           "originalarrivaltime": Data.msgTimeFmt,
                                                            "type": "Message",
-                                                           "version": "1451606400000"},
+                                                           "version": Data.msgTimeStr},
                                            "messages": "{0}/users/ME/conversations/{1}/messages".format(*chatFmt),
                                            "properties": {"consumptionhorizon": "0;0;0"},
                                            "targetLink": "{0}/threads/{1}".format(*chatFmt),
-                                           "threadProperties": {"lastjoinat": "1451606400000",
+                                           "threadProperties": {"lastjoinat": Data.msgTimeStr,
                                                                 "topic": "Team chat",
-                                                                "version": "1451606400000"},
+                                                                "version": Data.msgTimeStr},
                                            "type": "Conversation",
-                                           "version": 1451606400000}]})
+                                           "version": Data.msgTime}]})
+    # Retrieve a single conversation.
+    responses.add(responses.GET, "{0}/users/ME/conversations/{1}".format(*chatFmt),
+                  status=200, content_type="application/json",
+                  json={"id": Data.chatThreadId,
+                        "lastMessage": {"clientmessageid": Data.msgId,
+                                        "composetime": Data.msgTimeFmt,
+                                        "content": "A message for the team.",
+                                        "conversationLink": "{0}/users/ME/conversations/{1}"
+                                                            .format(*chatFmt),
+                                        "from": "{0}/users/ME/contacts/8:{1}".format(*nonConFmt),
+                                        "id": Data.msgTimeStr,
+                                        "messagetype": "Text",
+                                        "originalarrivaltime": Data.msgTimeFmt,
+                                        "type": "Message",
+                                        "version": Data.msgTimeStr},
+                        "messages": "{0}/users/ME/conversations/{1}/messages".format(*chatFmt),
+                        "properties": {"consumptionhorizon": "0;0;0"},
+                        "targetLink": "{0}/threads/{1}".format(*chatFmt),
+                        "threadProperties": {"lastjoinat": Data.msgTimeStr,
+                                             "topic": "Team chat",
+                                             "version": Data.msgTimeStr},
+                        "type": "Conversation",
+                        "version": Data.msgTime})
     # Request more information about the group conversation.
     responses.add(responses.GET, "{0}/threads/{1}".format(*chatFmt), status=200, content_type="application/json",
                   json={"id": Data.chatThreadId,
@@ -183,7 +211,7 @@ def registerMocks(regTokenRedirect=False, guest=False):
                                                         "SendVideoMsg",
                                                         "SendMediaMsg",
                                                         "ChangeModerated"],
-                                       "createdat": "1451606400000",
+                                       "createdat": Data.msgTimeStr,
                                        "creator": "8:{0}".format(Data.nonContactId),
                                        "creatorcid": "0",
                                        "historydisclosed": "true",
@@ -192,7 +220,24 @@ def registerMocks(regTokenRedirect=False, guest=False):
                                                   "{0}/views/avatar_fullsize".format(Data.asmId),
                                        "topic": "Team chat"},
                         "type": "Thread",
-                        "version": 1451606400000})
+                        "version": Data.msgTime})
+    # Retrieve messages for a single conversation.
+    responses.add(responses.GET, "{0}/users/ME/conversations/{1}/messages".format(*chatFmt),
+                  status=200, content_type="application/json",
+                  json={"messages": [{"clientmessageid": "1451606399999",
+                                      "composetime": Data.msgTimeFmt,
+                                      "content": "A message for the team.",
+                                      "conversationLink": "{0}/users/ME/conversations/{1}".format(*chatFmt),
+                                      "from": "{0}/users/ME/contacts/8:{1}".format(*nonConFmt),
+                                      "id": Data.msgTimeStr,
+                                      "messagetype": "Text",
+                                      "originalarrivaltime": Data.msgTimeFmt,
+                                      "type": "Message",
+                                      "version": Data.msgTimeStr}]})
+    # Send a new message to the conversation.
+    responses.add(responses.POST, "{0}/users/ME/conversations/{1}/messages".format(*chatFmt),
+                  status=200, content_type="application/json",
+                  json={"OriginalArrivalTime": Data.msgTime})
 
 
 def mockSkype():
@@ -303,6 +348,25 @@ class SkypeTest(unittest.TestCase):
         self.assertEqual(groupChat.topic, "Team chat")
         self.assertTrue(groupChat.open)
         self.assertTrue(groupChat.history)
+
+    @responses.activate
+    def testChatMsgs(self):
+        sk = mockSkype()
+        chat = sk.chats[Data.chatThreadId]
+        msgs = chat.getMsgs()
+        self.assertEqual(len(msgs), 1)
+        msg = msgs[0]
+        self.assertTrue(isinstance(msg, SkypeMsg))
+        self.assertEqual(msg.id, Data.msgTimeStr)
+        self.assertEqual(msg.time, datetime(2016, 1, 1))
+        self.assertEqual(msg.userId, Data.nonContactId)
+        self.assertEqual(msg.type, "Text")
+        self.assertEqual(msg.content, "A message for the team.")
+        msg = chat.sendMsg("Word.", rich=True)
+        self.assertTrue(isinstance(msg, SkypeMsg))
+        self.assertEqual(msg.userId, Data.userId)
+        self.assertEqual(msg.type, "RichText")
+        self.assertEqual(msg.content, "Word.")
 
 
 if __name__ == "__main__":
