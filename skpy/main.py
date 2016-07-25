@@ -189,6 +189,10 @@ class SkypeSettings(SkypeObj):
     All attributes are read/write, with values fetched on each access, and implicit server writes when changed.
 
     Attributes:
+        autoAddFriends (bool):
+            Make address book contacts with Skype accounts appear in the contact list.
+
+            *Skype will check your address books and automatically add people you know to your Skype Contact list.*
         webLinkPreviews (bool):
             Skype for Web: replace URLs in messages with rich previews.
 
@@ -237,6 +241,31 @@ class SkypeSettings(SkypeObj):
         """
 
     @property
+    def profile(self):
+        # Retrueve a dict of all profile options.
+        json = self.skype.conn("GET", self.skype.conn.API_PEOPLE, auth=SkypeConnection.Auth.SkypeToken,
+                               headers={"X-AppId": "5c7a1e34-3a23-4a36-b2e6-7aa15be85f07",
+                                        "X-SerializeAs": "purejson"}).json()
+        # Defaults aren't returned, so specify them here.
+        res = {"Skype.AutoBuddy": False}
+        for opt in json.get("Settings", []):
+            res[opt["Name"]] = (opt["Value"] == "true")
+        return res
+
+    def profProp(id):
+        @property
+        def prof(self):
+            return self.profile.get(id)
+
+        @prof.setter
+        def prof(self, val):
+            self.skype.conn("POST", self.skype.conn.API_PEOPLE, auth=SkypeConnection.Auth.SkypeToken,
+                            headers={"X-AppId": "5c7a1e34-3a23-4a36-b2e6-7aa15be85f07",
+                                     "X-SerializeAs": "purejson"},
+                            json={"Settings": [{"Name": id, "Value": val}]})
+        return prof
+
+    @property
     def flags(self):
         # Retrieve a list of all enabled flags.
         return self.skype.conn("GET", SkypeConnection.API_FLAGS, auth=SkypeConnection.Auth.SkypeToken).json()
@@ -268,6 +297,8 @@ class SkypeSettings(SkypeObj):
                                                                        self.skype.userId, id),
                             auth=SkypeConnection.Auth.SkypeToken, data={"integerValue": val})
         return opt
+
+    autoAddFriends = profProp("Skype.AutoBuddy")
 
     webLinkPreviews = flagProp(11, True)
     youtubePlayer = flagProp(12)

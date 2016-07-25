@@ -134,6 +134,7 @@ class SkypeConnection(SkypeObj):
     API_URL = "https://urlp.asm.skype.com/v1/url/info"
     API_CONTACTS = "https://contacts.skype.com/contacts/v1"
     API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1"
+    API_PEOPLE = "https://people.directory.live.com/people/account/settings"
 
     attrs = ("userId", "tokenFile", "connected", "guest")
 
@@ -573,8 +574,6 @@ def getMac256Hash(challenge, appId, key):
         return int(sC, 2)
 
     def cS64(pdwData, pInHash):
-        if len(pdwData) < 2 or len(pdwData) & 1 == 1:
-            return None
         MODULUS = 2147483647
         CS64_a = pInHash[0] & MODULUS
         CS64_b = pInHash[1] & MODULUS
