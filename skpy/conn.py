@@ -135,6 +135,7 @@ class SkypeConnection(SkypeObj):
     API_CONTACTS = "https://contacts.skype.com/contacts/v1"
     API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1"
     API_PEOPLE = "https://people.directory.live.com/people/account/settings"
+    API_PROFILE = "https://pf.directory.live.com/profile/mine/System.ShortCircuitProfile.json"
 
     attrs = ("userId", "tokenFile", "connected", "guest")
 

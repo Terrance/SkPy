@@ -21,6 +21,8 @@ class Skype(SkypeObj):
             Container of conversations for the connected user.
         settings (:class:`.SkypeSettings`):
             Read/write access to server-side account options.
+        profile (dict):
+            Email addresses and phone numbers associated with the account.
         services (dict):
             Skype credit and other paid services for the connected account.
         translate (:class:`.SkypeTranslator`):
@@ -75,6 +77,17 @@ class Skype(SkypeObj):
         json = self.conn("GET", "{0}/users/self/profile".format(SkypeConnection.API_USER),
                          auth=SkypeConnection.Auth.SkypeToken).json()
         return SkypeContact.fromRaw(self, json)
+
+    @property
+    @SkypeUtils.cacheResult
+    def profile(self):
+        json = self.conn("GET", SkypeConnection.API_PROFILE, auth=SkypeConnection.Auth.SkypeToken,
+                         headers={"PS-ApplicationId": "5c7a1e34-3a23-4a36-b2e6-7aa15be85f07"}).json()
+        raw = json.get("Views", [])[0].get("Attributes", [])
+        data = {}
+        for prop in raw:
+            data[prop["Name"]] = prop["Value"]
+        return data
 
     @property
     @SkypeUtils.cacheResult
