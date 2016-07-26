@@ -1,6 +1,6 @@
 import requests
 
-from .core import SkypeObj
+from .core import SkypeObj, SkypeEnum
 from .util import SkypeUtils
 from .conn import SkypeConnection
 from .user import SkypeContact, SkypeContacts
@@ -232,26 +232,13 @@ class SkypeSettings(SkypeObj):
             Who to accept incoming video and screen-share requests from.
     """
 
-    attrs = ("webLinkPreviews", "youtubePlayer", "mentionNotifs", "imagePaste", "shareTyping",
-             "callPrivacy", "videoPrivacy")
+    attrs = ("autoAddFriends", "webLinkPreviews", "youtubePlayer", "mentionNotifs", "imagePaste",
+             "shareTyping", "callPrivacy", "videoPrivacy")
 
-    class Privacy:
-        """
-        Enum: privacy option values for incoming audio and video calls.
-        """
-
-        Anyone = 0
-        """
-        Allow from all Skype users.
-        """
-        Contacts = 1
-        """
-        Only allow from Skype users on the connected account's contact list.
-        """
-        Nobody = 2
-        """
-        Deny from all Skype users.
-        """
+    Privacy = SkypeEnum("SkypeSettings.Privacy", ("Anyone", "Contacts", "Nobody"))
+    """
+    Enum: privacy option values for incoming audio and video calls.
+    """
 
     @property
     def profile(self):
