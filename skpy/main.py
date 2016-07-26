@@ -237,7 +237,15 @@ class SkypeSettings(SkypeObj):
 
     Privacy = SkypeEnum("SkypeSettings.Privacy", ("Anyone", "Contacts", "Nobody"))
     """
-    Enum: privacy option values for incoming audio and video calls.
+    :class:`.SkypeEnum`: Privacy option values for incoming audio and video calls.
+
+    Attributes:
+        Privacy.Anyone
+            Allow from all Skype users.
+        Privacy.Contacts
+            Only allow from Skype users on the connected account's contact list.
+        Privacy.Nobody
+            Deny from all Skype users.
     """
 
     @property
