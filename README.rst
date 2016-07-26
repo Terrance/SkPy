@@ -14,6 +14,7 @@ Requirements
 - Python 2.6+ (includes 3.x)
 - `BeautifulSoup <http://www.crummy.com/software/BeautifulSoup/>`_
 - `Requests <http://www.python-requests.org/en/latest/>`_
+- `Responses <https://github.com/getsentry/responses>`_ (for tests)
 
 Getting started
 ---------------
@@ -64,7 +65,9 @@ Make your class a subclass of ``SkypeEventLoop``, then override the ``onEvent(ev
 
 Create an instance and call its ``loop()`` method to start processing events. For programs with a frontend (e.g. a custom client), you'll likely want to put the event loop in its own thread.
 
-Running tests
--------------
+Tests and documentation
+-----------------------
 
-Unit tests can be found in ``test.py`` -- these are designed to test the library's behaviour and parsing of API responses, not the Skype API itself.  You'll need to ``pip install responses`` first.
+Unit tests can be found in ``test.py`` -- these are designed to test the library's behaviour and parsing of API responses, not the Skype API itself.
+
+The `SkPy docs <https://github.com/OllieTerrance/SkPy.docs>`_ repo holds, in addition to docs for this library, a collection of unofficial documentation for the Skype HTTP APIs at large.
