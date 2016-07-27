@@ -33,19 +33,25 @@ class Skype(SkypeObj):
 
     attrs = ("userId",)
 
-    def __init__(self, user=None, pwd=None, tokenFile=None, connect=None):
+    def __init__(self, user=None, pwd=None, msEmail=None, msPwd=None, tokenFile=None, connect=True):
         """
         Create a new Skype object and corresponding connection.
 
-        If ``user`` and ``pwd`` are given, they will be passed to :meth:`.SkypeConnection.setUserPwd`.  If a token file
-        path is present, it will be used if valid.  On a successful connection, the token file will also be written to.
+        If ``user`` and ``pwd`` are given, they will be passed to :meth:`.SkypeConnection.setUserPwd`.  Similarly,
+        ``msEmail`` and ``msPwd`` are passed to :meth:`.SkypeConnection.setMicrosoftAcc`.  Only one pair of login
+        credentials should be passed (Skype account will take priority over Microsoft account).
 
-        By default, a connection attempt will be made if any of ``user``, ``pwd`` or ``tokenFile`` are specified.  It
-        is also possible to handle authentication manually, by working with the underlying connection object instead.
+        If a token file path is present, it will be used if valid.  On a successful connection, the token file will
+        also be written to.
+
+        By default, a connection attempt will be made if any valid form of credentials are supplied.  It is also
+        possible to handle authentication manually, by working with the underlying connection object instead.
 
         Args:
-            user (str): username of the connecting account
-            pwd (str): password of the connecting account
+            user (str): Skype username of the connecting account
+            pwd (str): corresponding Skype account password
+            msEmail (str): Microsoft account email address
+            msPwd (str): corresponding Microsoft account password
             tokenFile (str): path to file used for token storage
             connect (bool): whether to try and connect straight away
         """
@@ -55,9 +61,9 @@ class Skype(SkypeObj):
             self.conn.setTokenFile(tokenFile)
         if user and pwd:
             self.conn.setUserPwd(user, pwd)
-        if connect is None:
-            connect = (user and pwd) or tokenFile
-        if connect:
+        elif msEmail and msPwd:
+            self.conn.setMicrosoftAcc(msEmail, msPwd)
+        if connect and ((user and pwd) or (msEmail and msPwd) or tokenFile):
             try:
                 self.conn.readToken()
             except:

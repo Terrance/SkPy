@@ -124,6 +124,7 @@ class SkypeConnection(SkypeObj):
         return resp
 
     API_LOGIN = "https://login.skype.com/login"
+    API_MSACC = "https://login.live.com"
     API_USER = "https://api.skype.com"
     API_JOIN = "https://join.skype.com"
     API_BOT = "https://api.aps.skype.com/v1"
@@ -247,8 +248,8 @@ class SkypeConnection(SkypeObj):
 
     def setUserPwd(self, user, pwd):
         """
-        Replace the stub :meth:`getSkypeToken` method with one that connects using the given credentials.  Avoids
-        storing the account password in an accessible way.
+        Replace the stub :meth:`getSkypeToken` method with one that connects via Skype account using the given
+        credentials.  Avoids storing the account password in an accessible way.
 
         Args:
             user (str): username of the connecting account
@@ -256,6 +257,19 @@ class SkypeConnection(SkypeObj):
         """
         def getSkypeToken(self):
             self.login(user, pwd)
+        self.getSkypeToken = MethodType(getSkypeToken, self)
+
+    def setMicrosoftAcc(self, email, pwd):
+        """
+        Replace the stub :meth:`getSkypeToken` method with one that connects via Microsoft account using the given
+        credentials.  Avoids storing the account password in an accessible way.
+
+        Args:
+            email (str): email address of the connecting account
+            pwd (str): password of the connecting account
+        """
+        def getSkypeToken(self):
+            self.liveLogin(email, pwd)
         self.getSkypeToken = MethodType(getSkypeToken, self)
 
     def setTokenFile(self, path):
@@ -381,7 +395,66 @@ class SkypeConnection(SkypeObj):
         if expiryField:
             self.tokenExpiry["skype"] = datetime.fromtimestamp(secs + int(expiryField.get("value")))
         self.userId = user
-        # Invalidate the registration token.
+        # (Re)generate the registration token.
+        self.tokens.pop("reg", None)
+        self.tokenExpiry.pop("reg", None)
+        self.getRegToken()
+
+    def liveLogin(self, email, pwd):
+        """
+        Obtain connection parameters from the Microsoft Account login page, and perform a login with the given email
+        address and password.  This emulates a login to Skype for Web on ``login.live.com``.
+
+        .. note:: Microsoft accounts with two-factor authentication enabled are not supported.
+
+        Args:
+            email (str): email address of the connecting account
+            pwd (str): password of the connecting account
+
+        Raises:
+            SkypeAuthException: if a captcha is required, or the login fails
+            .SkypeApiException: if the login form can't be processed
+        """
+        # First, start a Microsoft account login from Skype, which will redirect to login.live.com.
+        loginResp = self("GET", "{0}/oauth/microsoft".format(self.API_LOGIN),
+                         params={"client_id": "578134", "redirect_uri": "https://web.skype.com"})
+        # This is inside some embedded JavaScript, so can't easily parse with BeautifulSoup.
+        ppft = re.search(r"<input.*?name=\"PPFT\".*?value=\"(.*?)\"", loginResp.text).group(1)
+        # Now pass the login credentials over.
+        loginResp = self("POST", "{0}/ppsecure/post.srf".format(self.API_MSACC),
+                         params={"wa": "wsignin1.0", "wp": "MBI_SSL",
+                                 "wreply": "https://lw.skype.com/login/oauth/proxy?client_id=578134&site_name="
+                                           "lw.skype.com&redirect_uri=https%3A%2F%2Fweb.skype.com%2F"},
+                         cookies={"MSPRequ": loginResp.cookies.get("MSPRequ"),
+                                  "MSPOK": loginResp.cookies.get("MSPOK"),
+                                  "CkTst": str(int(time.time() * 1000))},
+                         data={"login": email, "passwd": pwd, "PPFT": ppft})
+        tField = BeautifulSoup(loginResp.text, "html.parser").find(id="t")
+        if tField is None:
+            if "{0}/GetSessionState.srf".format(self.API_MSACC) in loginResp.text:
+                # Two-factor authentication, not supported as it's rather unwieldy to implement.
+                raise SkypeAuthException("Two-factor authentication not supported", loginResp)
+            err = re.search(r"sErrTxt:'([^'\\]*(\\.[^'\\]*)*)'", loginResp.text)
+            if err:
+                raise SkypeAuthException(err.group(1), loginResp)
+        # Now exchange the 't' value for a Skype token.
+        loginResp = self("POST", "{0}/microsoft".format(self.API_LOGIN),
+                         params={"client_id": "578134", "redirect_uri": "https://web.skype.com"},
+                         data={"t": tField.get("value"), "client_id": "578134", "oauthPartner": "999",
+                               "site_name": "lw.skype.com", "redirect_uri": "https://web.skype.com"})
+        loginPage = BeautifulSoup(loginResp.text, "html.parser")
+        tokenField = loginPage.find("input", {"name": "skypetoken"})
+        if not tokenField:
+            raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
+        self.tokens["skype"] = tokenField.get("value")
+        expiryField = loginPage.find("input", {"name": "expires_in"})
+        if expiryField:
+            secs = int(time.time())
+            self.tokenExpiry["skype"] = datetime.fromtimestamp(secs + int(expiryField.get("value")))
+        # Figure out what the username is.
+        self.userId = self("GET", "{0}/users/self/profile".format(self.API_USER),
+                           auth=self.Auth.SkypeToken).json().get("username")
+        # (Re)generate the registration token.
         self.tokens.pop("reg", None)
         self.tokenExpiry.pop("reg", None)
         self.getRegToken()
@@ -398,21 +471,20 @@ class SkypeConnection(SkypeObj):
             name (str): display name as shown to other participants
         """
         urlId = url.split("/")[-1]
-        # Pretend to be Chrome on Windows (required to avoid "unsupported device" messages)..
+        # Pretend to be Chrome on Windows (required to avoid "unsupported device" messages).
         agent = "Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) " \
                 "Chrome/33.0.1750.117 Safari/537.36"
         cookies = self("GET", "{0}/{1}".format(self.API_JOIN, urlId), headers={"User-Agent": agent}).cookies
         ids = self("POST", "{0}/api/v2/conversation/".format(self.API_JOIN),
                    json={"shortId": urlId, "type": "wl"}).json()
-        headers = {"csrf_token": cookies.get("csrf_token"),
-                   "X-Skype-Request-Id": cookies.get("launcher_session_id")}
-        json = {"flowId": cookies.get("launcher_session_id"),
-                "shortId": urlId,
-                "longId": ids.get("Long"),
-                "threadId": ids.get("Resource"),
-                "name": name}
         self.tokens["skype"] = self("POST", "{0}/api/v1/users/guests".format(self.API_JOIN),
-                                    headers=headers, json=json).json().get("skypetoken")
+                                    headers={"csrf_token": cookies.get("csrf_token"),
+                                             "X-Skype-Request-Id": cookies.get("launcher_session_id")},
+                                    json={"flowId": cookies.get("launcher_session_id"),
+                                          "shortId": urlId,
+                                          "longId": ids.get("Long"),
+                                          "threadId": ids.get("Resource"),
+                                          "name": name}).json().get("skypetoken")
         # Assume the token lasts 24 hours, as a guest account only lasts that long anyway.
         self.tokenExpiry["skype"] = datetime.now() + timedelta(days=1)
         self.userId = self("GET", "{0}/users/self/profile".format(self.API_USER),
@@ -421,7 +493,7 @@ class SkypeConnection(SkypeObj):
 
     def getSkypeToken(self):
         """
-        A wrapper for :meth:`login` that applies the previously given username and password.
+        A wrapper for :meth:`login` or :meth:`liveLogin` that applies the previously given username and password.
 
         Raises:
             SkypeAuthException: if credentials were never provided
