@@ -232,6 +232,10 @@ class SkypeSettings(SkypeObj):
             Skype for Web: send typing notifications to contacts when active in conversations.
 
             *Typing indicator: Show when I am typing.*
+        emoteSuggestions (bool):
+            Skype for Web: show popup lists of emoticons matching keywords.
+
+            *Emoticon suggestions: Show emoticon suggestions as I type chat messages.*
         callPrivacy (:class:`Privacy`):
             Who to accept incoming audio calls from.
         videoPrivacy (:class:`Privacy`):
@@ -239,7 +243,7 @@ class SkypeSettings(SkypeObj):
     """
 
     attrs = ("autoAddFriends", "webLinkPreviews", "youtubePlayer", "mentionNotifs", "imagePaste",
-             "shareTyping", "callPrivacy", "videoPrivacy")
+             "shareTyping", "emoteSuggestions", "callPrivacy", "videoPrivacy")
 
     Privacy = SkypeEnum("SkypeSettings.Privacy", ("Anyone", "Contacts", "Nobody"))
     """
@@ -319,6 +323,7 @@ class SkypeSettings(SkypeObj):
     mentionNotifs = flagProp(13, True)
     imagePaste = flagProp(14)
     shareTyping = flagProp(20, True)
+    emoteSuggestions = flagProp(23)
 
     # Hidden options, which are abstracted below to avoid the flag nonsense.
     callPrivacyOpt = optProp("OPT_SKYPE_CALL_POLICY")
