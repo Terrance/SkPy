@@ -13,8 +13,10 @@ Requirements
 
 - Python 2.6+ (includes 3.x)
 - `BeautifulSoup <http://www.crummy.com/software/BeautifulSoup/>`_
-- `Requests <http://www.python-requests.org/en/latest/>`_
+- `Requests <http://www.python-requests.org/en/latest/>`_ [1]_
 - `Responses <https://github.com/getsentry/responses>`_ (for tests)
+
+.. [1] Note that Requests no longer supports Python 3.2 -- the last working version is 2.10.0.
 
 Getting started
 ---------------
