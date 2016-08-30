@@ -7,7 +7,6 @@ from bs4 import BeautifulSoup
 from .core import SkypeObj, SkypeEnum
 from .util import SkypeUtils
 from .conn import SkypeConnection
-from .static import emoticons
 
 
 @SkypeUtils.initAttrs
@@ -128,10 +127,11 @@ class SkypeMsg(SkypeObj):
         Returns:
             str: tag to render the emoticon
         """
-        for emote in emoticons:
-            if shortcut == emote or shortcut in emoticons[emote]["shortcuts"]:
-                name = emoticons[emote]["shortcuts"][0] if shortcut == emote else shortcut
-                return """<ss type="{0}">{1}</ss>""".format(emote, name)
+        for emote in SkypeUtils.static["items"]:
+            if shortcut == emote["id"]:
+                return """<ss type="{0}">{1}</ss>""".format(shortcut, emote["shortcuts"][0])
+            elif shortcut in emote["shortcuts"]:
+                return """<ss type="{0}">{1}</ss>""".format(emote["id"], shortcut)
         # No match, return the input as-is.
         return shortcut
 
