@@ -4,11 +4,18 @@ import re
 import functools
 
 from .core import SkypeEnum
+from .conn import SkypeConnection
 
 
 class SkypeUtils:
     """
     A collection of miscellaneous static methods used throughout the library.
+
+    Attributes:
+        config (dict):
+            Raw object containing miscellaneous server-side flags and configuration.
+        static (dict):
+            Raw object containing emoticons and packs.
     """
 
     Status = SkypeEnum("SkypeUtils.Status", ("Offline", "Hidden", "Busy", "Idle", "Online"))
@@ -72,6 +79,14 @@ class SkypeUtils:
         """
         match = re.search(r"conversations/([0-9]+:[A-Za-z0-9\.,:_\-]+(@thread\.skype)?)", url)
         return match.group(1) if match else None
+
+    class classprop(property):
+        """
+        Method decorator: allows designating class methods as properties.
+        """
+
+        def __get__(self, cls, owner):
+            return self.fget.__get__(None, owner)()
 
     @staticmethod
     def initAttrs(cls):
@@ -162,7 +177,7 @@ class SkypeUtils:
 
         return wrapper
 
-    @staticmethod
+    # This is used below, so don't make it static yet.
     def cacheResult(fn):
         """
         Method decorator: calculate the value on first access, produce the cached value thereafter.
@@ -223,3 +238,24 @@ class SkypeUtils:
                     yield item
             else:
                 break
+
+    @classprop
+    @classmethod
+    @cacheResult
+    def config(cls):
+        # Fetch the current assets URL, and follow that to retrieve the static content.
+        return SkypeConnection.externalCall("GET", "{0}/SkypeLyncWebExperience/0_0.0.0.0"
+                                                   .format(SkypeConnection.API_CONFIG),
+                                            params={"apikey": "skype.com"}).json()
+
+    @classprop
+    @classmethod
+    @cacheResult
+    def static(cls):
+        # Fetch the current assets URL, and follow that to retrieve the static content.
+        json = SkypeConnection.externalCall("GET", "{0}/Skype/0_0.0.0.0/SkypePersonalization"
+                                                   .format(SkypeConnection.API_CONFIG)).json()
+        return SkypeConnection.externalCall("GET", json.get("pes_config")).json()
+
+    # Now wrap this decorator as a static method.
+    cacheResult = staticmethod(cacheResult)
