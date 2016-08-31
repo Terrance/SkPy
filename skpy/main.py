@@ -208,6 +208,14 @@ class SkypeSettings(SkypeObj):
     All attributes are read/write, with values fetched on each access, and implicit server writes when changed.
 
     Attributes:
+        notificationPopups (bool):
+            Skype for Web: show browser notifications on new messages.
+
+            *Receive notifications for new chat messages*
+        notificationSounds (bool):
+            Skype for Web: play the Skype pop sound on new messages.
+
+            *Turn notification sounds on or off*
         autoAddFriends (bool):
             Make address book contacts with Skype accounts appear in the contact list.
 
@@ -242,8 +250,8 @@ class SkypeSettings(SkypeObj):
             Who to accept incoming video and screen-share requests from.
     """
 
-    attrs = ("autoAddFriends", "webLinkPreviews", "youtubePlayer", "mentionNotifs", "imagePaste",
-             "shareTyping", "emoteSuggestions", "callPrivacy", "videoPrivacy")
+    attrs = ("notificationPopups", "notificationSounds", "autoAddFriends", "webLinkPreviews", "youtubePlayer",
+             "mentionNotifs", "imagePaste", "shareTyping", "emoteSuggestions", "callPrivacy", "videoPrivacy")
 
     Privacy = SkypeEnum("SkypeSettings.Privacy", ("Anyone", "Contacts", "Nobody"))
     """
@@ -318,6 +326,8 @@ class SkypeSettings(SkypeObj):
 
     autoAddFriends = profProp("Skype.AutoBuddy")
 
+    notificationPopups = flagProp(21, True)
+    notificationSounds = flagProp(22, True)
     webLinkPreviews = flagProp(11, True)
     youtubePlayer = flagProp(12)
     mentionNotifs = flagProp(13, True)
