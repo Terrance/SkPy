@@ -224,6 +224,12 @@ class SkypeSettings(SkypeObj):
             Skype for Web (Typing indicator): send typing notifications to contacts when active in conversations.
         emoteSuggestions (bool):
             Skype for Web (Emoticon suggestions): show popup lists of emoticons matching keywords.
+        animateEmotes (bool):
+            Skype for Web (Show animated emoticons): use animated version of emoticons.
+        largeEmotes (bool):
+            Skype for Web (Show large emoticons): if only an emoticon in a message, display it larger.
+        pinFavourites (bool):
+            Skype for Web (Pin recent favorites): show favourite and recent contacts at the top of the contact list.
         autoAddFriends (bool):
             Make address book contacts with Skype accounts appear in the contact list.
         callPrivacy (:class:`Privacy`):
@@ -233,7 +239,8 @@ class SkypeSettings(SkypeObj):
     """
 
     attrs = ("notificationPopups", "notificationSounds", "webLinkPreviews", "youtubePlayer", "mentionNotifs",
-             "imagePaste", "shareTyping", "emoteSuggestions", "autoAddFriends", "callPrivacy", "videoPrivacy")
+             "imagePaste", "shareTyping", "emoteSuggestions", "animateEmotes", "largeEmotes", "pinFavourites",
+             "autoAddFriends", "callPrivacy", "videoPrivacy")
 
     Privacy = SkypeEnum("SkypeSettings.Privacy", ("Anyone", "Contacts", "Nobody"))
     """
@@ -316,6 +323,9 @@ class SkypeSettings(SkypeObj):
     imagePaste = flagProp(14)
     shareTyping = flagProp(20, True)
     emoteSuggestions = flagProp(23)
+    animateEmotes = flagProp(25, True)
+    largeEmotes = flagProp(26, True)
+    pinFavourites = flagProp(27, True)
 
     # Hidden options, which are abstracted below to avoid the flag nonsense.
     callPrivacyOpt = optProp("OPT_SKYPE_CALL_POLICY")
