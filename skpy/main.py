@@ -209,49 +209,31 @@ class SkypeSettings(SkypeObj):
 
     Attributes:
         notificationPopups (bool):
-            Skype for Web: show browser notifications on new messages.
-
-            *Receive notifications for new chat messages*
+            Skype for Web (Notifications): show browser notifications on new messages.
         notificationSounds (bool):
-            Skype for Web: play the Skype pop sound on new messages.
-
-            *Turn notification sounds on or off*
+            Skype for Web (Sounds): play the Skype pop sound on new messages.
+        webLinkPreviews (bool):
+            Skype for Web (Web link previews): replace URLs in messages with rich previews.
+        youtubePlayer (bool):
+            Skype for Web (YouTube player): replace YouTube URLs with an inline player.
+        mentionNotifs (bool):
+            Skype for Web (@mention notifications): trigger notifications when mentioned in a message.
+        imagePaste (bool):
+            Skype for Web (Enable image paste): support sending image files by pasting into a conversation input field.
+        shareTyping (bool):
+            Skype for Web (Typing indicator): send typing notifications to contacts when active in conversations.
+        emoteSuggestions (bool):
+            Skype for Web (Emoticon suggestions): show popup lists of emoticons matching keywords.
         autoAddFriends (bool):
             Make address book contacts with Skype accounts appear in the contact list.
-
-            *Skype will check your address books and automatically add people you know to your Skype Contact list.*
-        webLinkPreviews (bool):
-            Skype for Web: replace URLs in messages with rich previews.
-
-            *Web link previews: Show me a preview of websites I send or receive on Skype.*
-        youtubePlayer (bool):
-            Skype for Web: replace YouTube URLs with an inline player.
-
-            *YouTube player: Use YouTube player directly to preview videos I send or receive.*
-        mentionNotifs (bool):
-            Skype for Web: trigger notifications when mentioned in a message.
-
-            *@mention notifications: Always notify me when someone mentions me on Skype. (@<username>)*
-        imagePaste (bool):
-            Skype for Web: support sending image files by pasting into a conversation input field.
-
-            *Enable image paste: Enable pasting of images from clipboard directly into the chat.*
-        shareTyping (bool):
-            Skype for Web: send typing notifications to contacts when active in conversations.
-
-            *Typing indicator: Show when I am typing.*
-        emoteSuggestions (bool):
-            Skype for Web: show popup lists of emoticons matching keywords.
-
-            *Emoticon suggestions: Show emoticon suggestions as I type chat messages.*
         callPrivacy (:class:`Privacy`):
             Who to accept incoming audio calls from.
         videoPrivacy (:class:`Privacy`):
             Who to accept incoming video and screen-share requests from.
     """
 
-    attrs = ("notificationPopups", "notificationSounds", "autoAddFriends", "webLinkPreviews", "youtubePlayer",
-             "mentionNotifs", "imagePaste", "shareTyping", "emoteSuggestions", "callPrivacy", "videoPrivacy")
+    attrs = ("notificationPopups", "notificationSounds", "webLinkPreviews", "youtubePlayer", "mentionNotifs",
+             "imagePaste", "shareTyping", "emoteSuggestions", "autoAddFriends", "callPrivacy", "videoPrivacy")
 
     Privacy = SkypeEnum("SkypeSettings.Privacy", ("Anyone", "Contacts", "Nobody"))
     """
