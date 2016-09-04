@@ -253,7 +253,7 @@ def mockSkype():
     return sk
 
 
-class SkypeTest(unittest.TestCase):
+class SkypeClientTest(unittest.TestCase):
     """
     Main test class for all SkPy code.
 
@@ -351,6 +351,9 @@ class SkypeTest(unittest.TestCase):
 
     @responses.activate
     def testChatMsgs(self):
+        """
+        Collect a list of messages for a conversation, and send a message.
+        """
         sk = mockSkype()
         chat = sk.chats[Data.chatThreadId]
         msgs = chat.getMsgs()
