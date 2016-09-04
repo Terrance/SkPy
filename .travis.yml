@@ -10,4 +10,4 @@ install:
   - if [[ $TRAVIS_PYTHON_VERSION == 3.2 ]]; then pip install 'requests<2.11.0'; fi
   - pip install -r requirements.txt
   - pip install responses
-script: python -m unittest test/client.py
+script: python -m unittest test.client
