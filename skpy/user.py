@@ -21,6 +21,8 @@ class SkypeUser(SkypeObj):
             Representation of the user's name.
         location (:class:`Location`):
             Geographical information provided by the user.
+        language (str):
+            Two-letter language code as specified by the user.
         avatar (str):
             URL to retrieve the user's profile picture.
         mood (:class:`Mood`):
@@ -86,7 +88,7 @@ class SkypeUser(SkypeObj):
         def __str__(self):
             return self.plain or self.rich or ""
 
-    attrs = ("id", "name", "location", "avatar", "mood")
+    attrs = ("id", "name", "location", "language", "avatar", "mood")
     defaults = dict(name=Name(), location=Location())
 
     @classmethod
@@ -116,6 +118,7 @@ class SkypeUser(SkypeObj):
                         "country": raw.get("countryCode", raw.get("country"))}
         location = SkypeUser.Location(city=locParts.get("city"), region=locParts.get("region"),
                                       country=((locParts.get("country") or "").upper() or None))
+        language = (raw.get("language") or "").upper() or None
         avatar = raw.get("avatar_url", raw.get("avatarUrl"))
         mood = None
         if raw.get("mood", raw.get("richMood")):
@@ -123,6 +126,7 @@ class SkypeUser(SkypeObj):
         return {"id": raw.get("id", raw.get("username", raw.get("skypeId"))),
                 "name": name,
                 "location": location,
+                "language": language,
                 "avatar": avatar,
                 "mood": mood}
 
@@ -148,8 +152,6 @@ class SkypeContact(SkypeUser):
     A user on Skype that the logged-in account is a contact of.  Allows access to contacts-only properties.
 
     Attributes:
-        language (str):
-            Two-letter language code as specified by the user.
         phones (:class:`Phone` list):
             Any phone numbers defined for the user.
         birthday (datetime.datetime):
@@ -186,7 +188,7 @@ class SkypeContact(SkypeUser):
         def __str__(self):
             return self.number or ""
 
-    attrs = SkypeUser.attrs + ("language", "phones", "birthday", "authorised", "blocked", "favourite")
+    attrs = SkypeUser.attrs + ("phones", "birthday", "authorised", "blocked", "favourite")
     defaults = dict(SkypeUser.defaults, phones=[])
 
     @classmethod
@@ -204,8 +206,7 @@ class SkypeContact(SkypeUser):
             birthday = datetime.strptime(raw.get("birthday") or "", "%Y-%m-%d").date()
         except ValueError:
             birthday = None
-        fields.update({"language": (raw.get("language") or "").upper() or None,
-                       "phones": phones,
+        fields.update({"phones": phones,
                        "birthday": birthday,
                        "authorised": raw.get("authorized"),
                        "blocked": raw.get("blocked"),
