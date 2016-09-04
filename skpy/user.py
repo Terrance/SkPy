@@ -30,6 +30,7 @@ class SkypeUser(SkypeObj):
     """
 
     @SkypeUtils.initAttrs
+    @SkypeUtils.truthyAttrs
     class Name(SkypeObj):
         """
         The name of a user or contact.
@@ -47,6 +48,7 @@ class SkypeUser(SkypeObj):
             return " ".join(filter(None, (self.first, self.last)))
 
     @SkypeUtils.initAttrs
+    @SkypeUtils.truthyAttrs
     class Location(SkypeObj):
         """
         The location of a user or contact.
