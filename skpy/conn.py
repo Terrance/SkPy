@@ -136,6 +136,7 @@ class SkypeConnection(SkypeObj):
     API_CONTACTS = "https://contacts.skype.com/contacts/v1"
     API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1"
     API_PEOPLE = "https://people.directory.live.com/people/account/settings"
+    API_DIRECTORY = "https://skypegraph.skype.com/search/v1.1/namesearch/swx/"
     API_PROFILE = "https://pf.directory.live.com/profile/mine/System.ShortCircuitProfile.json"
     # Version doesn't seem to be important, at least not for what we need.
     API_CONFIG = "https://a.config.skype.com/config/v1"

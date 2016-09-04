@@ -91,8 +91,19 @@ class SkypeUser(SkypeObj):
 
     @classmethod
     def rawToFields(cls, raw={}):
-        firstName = raw.get("firstname", raw.get("name", {}).get("first"))
-        lastName = raw.get("lastname", raw.get("name", {}).get("surname"))
+        name = raw.get("name")
+        if isinstance(name, str):
+            # Unified name provided by directory.
+            firstName = name
+            lastName = None
+        elif isinstance(name, dict):
+            # Name object from contact APIs.
+            firstName = name.get("first")
+            lastName = name.get("last", name.get("surname"))
+        else:
+            # Individual first/last name keys.
+            firstName = raw.get("firstname")
+            lastName = raw.get("lastname")
         # Some clients stores the whole name in the user's first name field.
         if not lastName and firstName and " " in firstName:
             firstName, lastName = firstName.rsplit(" ", 1)
@@ -101,15 +112,15 @@ class SkypeUser(SkypeObj):
             locParts = raw.get("locations")[0]
         else:
             locParts = {"city": raw.get("city"),
-                        "region": raw.get("province"),
-                        "country": raw.get("country")}
+                        "region": raw.get("province", raw.get("state")),
+                        "country": raw.get("countryCode", raw.get("country"))}
         location = SkypeUser.Location(city=locParts.get("city"), region=locParts.get("region"),
                                       country=((locParts.get("country") or "").upper() or None))
         avatar = raw.get("avatar_url", raw.get("avatarUrl"))
         mood = None
         if raw.get("mood", raw.get("richMood")):
             mood = SkypeUser.Mood(plain=raw.get("mood"), rich=raw.get("richMood"))
-        return {"id": raw.get("id", raw.get("username")),
+        return {"id": raw.get("id", raw.get("username", raw.get("skypeId"))),
                 "name": name,
                 "location": location,
                 "avatar": avatar,
@@ -398,18 +409,12 @@ class SkypeContacts(SkypeObjs):
             query (str): name to search for
 
         Returns:
-            list: collection of possible results
+            SkypeUser list: collection of possible results
         """
-        json = self.skype.conn("GET", "{0}/search/users/any".format(SkypeConnection.API_USER),
-                               auth=SkypeConnection.Auth.SkypeToken,
-                               params={"keyWord": query, "contactTypes[]": "skype"}).json()
-        results = []
-        for obj in json:
-            res = obj.get("ContactCards", {}).get("Skype")
-            # Make result data nesting a bit cleaner.
-            res["Location"] = obj.get("ContactCards", {}).get("CurrentLocation")
-            results.append(res)
-        return results
+        results = self.skype.conn("GET", SkypeConnection.API_DIRECTORY,
+                                  auth=SkypeConnection.Auth.SkypeToken,
+                                  params={"searchstring": query, "requestId": "0"}).json().get("results", [])
+        return [SkypeUser.fromRaw(self.skype, json.get("nodeProfileData", {})) for json in results]
 
     def requests(self):
         """
