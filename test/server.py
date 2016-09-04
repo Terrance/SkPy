@@ -10,16 +10,16 @@ class SkypeServerTest(unittest.TestCase):
     """
     Tests for interpretation of server responses.
 
-    .. warning:
-        This requires access to a live Skype account, the credentials for which will be read from `.tokens` (or from
-        a file named in environment variable `SKPY_TESTSERVER_TOKENS` if set).  This can be accomplished in a shell::
+    .. warning::
+        This requires access to a live Skype account, the credentials for which will be read from **.tokens** (or from
+        a file named in environment variable ``SKPY_TESTSERVER_TOKENS`` if set).  This can be accomplished in a shell::
 
             >>> from skpy import Skype
             >>> Skype(username, password, tokenFile=".tokens")
 
-        You must also set `SKPY_TESTSERVER_RECIP` to a contact on the account that should receive test messages.
+        You must also set ``SKPY_TESTSERVER_RECIP`` to a contact on the account that should receive test messages.
 
-    The more involved tests are separated out into :cls:`SkypeServerWritesTest` and :cls:`SkypeServerEventsTest`.
+    The more involved tests are separated out into :class:`SkypeServerWritesTest` and :class:`SkypeServerEventsTest`.
     """
 
     @classmethod
