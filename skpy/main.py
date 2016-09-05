@@ -174,7 +174,7 @@ class SkypeEventLoop(Skype):
             tokenFile (str): path to a file, used to cache session tokens
             autoAck (bool): whether to automatically acknowledge all incoming events
         """
-        super(SkypeEventLoop, self).__init__(user, pwd, tokenFile)
+        super(SkypeEventLoop, self).__init__(user, pwd, tokenFile=tokenFile)
         self.autoAck = autoAck
 
     def loop(self):
