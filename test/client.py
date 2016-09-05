@@ -78,28 +78,27 @@ def registerMocks(regTokenRedirect=False, guest=False):
                   status=200, content_type="application/json",
                   json={"username": Data.guestId if guest else Data.userId})
     # Retrieve a list of contacts.
-    responses.add(responses.GET, "{0}/users/{1}/contacts".format(SkypeConnection.API_CONTACTS, Data.userId),
+    responses.add(responses.GET, "{0}/users/{1}".format(SkypeConnection.API_CONTACTS, Data.userId),
                   status=200, content_type="application/json",
                   json={"contacts": [{"authorized": True,
-                                      "avatar_url": "https://api.skype.com/users/{0}/profile/avatar"
-                                                    .format(Data.contactId),
                                       "blocked": False,
                                       "display_name": "Joe Bloggs",
-                                      "id": Data.contactId,
-                                      "locations": [{"city": "London", "state": None, "country": "GB"}],
-                                      "mood": "Happy <ss type=\"laugh\">:D</ss>",
-                                      "name": {"first": "Joe", "surname": "Bloggs", "nickname": "Joe Bloggs"},
-                                      "phones": [{"number": "+442099887766", "type": 0},
-                                                 {"number": "+442020900900", "type": 1},
-                                                 {"number": "+447711223344", "type": 2}],
-                                      "type": "skype"},
+                                      "mri": Data.contactId,
+                                      "profile": {"avatar_url": "https://api.skype.com/users/{0}/profile/avatar"
+                                                                .format(Data.contactId),
+                                                  "locations": [{"city": "London", "state": None, "country": "GB"}],
+                                                  "mood": "Happy <ss type=\"laugh\">:D</ss>",
+                                                  "name": {"first": "Joe", "surname": "Bloggs",
+                                                           "nickname": "Joe Bloggs"},
+                                                  "phones": [{"number": "+442099887766", "type": 0},
+                                                             {"number": "+442020900900", "type": 1},
+                                                             {"number": "+447711223344", "type": 2}]}},
                                      {"authorized": False,
                                       "blocked": False,
                                       "display_name": "Anna Cooper",
                                       "id": Data.nonContactId,
                                       "name": {"first": "Anna", "surname": "Cooper"},
-                                      "suggested": True,
-                                      "type": "skype"}]})
+                                      "suggested": True}]})
     # Retrieve a list of conversations.
     userFmt = (SkypeConnection.API_MSGSHOST, Data.userId)
     conFmt = (SkypeConnection.API_MSGSHOST, Data.contactId)
