@@ -2,13 +2,18 @@
 
 import os
 import unittest
+from getpass import getpass
 
 from skpy import Skype, SkypeNewMessageEvent
 
 
-class SkypeServerTest(unittest.TestCase):
+# Slightly less verbose access to environment variables.
+env = dict((x, os.getenv("SKPY_TESTSERVER_{0}".format(x.upper()))) for x in ("tokens", "recip"))
+
+
+class SkypeServerTestBase(unittest.TestCase):
     """
-    Tests for interpretation of server responses.
+    Base class for tests designed to interpret server responses.
 
     .. warning::
         This requires access to a live Skype account, the credentials for which will be read from **.tokens** (or from
@@ -18,16 +23,29 @@ class SkypeServerTest(unittest.TestCase):
             >>> Skype(username, password, tokenFile=".tokens")
 
         You must also set ``SKPY_TESTSERVER_RECIP`` to a contact on the account that should receive test messages.
-
-    The more involved tests are separated out into :class:`SkypeServerWritesTest` and :class:`SkypeServerEventsTest`.
     """
 
     @classmethod
     def setUpClass(cls):
-        cls.sk = Skype(tokenFile=os.getenv("SKPY_TESTSERVER_TOKENS", ".tokens"))
+        cls.sk = Skype(tokenFile=env["tokens"] or ".tokens")
         if not cls.sk.conn.connected:
             raise RuntimeError("Token file is invalid")
-        cls.recip = os.environ["SKPY_TESTSERVER_RECIP"]
+        cls.recip = env["recip"]
+        if not cls.recip:
+            raise RuntimeError("No recipient specified (SKPY_TESTSERVER_RECIP)")
+
+
+class SkypeServerReadTest(SkypeServerTestBase):
+    """
+    Basic, read-only tests on information provided by the server for the connected account.
+    """
+
+    def testSelf(self):
+        """
+        Retrieve the current user.
+        """
+        self.sk.contacts.cache.clear()
+        self.assertTrue(self.sk.user.id == self.sk.userId, "Wrong user identifier")
 
     def testSettings(self):
         """
@@ -45,6 +63,8 @@ class SkypeServerTest(unittest.TestCase):
         self.assertTrue(self.recip in (contact.id for contact in self.sk.contacts), "No contacts returned")
         self.assertTrue(self.sk.contacts[self.recip].id == self.recip, "Failed to lookup cached contact")
         self.assertTrue(self.sk.contacts.contact(self.recip).id == self.recip, "Failed to lookup full contact")
+        self.assertTrue(self.sk.contacts.bot("concierge").id == "concierge")
+        self.assertTrue(self.sk.contacts.bots())
 
     def testChats(self):
         """
@@ -56,16 +76,24 @@ class SkypeServerTest(unittest.TestCase):
         self.assertTrue(chat.id == chatId, "Wrong chat: {0}".format(chat.id))
         self.assertTrue(chat.userId == self.recip, "Wrong recipient: {0}".format(chat.userId))
 
+    def testTranslate(self):
+        """
+        Request a text translation.
+        """
+        self.assertTrue("en" in self.sk.translate.languages)
+        self.sk.translate(self.sk.translate("Skype server test", "fr"), "en", "fr")
 
-class SkypeServerWritesTest(unittest.TestCase):
+    def testServices(self):
+        """
+        Retrieve the services list for the current user.
+        """
+        self.assertTrue(self.sk.services)
+
+
+class SkypeServerWriteTest(SkypeServerTestBase):
     """
     Specific test cases that require performing "write" actions on the connected account.
     """
-
-    @classmethod
-    def setUpClass(cls):
-        cls.sk = Skype(tokenFile=os.getenv("SKPY_TESTSERVER_TOKENS", ".tokens"))
-        cls.recip = os.environ["SKPY_TESTSERVER_RECIP"]
 
     def testGroupChats(self):
         """
@@ -97,22 +125,38 @@ class SkypeServerWritesTest(unittest.TestCase):
             chat.delete()
 
 
-class SkypeServerEventsTest(unittest.TestCase):
+class SkypeServerEventTest(SkypeServerTestBase):
     """
     Specific test cases that poll the event stream, and require external data (i.e. sending messages from another
     client to this user account).
     """
 
-    @classmethod
-    def setUpClass(cls):
-        cls.sk = Skype(tokenFile=os.getenv("SKPY_TESTSERVER_TOKENS", ".tokens"))
-        cls.recip = os.environ["SKPY_TESTSERVER_RECIP"]
+    @staticmethod
+    def input(prompt):
+        try:
+            return raw_input(prompt)
+        except NameError:
+            return input(prompt)
 
-    def testEvents(self):
+    def testPasswordLogin(self):
+        """
+        Attempt a fresh login with a username and password.
+        """
+        if self.sk.userId.startswith("live:"):
+            email = self.input("> Microsoft account email address: ")
+            pwd = getpass("> Microsoft account password: ")
+            sk = Skype(msEmail=email, msPwd=pwd)
+        else:
+            pwd = getpass("> Skype account password: ")
+            sk = Skype(self.sk.userId, pwd)
+        self.assertTrue(sk.conn.connected)
+
+    def testMessageEvent(self):
         """
         Receive a message from the named recipient.
         """
-        print("Send a message from {0} to {1} now.".format(self.sk.userId, self.recip))
+        print("")
+        print("> Send a message from {0} to {1} now.".format(self.sk.userId, self.recip))
         while True:
             dead = True
             for event in self.sk.getEvents():
