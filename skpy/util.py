@@ -46,7 +46,7 @@ class SkypeUtils:
         Returns:
             str: unprefixed string
         """
-        return s if s is None else s.split(":", 1)[1]
+        return None if s is None else re.sub("^[0-9]+:", "", s)
 
     @staticmethod
     def userToId(url):

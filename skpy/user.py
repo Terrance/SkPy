@@ -93,6 +93,7 @@ class SkypeUser(SkypeObj):
 
     @classmethod
     def rawToFields(cls, raw={}):
+        id = SkypeUtils.noPrefix(raw.get("id", raw.get("mri", raw.get("skypeId", raw.get("username")))))
         name = raw.get("name")
         if isinstance(name, str):
             # Unified name provided by directory.
@@ -123,7 +124,7 @@ class SkypeUser(SkypeObj):
         mood = None
         if raw.get("mood", raw.get("richMood")):
             mood = SkypeUser.Mood(plain=raw.get("mood"), rich=raw.get("richMood"))
-        return {"id": raw.get("id", raw.get("username", raw.get("skypeId"))),
+        return {"id": id,
                 "name": name,
                 "location": location,
                 "language": language,
@@ -135,15 +136,16 @@ class SkypeUser(SkypeObj):
     def chat(self):
         return self.skype.chats["8:" + self.id]
 
-    def invite(self, greeting=None):
+    def invite(self, greeting):
         """
         Send the user a contact request.
 
         Args:
             greeting (str): custom message to include with the request
         """
-        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}".format(SkypeConnection.API_USER, self.id),
-                        json={"greeting": greeting})
+        self.skype.conn("POST", "{0}/users/{1}/contacts".format(SkypeConnection.API_CONTACTS, self.skype.userId),
+                        auth=SkypeConnection.Auth.SkypeToken, json={"mri": "8:{0}".format(self.id),
+                                                                    "greeting": greeting})
 
 
 @SkypeUtils.initAttrs
@@ -222,7 +224,11 @@ class SkypeContact(SkypeUser):
         """
         Remove the user from your contacts.
         """
-        self.skype.conn("DELETE", "{0}/users/self/contacts/{1}".format(SkypeConnection.API_USER, self.id))
+        self.skype.conn("DELETE", "{0}/users/{1}/contacts/8:{2}"
+                                  .format(SkypeConnection.API_CONTACTS, self.skype.userId, self.id),
+                        auth=SkypeConnection.Auth.SkypeToken)
+        self.skype.conn("DELETE", "{0}/users/ME/contacts/8:{1}".format(self.skype.conn.msgsHost, self.id),
+                        auth=SkypeConnection.Auth.RegToken)
 
 
 @SkypeUtils.initAttrs
@@ -322,17 +328,18 @@ class SkypeContacts(SkypeObjs):
         return len(self.contactIds)
 
     def sync(self):
-        params = {"delta": "",
-                  "$filter": "type eq 'skype' or type eq 'msn' or type eq 'pstn' or type eq 'agent' or type eq 'lync'",
-                  "reason": "default"}
-        for json in self.skype.conn("GET", "{0}/users/{1}/contacts".format(SkypeConnection.API_CONTACTS,
-                                                                           self.skype.userId),
-                                    auth=SkypeConnection.Auth.SkypeToken, params=params).json().get("contacts", []):
+        resp = self.skype.conn("GET", "{0}/users/{1}".format(SkypeConnection.API_CONTACTS, self.skype.userId),
+                               params={"delta": "", "reason": "default"},
+                               auth=SkypeConnection.Auth.SkypeToken).json()
+        for json in resp.get("contacts", []):
+            # Merge nested profile key into self.
+            json.update(json.get("profile", {}))
             # Favourite property only exists if true, else default it to false (doesn't appear in other API requests).
             json["favorite"] = json.get("favorite", False)
-            self.merge(SkypeContact.fromRaw(self.skype, json))
+            contact = SkypeContact.fromRaw(self.skype, json)
+            self.merge(contact)
             if not json.get("suggested"):
-                self.contactIds.append(json.get("id"))
+                self.contactIds.append(contact.id)
         super(SkypeContacts, self).sync()
 
     def contact(self, id):
@@ -348,9 +355,10 @@ class SkypeContacts(SkypeObjs):
         try:
             json = self.skype.conn("GET", "{0}/users/{1}/profile".format(SkypeConnection.API_USER, id),
                                    auth=SkypeConnection.Auth.SkypeToken).json()
-            if json.get("id") not in self.contactIds:
-                self.contactIds.append(json.get("id"))
-            return self.merge(SkypeContact.fromRaw(self.skype, json))
+            contact = SkypeContact.fromRaw(self.skype, json)
+            if contact.id not in self.contactIds:
+                self.contactIds.append(contact.id)
+            return self.merge(contact)
         except SkypeApiException as e:
             if len(e.args) >= 2 and getattr(e.args[1], "status_code", None) == 403:
                 # Not a contact, so no permission to retrieve information.
@@ -424,11 +432,14 @@ class SkypeContacts(SkypeObjs):
         Returns:
             :class:`SkypeRequest` list: collection of requests
         """
-        json = self.skype.conn("GET", "{0}/users/self/contacts/auth-request".format(SkypeConnection.API_USER),
-                               auth=SkypeConnection.Auth.SkypeToken).json()
         requests = []
-        for obj in json:
-            requests.append(SkypeRequest.fromRaw(self.skype, obj))
+        for json in self.skype.conn("GET", "{0}/users/{1}/invites"
+                                           .format(SkypeConnection.API_CONTACTS, self.skype.userId),
+                                    auth=SkypeConnection.Auth.SkypeToken).json().get("invite_list", []):
+            for invite in json.get("invites", []):
+                # Copy user identifier to each invite message.
+                invite["userId"] = SkypeUtils.noPrefix(json.get("mri"))
+                requests.append(SkypeRequest.fromRaw(self.skype, invite))
         return requests
 
 
@@ -443,20 +454,25 @@ class SkypeRequest(SkypeObj):
             User that initiated the request.
         greeting (str):
             Custom message included with the request.
+        time (datetime.datetime):
+            Time and date when the invite was sent.
     """
 
-    attrs = ("userId", "greeting")
+    attrs = ("userId", "greeting", "time")
 
     @classmethod
     def rawToFields(cls, raw={}):
-        return {"userId": raw.get("sender"), "greeting": raw.get("greeting")}
+        return {"userId": raw.get("userId"),
+                "greeting": raw.get("message"),
+                "time": datetime.strptime(raw.get("time", ""), "%Y-%m-%dT%H:%M:%SZ")}
 
     def accept(self):
         """
         Accept the contact request, and add the user to the contact list.
         """
-        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/accept"
-                               .format(SkypeConnection.API_USER, self.userId), auth=SkypeConnection.Auth.SkypeToken)
+        self.skype.conn("PUT", "{0}/users/{1}/invites/8:{2}/accept"
+                               .format(SkypeConnection.API_CONTACTS, self.skype.userId, self.userId),
+                        auth=SkypeConnection.Auth.SkypeToken)
         self.skype.conn("PUT", "{0}/users/ME/contacts/8:{1}".format(self.skype.conn.msgsHost, self.userId),
                         auth=SkypeConnection.Auth.RegToken)
 
@@ -464,5 +480,6 @@ class SkypeRequest(SkypeObj):
         """
         Decline the contact request.
         """
-        self.skype.conn("PUT", "{0}/users/self/contacts/auth-request/{1}/decline"
-                               .format(SkypeConnection.API_USER, self.userId), auth=SkypeConnection.Auth.SkypeToken)
+        self.skype.conn("PUT", "{0}/users/{1}/invites/8:{2}/decline"
+                               .format(SkypeConnection.API_CONTACTS, self.skype.userId, self.userId),
+                        auth=SkypeConnection.Auth.SkypeToken)
