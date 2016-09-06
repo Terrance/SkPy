@@ -162,6 +162,8 @@ class SkypeEventLoop(Skype):
             Whether to automatically acknowledge all incoming events.
     """
 
+    attrs = Skype.attrs + ("autoAck",)
+
     def __init__(self, user=None, pwd=None, msEmail=None, msPwd=None, tokenFile=None, autoAck=True, status=None):
         """
         Create a new event loop and the underlying connection.
