@@ -70,6 +70,6 @@ Create an instance and call its ``loop()`` method to start processing events. Fo
 Tests and documentation
 -----------------------
 
-Unit tests can be found in ``test.py`` -- these are designed to test the library's behaviour and parsing of API responses, not the Skype API itself.
+Unit tests can be found in the ``test`` folder -- client test cases are designed to test the library's behaviour and parsing of mocked API responses, whereas server cases connect to the live Skype API.
 
 The `SkPy docs <https://github.com/OllieTerrance/SkPy.docs>`_ repo holds, in addition to docs for this library, a collection of unofficial documentation for the Skype HTTP APIs at large.
