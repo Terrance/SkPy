@@ -20,7 +20,7 @@ class Data:
     regToken = "r" * 886
     tokenExpiry = datetime.now() + timedelta(days=1)
     msgsHost = "https://db1-client-s.gateway.messenger.live.com/v1"
-    endpointId = "{eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee}"
+    endpointId = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
     chatShortId = "c" * 12
     chatLongId = "c" * 32
     chatThreadId = "19:{0}@thread.skype".format(chatLongId)
@@ -54,16 +54,18 @@ def registerMocks(regTokenRedirect=False, guest=False):
                           <input name="expires_in" value="86400"></body></html>""".format(Data.skypeToken))
     # Request registration token.
     expiry = int(time.mktime((datetime.now() + timedelta(days=1)).timetuple()))
+    msgsHost = Data.msgsHost if regTokenRedirect else SkypeConnection.API_MSGSHOST
     if regTokenRedirect:
         responses.add(responses.POST, "{0}/users/ME/endpoints".format(SkypeConnection.API_MSGSHOST), status=404,
                       adding_headers={"Location": "{0}/users/ME/endpoints".format(Data.msgsHost)})
-        responses.add(responses.POST, "{0}/users/ME/endpoints".format(Data.msgsHost), status=200,
-                      adding_headers={"Set-RegistrationToken": "registrationToken={0}; expires={1}; endpointId={2}"
-                                                               .format(Data.regToken, expiry, Data.endpointId)})
-    else:
-        responses.add(responses.POST, "{0}/users/ME/endpoints".format(SkypeConnection.API_MSGSHOST), status=200,
-                      adding_headers={"Set-RegistrationToken": "registrationToken={0}; expires={1}; endpointId={2}"
-                                                               .format(Data.regToken, expiry, Data.endpointId)})
+    responses.add(responses.POST, "{0}/users/ME/endpoints".format(msgsHost), status=200,
+                  adding_headers={"Set-RegistrationToken": "registrationToken={0}; expires={1}; endpointId={{{2}}}"
+                                                           .format(Data.regToken, expiry, Data.endpointId)})
+    # Configure and retrieve endpoints.
+    responses.add(responses.PUT, "{0}/users/ME/endpoints/%7B{1}%7D/presenceDocs/messagingService"
+                                 .format(msgsHost, Data.endpointId), status=200)
+    responses.add(responses.GET, "{0}/users/ME/presenceDocs/messagingService"
+                                 .format(msgsHost), status=200, json={"endpointPresenceDocs": []})
     # Retrieve public information about a group chat.
     responses.add(responses.GET, re.compile("{0}/[a-z0-9]{{12}}".format(SkypeConnection.API_JOIN), re.I),
                   status=200, adding_headers={"Set-Cookie": "csrf_token=csrf; launcher_session_id=launch"})
@@ -272,7 +274,7 @@ class SkypeClientTest(unittest.TestCase):
         self.assertEqual(sk.conn.tokens["skype"], Data.skypeToken)
         self.assertEqual(sk.conn.tokens["reg"], "registrationToken={0}".format(Data.regToken))
         self.assertEqual(sk.conn.msgsHost, SkypeConnection.API_MSGSHOST)
-        self.assertEqual(sk.conn.endpoints["main"].id, Data.endpointId)
+        self.assertEqual(sk.conn.endpoints["main"].id, "{{{0}}}".format(Data.endpointId))
         self.assertTrue(sk.conn.connected)
         self.assertFalse(sk.conn.guest)
         self.assertEqual(sk.userId, Data.userId)
@@ -287,7 +289,7 @@ class SkypeClientTest(unittest.TestCase):
         self.assertEqual(sk.conn.tokens["skype"], Data.skypeToken)
         self.assertEqual(sk.conn.tokens["reg"], "registrationToken={0}".format(Data.regToken))
         self.assertEqual(sk.conn.msgsHost, Data.msgsHost)
-        self.assertEqual(sk.conn.endpoints["main"].id, Data.endpointId)
+        self.assertEqual(sk.conn.endpoints["main"].id, "{{{0}}}".format(Data.endpointId))
         self.assertTrue(sk.conn.connected)
         self.assertFalse(sk.conn.guest)
         self.assertEqual(sk.userId, Data.userId)
@@ -303,7 +305,7 @@ class SkypeClientTest(unittest.TestCase):
         self.assertEqual(sk.conn.tokens["skype"], Data.skypeToken)
         self.assertEqual(sk.conn.tokens["reg"], "registrationToken={0}".format(Data.regToken))
         self.assertEqual(sk.conn.msgsHost, SkypeConnection.API_MSGSHOST)
-        self.assertEqual(sk.conn.endpoints["main"].id, Data.endpointId)
+        self.assertEqual(sk.conn.endpoints["main"].id, "{{{0}}}".format(Data.endpointId))
         self.assertTrue(sk.conn.connected)
         self.assertTrue(sk.conn.guest)
         self.assertEqual(sk.userId, Data.guestId)

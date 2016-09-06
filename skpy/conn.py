@@ -534,12 +534,25 @@ class SkypeConnection(SkypeObj):
                     # Skype is requiring the use of a different hostname.
                     self.msgsHost = locHead.rsplit("/", 4 if locParts[2] else 3)[0]
                 if locParts[2]:
-                    self.endpoints["main"] = SkypeEndpoint(self, locParts[2])
+                    self.endpoints["main"] = SkypeEndpoint(self, locParts[2].replace("%7B", "{").replace("%7D", "}"))
             if endpointResp.status_code == 200 and "main" not in self.endpoints:
                 # Use the most recent endpoint listed in the JSON response.
                 self.endpoints["main"] = SkypeEndpoint(self, endpointResp.json()[0]["id"])
+        if "main" in self.endpoints:
+            self.endpoints["main"].config()
+            self.syncEndpoints()
         if self.tokenFile:
             self.writeToken()
+
+    def syncEndpoints(self):
+        """
+        Retrieve all current endpoints for the connected user.
+        """
+        self.endpoints["all"] = []
+        for json in self("GET", "{0}/users/ME/presenceDocs/messagingService".format(self.msgsHost),
+                         params={"view": "expanded"}, auth=self.Auth.RegToken).json().get("endpointPresenceDocs", []):
+            id = json.get("link", "").split("/")[7]
+            self.endpoints["all"].append(SkypeEndpoint(self, id))
 
 
 class SkypeEndpoint(SkypeObj):
@@ -565,6 +578,26 @@ class SkypeEndpoint(SkypeObj):
         self.conn = conn
         self.id = id
         self.subscribed = False
+
+    def config(self, name="skype"):
+        """
+        Configure this endpoint to allow setting presence.
+
+        Args:
+            name (str): display name for this endpoint
+        """
+        self.conn("PUT", "{0}/users/ME/endpoints/{1}/presenceDocs/messagingService"
+                         .format(self.conn.msgsHost, self.id),
+                  auth=SkypeConnection.Auth.RegToken,
+                  json={"id": "messagingService",
+                        "type": "EndpointPresenceDoc",
+                        "selfLink": "uri",
+                        "privateInfo": {"epname": name},
+                        "publicInfo": {"capabilities": "",
+                                       "type": 1,
+                                       "skypeNameVersion": "skype.com",
+                                       "nodeInfo": "xx",
+                                       "version": "908/1.30.0.128"}})
 
     def ping(self, timeout=12):
         """
