@@ -162,20 +162,25 @@ class SkypeEventLoop(Skype):
             Whether to automatically acknowledge all incoming events.
     """
 
-    def __init__(self, user=None, pwd=None, tokenFile=None, autoAck=True):
+    def __init__(self, user=None, pwd=None, msEmail=None, msPwd=None, tokenFile=None, autoAck=True, status=None):
         """
         Create a new event loop and the underlying connection.
 
-        The ``user``, ``pwd`` and ``tokenFile``  arguments are passed to the :class:`.SkypeConnection` instance.
+        All arguments up to ``tokenFile``  are passed to the :class:`.SkypeConnection` instance.
 
         Args:
-            user (str): the connecting user's username
-            pwd (str): the connecting user's account password
-            tokenFile (str): path to a file, used to cache session tokens
+            user (str): Skype username of the connecting account
+            pwd (str): corresponding Skype account password
+            msEmail (str): Microsoft account email address
+            msPwd (str): corresponding Microsoft account password
+            tokenFile (str): path to file used for token storage
             autoAck (bool): whether to automatically acknowledge all incoming events
+            status (.Status): availability to display to contacts
         """
-        super(SkypeEventLoop, self).__init__(user, pwd, tokenFile=tokenFile)
+        super(SkypeEventLoop, self).__init__(user, pwd, msEmail, msPwd, tokenFile)
         self.autoAck = autoAck
+        if status:
+            self.setPresence(status)
 
     def loop(self):
         """
