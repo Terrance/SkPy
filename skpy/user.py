@@ -307,6 +307,7 @@ class SkypeContacts(SkypeObjs):
     def __init__(self, skype=None):
         super(SkypeContacts, self).__init__(skype)
         self.contactIds = []
+        self.groups = {}
 
     def __getitem__(self, key):
         # Try to retrieve from the cache, otherwise return a user object instead.
@@ -340,6 +341,8 @@ class SkypeContacts(SkypeObjs):
             self.merge(contact)
             if not json.get("suggested"):
                 self.contactIds.append(contact.id)
+        for json in resp.get("groups", []):
+            self.groups[json.get("name", json.get("id"))] = SkypeContactGroup.fromRaw(self.skype, json)
         super(SkypeContacts, self).sync()
 
     def contact(self, id):
@@ -441,6 +444,30 @@ class SkypeContacts(SkypeObjs):
                 invite["userId"] = SkypeUtils.noPrefix(json.get("mri"))
                 requests.append(SkypeRequest.fromRaw(self.skype, invite))
         return requests
+
+
+@SkypeUtils.initAttrs
+@SkypeUtils.convertIds("users")
+class SkypeContactGroup(SkypeObj):
+    """
+    A user-defined collection of contacts.  Currently read-only in the API.
+
+    Attributes:
+        id (str):
+            Unique identifier for this group.
+        name (str):
+            Display name as set by the user.
+        contacts (:class:`SkypeContact` list):
+            Contacts added to this group.
+    """
+
+    attrs = ("id", "name", "userIds")
+
+    @classmethod
+    def rawToFields(cls, raw={}):
+        return {"id": raw.get("id"),
+                "name": raw.get("name"),
+                "userIds": [SkypeUtils.noPrefix(id) for id in raw.get("contacts")]}
 
 
 @SkypeUtils.initAttrs
