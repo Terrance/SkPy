@@ -147,6 +147,27 @@ class SkypeUser(SkypeObj):
                         auth=SkypeConnection.Auth.SkypeToken, json={"mri": "8:{0}".format(self.id),
                                                                     "greeting": greeting})
 
+    def block(self, report=False):
+        """
+        Block the user from all communication.
+
+        Args:
+            report (bool): whether to report this user to Skype
+        """
+        self.skype.conn("PUT", "{0}/users/{1}/contacts/blocklist/8:{2}"
+                               .format(SkypeConnection.API_CONTACTS, self.skype.userId, self.id),
+                        auth=SkypeConnection.Auth.SkypeToken, json={"report_abuse": report, "ui_version": "skype.com"})
+        self.blocked = True
+
+    def unblock(self):
+        """
+        Unblock a previously blocked user.
+        """
+        self.skype.conn("DELETE", "{0}/users/{1}/contacts/blocklist/8:{2}"
+                                  .format(SkypeConnection.API_CONTACTS, self.skype.userId, self.id),
+                        auth=SkypeConnection.Auth.SkypeToken)
+        self.blocked = False
+
 
 @SkypeUtils.initAttrs
 class SkypeContact(SkypeUser):
@@ -302,6 +323,12 @@ class SkypeContacts(SkypeObjs):
     When using key lookups, it checks the contact list first, with a user fallback for non-contacts.
 
     Contacts can also be iterated over, where only authorised users are returned in the collection.
+
+    Attributes:
+        groups (dict):
+            Set of :class:`SkypeContactGroup` instances, keyed by group name.
+        blocked (SkypeContactGroup):
+            Group of users blocked from all communication.
     """
 
     def __init__(self, skype=None):
@@ -343,6 +370,8 @@ class SkypeContacts(SkypeObjs):
                 self.contactIds.append(contact.id)
         for json in resp.get("groups", []):
             self.groups[json.get("name", json.get("id"))] = SkypeContactGroup.fromRaw(self.skype, json)
+        blocked = resp.get("blocklist", [])
+        self.blocked = SkypeContactGroup(self.skype, blocked, userIds=[block.get("mri") for block in blocked])
         super(SkypeContacts, self).sync()
 
     def contact(self, id):
