@@ -184,19 +184,25 @@ class SkypeEventLoop(Skype):
         if status:
             self.setPresence(status)
 
+    def cycle(self):
+        """
+        Run one cycle of :meth:`loop`; get the most recent events and call :meth:`OnEvent` for each one. Subclasses can extend this method to add other functionality to the event loop or change its behavior. Returns `None`.
+        """
+        try:
+            events = self.getEvents()
+        except requests.ConnectionError:
+            return
+        for event in events:
+            self.onEvent(event)
+            if self.autoAck:
+                event.ack()
+
     def loop(self):
         """
         Handle any incoming events, by calling out to :meth:`onEvent` for each one.  This method does not return.
         """
         while True:
-            try:
-                events = self.getEvents()
-            except requests.ConnectionError:
-                continue
-            for event in events:
-                self.onEvent(event)
-                if self.autoAck:
-                    event.ack()
+            self.cycle()
 
     def onEvent(self, event):
         """
