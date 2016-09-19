@@ -18,7 +18,7 @@ class SkypeUtils:
             Raw object containing emoticons and packs.
     """
 
-    Status = SkypeEnum("SkypeUtils.Status", ("Offline", "Hidden", "Busy", "Idle", "Online"))
+    Status = SkypeEnum("SkypeUtils.Status", ("Offline", "Hidden", "Busy", "Away", "Idle", "Online"))
     """
     :class:`.SkypeEnum`: Types of user availability.
 
@@ -29,6 +29,8 @@ class SkypeUtils:
             User is pretending to be offline.  Shows as hidden to the current user, offline to anyone else.
         Status.Busy:
             User wishes not to be disturbed.  Disables notifications on some clients (e.g. on the desktop).
+        Status.Away:
+            User has explicitly marked themselves as away.  Alternatively, this may just be an alias for idle.
         Status.Idle:
             User is online but not active.  Messages will likely be delivered as normal, though may not be read.
         Status.Online:
