@@ -155,7 +155,8 @@ class Skype(SkypeObj):
 
 class SkypeEventLoop(Skype):
     """
-    A skeleton class for producing event processing programs.
+    A skeleton class for producing event processing programs.  Implementers will most likely want to override the
+    :meth:`onEvent` method.
 
     Attributes:
         autoAck (bool):
@@ -184,19 +185,29 @@ class SkypeEventLoop(Skype):
         if status:
             self.setPresence(status)
 
+    def cycle(self):
+        """
+        Request one batch of events from Skype, calling :meth:`onEvent` with each event in turn.
+
+        Subclasses may override this method to alter loop functionality.
+        """
+        try:
+            events = self.getEvents()
+        except requests.ConnectionError:
+            return
+        for event in events:
+            self.onEvent(event)
+            if self.autoAck:
+                event.ack()
+
     def loop(self):
         """
-        Handle any incoming events, by calling out to :meth:`onEvent` for each one.  This method does not return.
+        Continuously handle any incoming events using :meth:`cycle`.
+
+        This method does not return, so for programs with a UI, this will likely need to be run in its own thread.
         """
         while True:
-            try:
-                events = self.getEvents()
-            except requests.ConnectionError:
-                continue
-            for event in events:
-                self.onEvent(event)
-                if self.autoAck:
-                    event.ack()
+            self.cycle()
 
     def onEvent(self, event):
         """
@@ -264,7 +275,7 @@ class SkypeSettings(SkypeObj):
 
     @property
     def profile(self):
-        # Retrueve a dict of all profile options.
+        # Retrieve a dict of all profile options.
         json = self.skype.conn("GET", self.skype.conn.API_PEOPLE, auth=SkypeConnection.Auth.SkypeToken,
                                headers={"X-AppId": "5c7a1e34-3a23-4a36-b2e6-7aa15be85f07",
                                         "X-SerializeAs": "purejson"}).json()
