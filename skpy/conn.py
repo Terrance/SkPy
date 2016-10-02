@@ -535,7 +535,7 @@ class SkypeConnection(SkypeObj):
                     self.msgsHost = locHead.rsplit("/", 4 if locParts[2] else 3)[0]
                 if locParts[2]:
                     self.endpoints["main"] = SkypeEndpoint(self, locParts[2].replace("%7B", "{").replace("%7D", "}"))
-            if endpointResp.status_code == 200 and "main" not in self.endpoints:
+            if endpointResp.status_code == 200 and "main" not in self.endpoints and endpointResp.json():
                 # Use the most recent endpoint listed in the JSON response.
                 self.endpoints["main"] = SkypeEndpoint(self, endpointResp.json()[0]["id"])
         if "main" in self.endpoints:
