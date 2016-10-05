@@ -3,7 +3,7 @@ import requests
 from .core import SkypeObj, SkypeEnum
 from .util import SkypeUtils
 from .conn import SkypeConnection
-from .user import SkypeContact, SkypeContacts
+from .user import SkypeUser, SkypeContact, SkypeContacts
 from .chat import SkypeChats
 from .event import SkypeEvent
 
@@ -128,6 +128,17 @@ class Skype(SkypeObj):
         """
         self.conn("PUT", "{0}/users/ME/presenceDocs/messagingService".format(self.conn.msgsHost),
                   auth=SkypeConnection.Auth.RegToken, json={"status": status.label})
+
+    def setMood(self, mood):
+        """
+        Update the activity message for the current user.
+
+        Args:
+            mood (str): new mood message
+        """
+        self.conn("POST", "{0}/users/{1}/profile/partial".format(SkypeConnection.API_USER, self.userId),
+                  auth=SkypeConnection.Auth.SkypeToken, json={"payload": {"mood": mood or ""}})
+        self.user.mood = SkypeUser.Mood(plain=mood) if mood else None
 
     def setAvatar(self, image):
         """
