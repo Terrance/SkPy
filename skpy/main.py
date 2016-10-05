@@ -248,6 +248,8 @@ class SkypeSettings(SkypeObj):
             Skype for Web (Show large emoticons): if only an emoticon in a message, display it larger.
         pinFavourites (bool):
             Skype for Web (Pin recent favorites): show favourite and recent contacts at the top of the contact list.
+        darkTheme (bool):
+            Skype for Web (Dark theme): use white text on a dark background.
         autoAddFriends (bool):
             Make address book contacts with Skype accounts appear in the contact list.
         callPrivacy (:class:`Privacy`):
@@ -258,7 +260,7 @@ class SkypeSettings(SkypeObj):
 
     attrs = ("notificationPopups", "notificationSounds", "webLinkPreviews", "youtubePlayer", "mentionNotifs",
              "imagePaste", "shareTyping", "emoteSuggestions", "animateEmotes", "largeEmotes", "pinFavourites",
-             "autoAddFriends", "callPrivacy", "videoPrivacy")
+             "darkTheme", "autoAddFriends", "callPrivacy", "videoPrivacy")
 
     Privacy = SkypeEnum("SkypeSettings.Privacy", ("Anyone", "Contacts", "Nobody"))
     """
@@ -344,6 +346,7 @@ class SkypeSettings(SkypeObj):
     animateEmotes = flagProp(25, True)
     largeEmotes = flagProp(26, True)
     pinFavourites = flagProp(27, True)
+    darkTheme = flagProp(28)
 
     # Hidden options, which are abstracted below to avoid the flag nonsense.
     callPrivacyOpt = optProp("OPT_SKYPE_CALL_POLICY")
