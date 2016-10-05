@@ -66,6 +66,8 @@ def registerMocks(regTokenRedirect=False, guest=False):
                                  .format(msgsHost, Data.endpointId), status=200)
     responses.add(responses.GET, "{0}/users/ME/presenceDocs/messagingService"
                                  .format(msgsHost), status=200, json={"endpointPresenceDocs": []})
+    # Retrieve user flags.
+    responses.add(responses.GET, SkypeConnection.API_FLAGS, status=200, json=[1])
     # Retrieve public information about a group chat.
     responses.add(responses.GET, re.compile("{0}/[a-z0-9]{{12}}".format(SkypeConnection.API_JOIN), re.I),
                   status=200, adding_headers={"Set-Cookie": "csrf_token=csrf; launcher_session_id=launch"})

@@ -275,6 +275,11 @@ class SkypeSettings(SkypeObj):
             Deny from all Skype users.
     """
 
+    def __init__(self, skype=None, raw=None):
+        super(SkypeSettings, self).__init__(skype, raw)
+        if skype and skype.conn.connected:
+            self.syncFlags()
+
     @property
     def profile(self):
         # Retrieve a dict of all profile options.
@@ -300,10 +305,12 @@ class SkypeSettings(SkypeObj):
                             json={"Settings": [{"Name": id, "Value": val}]})
         return prof
 
-    @property
-    def flags(self):
-        # Retrieve a list of all enabled flags.
-        return self.skype.conn("GET", SkypeConnection.API_FLAGS, auth=SkypeConnection.Auth.SkypeToken).json()
+    def syncFlags(self):
+        """
+        Update the cached list of all enabled flags, and store it in the :attr:`flags` attribute.
+        """
+        self.flags = set(self.skype.conn("GET", SkypeConnection.API_FLAGS,
+                                         auth=SkypeConnection.Auth.SkypeToken).json())
 
     def flagProp(id, invert=False):
         @property
@@ -313,9 +320,11 @@ class SkypeSettings(SkypeObj):
         @flag.setter
         def flag(self, val):
             val = bool(val) ^ invert
+            self.syncFlags()
             if not val == (id in self.flags):
                 self.skype.conn("PUT" if val else "DELETE", "{0}/{1}".format(SkypeConnection.API_FLAGS, id),
                                 auth=SkypeConnection.Auth.SkypeToken)
+                self.flags.add(id) if val else self.flags.remove(id)
         return flag
 
     def optProp(id):
