@@ -79,7 +79,7 @@ class SkypeUtils:
         Returns:
             str: extracted identifier
         """
-        match = re.search(r"conversations/([0-9]+:[A-Za-z0-9\.,:_\-]+(@thread\.skype)?)", url)
+        match = re.search(r"conversations/([0-9]+:[A-Za-z0-9\.,:_=/\+\-]+@(p2p\.)?thread\.skype)", url)
         return match.group(1) if match else None
 
     class classprop(property):
