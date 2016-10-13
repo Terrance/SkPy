@@ -37,9 +37,8 @@ class Skype(SkypeObj):
         """
         Create a new Skype object and corresponding connection.
 
-        If ``user`` and ``pwd`` are given, they will be passed to :meth:`.SkypeConnection.setUserPwd`.  Similarly,
-        ``msEmail`` and ``msPwd`` are passed to :meth:`.SkypeConnection.setMicrosoftAcc`.  Only one pair of login
-        credentials should be passed (Skype account will take priority over Microsoft account).
+        If ``user`` and ``pwd`` are given, they will be passed to :meth:`.SkypeConnection.setUserPwd`.  This can be
+        either a Skype username/password pair, or a Microsoft account email address and its associated password.
 
         If a token file path is present, it will be used if valid.  On a successful connection, the token file will
         also be written to.
@@ -50,8 +49,6 @@ class Skype(SkypeObj):
         Args:
             user (str): Skype username of the connecting account
             pwd (str): corresponding Skype account password
-            msEmail (str): Microsoft account email address
-            msPwd (str): corresponding Microsoft account password
             tokenFile (str): path to file used for token storage
             connect (bool): whether to try and connect straight away
         """
@@ -61,9 +58,7 @@ class Skype(SkypeObj):
             self.conn.setTokenFile(tokenFile)
         if user and pwd:
             self.conn.setUserPwd(user, pwd)
-        elif msEmail and msPwd:
-            self.conn.setMicrosoftAcc(msEmail, msPwd)
-        if connect and ((user and pwd) or (msEmail and msPwd) or tokenFile):
+        if connect and ((user and pwd) or tokenFile):
             try:
                 self.conn.readToken()
             except:

@@ -4,7 +4,6 @@ import functools
 from datetime import datetime, timedelta
 import time
 from types import MethodType
-import math
 import hashlib
 
 from bs4 import BeautifulSoup
@@ -251,28 +250,15 @@ class SkypeConnection(SkypeObj):
 
     def setUserPwd(self, user, pwd):
         """
-        Replace the stub :meth:`getSkypeToken` method with one that connects via Skype account using the given
-        credentials.  Avoids storing the account password in an accessible way.
+        Replace the stub :meth:`getSkypeToken` method with one that connects via the Microsoft account flow using the
+        given credentials.  Avoids storing the account password in an accessible way.
 
         Args:
-            user (str): username of the connecting account
+            user (str): username or email address of the connecting account
             pwd (str): password of the connecting account
         """
         def getSkypeToken(self):
-            self.login(user, pwd)
-        self.getSkypeToken = MethodType(getSkypeToken, self)
-
-    def setMicrosoftAcc(self, email, pwd):
-        """
-        Replace the stub :meth:`getSkypeToken` method with one that connects via Microsoft account using the given
-        credentials.  Avoids storing the account password in an accessible way.
-
-        Args:
-            email (str): email address of the connecting account
-            pwd (str): password of the connecting account
-        """
-        def getSkypeToken(self):
-            self.liveLogin(email, pwd)
+            self.liveLogin(user, pwd)
         self.getSkypeToken = MethodType(getSkypeToken, self)
 
     def setTokenFile(self, path):
@@ -349,69 +335,15 @@ class SkypeConnection(SkypeObj):
             if "reg" not in self.tokenExpiry or datetime.now() >= self.tokenExpiry["reg"]:
                 self.getRegToken()
 
-    def login(self, user, pwd):
+    def liveLogin(self, user, pwd):
         """
-        Obtain connection parameters from the Skype web login page, and perform a login with the given username and
-        password.  This emulates a login to Skype for Web on ``login.skype.com``.
-
-        Args:
-            user (str): username of the connecting account
-            pwd (str): password of the connecting account
-
-        Raises:
-            SkypeAuthException: if a captcha is required, or the login fails
-            .SkypeApiException: if the login form can't be processed
-        """
-        self.tokens.pop("skype", None)
-        self.tokenExpiry.pop("skype", None)
-        loginResp = self("GET", self.API_LOGIN,
-                         params={"client_id": "578134", "redirect_uri": "https://web.skype.com"})
-        loginPage = BeautifulSoup(loginResp.text, "html.parser")
-        secs = int(time.time())
-        tokenField = loginPage.find("input", {"name": "skypetoken"})
-        # If present, the previous auth is still valid and we can get a refreshed token without a password.
-        if not tokenField:
-            # Reached the login form page.
-            if loginPage.find(id="captcha"):
-                raise SkypeAuthException("Captcha required", loginResp)
-            pie = loginPage.find(id="pie").get("value")
-            etm = loginPage.find(id="etm").get("value")
-            frac, hour = math.modf(time.timezone)
-            timezone = "{0:+03d}|{1}".format(int(hour), int(frac * 60))
-            data = {"username": user,
-                    "password": pwd,
-                    "pie": pie,
-                    "etm": etm,
-                    "timezone_field": timezone,
-                    "js_time": secs}
-            loginResp = self("POST", self.API_LOGIN, data=data,
-                             params={"client_id": "578134", "redirect_uri": "https://web.skype.com"})
-            loginPage = BeautifulSoup(loginResp.text, "html.parser")
-            errors = loginPage.select("div.messageBox.message_error span")
-            if errors:
-                raise SkypeAuthException(errors[0].text, loginResp)
-            tokenField = loginPage.find("input", {"name": "skypetoken"})
-        if not tokenField:
-            raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
-        self.tokens["skype"] = tokenField.get("value")
-        expiryField = loginPage.find("input", {"name": "expires_in"})
-        if expiryField:
-            self.tokenExpiry["skype"] = datetime.fromtimestamp(secs + int(expiryField.get("value")))
-        self.userId = user
-        # (Re)generate the registration token.
-        self.tokens.pop("reg", None)
-        self.tokenExpiry.pop("reg", None)
-        self.getRegToken()
-
-    def liveLogin(self, email, pwd):
-        """
-        Obtain connection parameters from the Microsoft Account login page, and perform a login with the given email
-        address and password.  This emulates a login to Skype for Web on ``login.live.com``.
+        Obtain connection parameters from the Microsoft account login page, and perform a login with the given email
+        address or Skype username, and its password.  This emulates a login to Skype for Web on ``login.live.com``.
 
         .. note:: Microsoft accounts with two-factor authentication enabled are not supported.
 
         Args:
-            email (str): email address of the connecting account
+            user (str): username or email address of the connecting account
             pwd (str): password of the connecting account
 
         Raises:
@@ -422,7 +354,7 @@ class SkypeConnection(SkypeObj):
         loginResp = self("GET", "{0}/oauth/microsoft".format(self.API_LOGIN),
                          params={"client_id": "578134", "redirect_uri": "https://web.skype.com"})
         # This is inside some embedded JavaScript, so can't easily parse with BeautifulSoup.
-        ppft = re.search(r"<input.*?name=\"PPFT\".*?value=\"(.*?)\"", loginResp.text).group(1)
+        ppft = re.search(r"""<input.*?name="PPFT".*?value="(.*?)\"""", loginResp.text).group(1)
         # Now pass the login credentials over.
         loginResp = self("POST", "{0}/ppsecure/post.srf".format(self.API_MSACC),
                          params={"wa": "wsignin1.0", "wp": "MBI_SSL",
@@ -431,7 +363,7 @@ class SkypeConnection(SkypeObj):
                          cookies={"MSPRequ": loginResp.cookies.get("MSPRequ"),
                                   "MSPOK": loginResp.cookies.get("MSPOK"),
                                   "CkTst": str(int(time.time() * 1000))},
-                         data={"login": email, "passwd": pwd, "PPFT": ppft})
+                         data={"login": user, "passwd": pwd, "PPFT": ppft})
         tField = BeautifulSoup(loginResp.text, "html.parser").find(id="t")
         if tField is None:
             if "{0}/GetSessionState.srf".format(self.API_MSACC) in loginResp.text:
@@ -613,14 +545,14 @@ class SkypeEndpoint(SkypeObj):
         """
         Subscribe to contact and conversation events.  These are accessible through :meth:`getEvents`.
         """
-        meta = {"interestedResources": ["/v1/threads/ALL",
-                                        "/v1/users/ME/contacts/ALL",
-                                        "/v1/users/ME/conversations/ALL/messages",
-                                        "/v1/users/ME/conversations/ALL/properties"],
-                "template": "raw",
-                "channelType": "httpLongPoll"}
         self.conn("POST", "{0}/users/ME/endpoints/{1}/subscriptions".format(self.conn.msgsHost, self.id),
-                  auth=SkypeConnection.Auth.RegToken, json=meta)
+                  auth=SkypeConnection.Auth.RegToken,
+                  json={"interestedResources": ["/v1/threads/ALL",
+                                                "/v1/users/ME/contacts/ALL",
+                                                "/v1/users/ME/conversations/ALL/messages",
+                                                "/v1/users/ME/conversations/ALL/properties"],
+                        "template": "raw",
+                        "channelType": "httpLongPoll"})
         self.subscribed = True
 
     def getEvents(self):

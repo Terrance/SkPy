@@ -142,13 +142,13 @@ class SkypeServerEventTest(SkypeServerTestBase):
         """
         Attempt a fresh login with a username and password.
         """
-        if self.sk.userId.startswith("live:"):
-            email = self.input("> Microsoft account email address: ")
+        user = self.sk.userId
+        if user.startswith("live:"):
+            user = self.input("> Microsoft account email address: ")
             pwd = getpass("> Microsoft account password: ")
-            sk = Skype(msEmail=email, msPwd=pwd)
         else:
             pwd = getpass("> Skype account password: ")
-            sk = Skype(self.sk.userId, pwd)
+        sk = Skype(user, pwd)
         self.assertTrue(sk.conn.connected)
 
     def testMessageEvent(self):

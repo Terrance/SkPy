@@ -43,12 +43,14 @@ def registerMocks(regTokenRedirect=False, guest=False):
         guest (bool): whether to emulate a guest account
     """
     # Retrieve the login form.
-    responses.add(responses.GET, "https://login.skype.com/login",
+    responses.add(responses.GET, "{0}/oauth/microsoft".format(SkypeConnection.API_LOGIN),
                   status=200, content_type="text/html",
-                  body="""<html><body><input id="pie" value="pievalue">
-                          <input id="etm" value="etmvalue"></body></html>""")
+                  body="""<html><body><input name="PPFT" value="ppftvalue"></body></html>""")
     # Submit username/password to form.
-    responses.add(responses.POST, "https://login.skype.com/login",
+    responses.add(responses.POST, "{0}/ppsecure/post.srf".format(SkypeConnection.API_MSACC),
+                  status=200, content_type="text/html",
+                  body="""<html><body><input id="t" value="tvalue"></body></html>""")
+    responses.add(responses.POST, "{0}/microsoft".format(SkypeConnection.API_LOGIN),
                   status=200, content_type="text/html",
                   body="""<html><body><input name="skypetoken" value="{0}">
                           <input name="expires_in" value="86400"></body></html>""".format(Data.skypeToken))
