@@ -248,6 +248,8 @@ class SkypeSettings(SkypeObj):
             Skype for Web (Typing indicator): send typing notifications to contacts when active in conversations.
         emoteSuggestions (bool):
             Skype for Web (Emoticon suggestions): show popup lists of emoticons matching keywords.
+        showEmotes(bool):
+            Skype for Web (Show emoticons): replace text shortcuts (``:)``) with actual emoticons in conversations.
         animateEmotes (bool):
             Skype for Web (Show animated emoticons): use animated version of emoticons.
         largeEmotes (bool):
@@ -265,8 +267,8 @@ class SkypeSettings(SkypeObj):
     """
 
     attrs = ("notificationPopups", "notificationSounds", "webLinkPreviews", "youtubePlayer", "mentionNotifs",
-             "imagePaste", "shareTyping", "emoteSuggestions", "animateEmotes", "largeEmotes", "pinFavourites",
-             "darkTheme", "autoAddFriends", "callPrivacy", "videoPrivacy")
+             "imagePaste", "shareTyping", "emoteSuggestions", "showEmotes", "animateEmotes", "largeEmotes",
+             "pinFavourites", "darkTheme", "autoAddFriends", "callPrivacy", "videoPrivacy")
 
     Privacy = SkypeEnum("SkypeSettings.Privacy", ("Anyone", "Contacts", "Nobody"))
     """
@@ -358,6 +360,7 @@ class SkypeSettings(SkypeObj):
     imagePaste = flagProp(14)
     shareTyping = flagProp(20, True)
     emoteSuggestions = flagProp(23)
+    showEmotes = flagProp(24, True)
     animateEmotes = flagProp(25, True)
     largeEmotes = flagProp(26, True)
     pinFavourites = flagProp(27, True)
