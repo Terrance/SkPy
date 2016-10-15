@@ -21,11 +21,12 @@ class SkypeChat(SkypeObj):
             Cloud group chat identifiers are of the form ``<type>:<identifier>@thread.skype``.
     """
 
-    attrs = ("id",)
+    attrs = ("id", "alerts")
 
     @classmethod
     def rawToFields(cls, raw={}):
-        return {"id": raw.get("id")}
+        return {"id": raw.get("id"),
+                "alerts": False if raw.get("properties", {}).get("alerts") == "false" else True}
 
     def getMsgs(self):
         """
@@ -195,6 +196,18 @@ class SkypeChat(SkypeObj):
                         auth=SkypeConnection.Auth.RegToken, params={"name": "consumptionhorizon"},
                         json={"consumptionhorizon": horizon})
 
+    def setAlerts(self, alerts):
+        """
+        Enable or disable message and event alerts for this conversation.
+
+        Args:
+            alerts (bool): whether to receive notifications
+        """
+        self.skype.conn("PUT", "{0}/users/ME/conversations/{1}/properties".format(self.skype.conn.msgsHost, self.id),
+                        auth=SkypeConnection.Auth.RegToken, params={"name": "alerts"},
+                        json={"alerts": str(alerts).lower()})
+        self.alerts = alerts
+
     def delete(self):
         """
         Delete the conversation and all message history.
@@ -299,7 +312,7 @@ class SkypeGroupChat(SkypeChat):
         Enable or disable joining by URL.  This does not affect current participants inviting others.
 
         Args:
-            topic (str): whether to accept new participants via a public join link
+            open (bool): whether to accept new participants via a public join link
         """
         self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id),
                         auth=SkypeConnection.Auth.RegToken, params={"name": "joiningenabled"},
