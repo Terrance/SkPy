@@ -136,6 +136,19 @@ class SkypeMsg(SkypeObj):
         return shortcut
 
     @staticmethod
+    def mention(user):
+        """
+        Mention a user in a message.  This may trigger a notification for them even if the conversation is muted.
+
+        Args:
+            user (SkypeUser): user who is to be mentioned
+
+        Returns:
+            str: tag to display the mention
+        """
+        return """<at id="8:{0}">{1}</at>""".format(user.id, user.name)
+
+    @staticmethod
     def quote(user, chat, timestamp, content):
         """
         Display a message excerpt as a quote from another user.
@@ -244,6 +257,7 @@ class SkypeMsg(SkypeObj):
             text = re.sub(r"</?i.*?>", "_" if entities else "", text)
             text = re.sub(r"</?s.*?>", "~" if entities else "", text)
             text = re.sub(r"</?pre.*?>", "{code}" if entities else "", text)
+            text = re.sub(r"""<at.*?id="8:(.*?)">.*?</at>""", r"@\1", text)
             text = text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&") \
                        .replace("&quot;", "\"").replace("&apos;", "'")
             return text

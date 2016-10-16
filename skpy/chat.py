@@ -1,4 +1,5 @@
 from datetime import datetime
+import re
 import time
 
 from .core import SkypeObj, SkypeObjs
@@ -63,6 +64,7 @@ class SkypeChat(SkypeObj):
             contenttype (str): format of the message, normally ``text``
             messagetype (str): base message type
             skypeemoteoffset (int): used with action messages to control where the user's name ends
+            Has-Mentions (str): whether the message mentions any other users
             kwargs (dict): any additional arguments not listed above
 
         Returns:
@@ -81,7 +83,7 @@ class SkypeChat(SkypeObj):
         msg.update({"composetime": datetime.strftime(clientDate, "%Y-%m-%dT%H:%M:%S.%fZ"),
                     "conversationLink": "{0}/users/ME/conversations/{1}".format(self.skype.conn.msgsHost, self.id),
                     "from": "{0}/users/ME/contacts/8:{1}".format(self.skype.conn.msgsHost, self.skype.userId),
-                    "imdisplayname": self.skype.user.name,
+                    "imdisplayname": str(self.skype.user.name),
                     "isactive": True,
                     "originalarrivaltime": datetime.strftime(arriveDate, "%Y-%m-%dT%H:%M:%S.%fZ"),
                     "type": "Message"})
@@ -126,12 +128,16 @@ class SkypeChat(SkypeObj):
         """
         msgType = "Text"
         meOffset = None
+        mentions = False
         if me:
             content = "{0} {1}".format(self.skype.user.name, content)
             meOffset = len(str(self.skype.user.name)) + 1
         elif rich:
             msgType = "RichText"
-        return self.sendRaw(editId=edit, messagetype=msgType, content=content, skypeemoteoffset=meOffset)
+            if re.search(r"""<at id=".+?">.+</at>""", content):
+                mentions = True
+        return self.sendRaw(editId=edit, **{"messagetype": msgType, "content": content,
+                                            "Has-Mentions": mentions, "skypeemoteoffset": meOffset})
 
     def sendFile(self, content, name, image=False):
         """
