@@ -353,8 +353,7 @@ class SkypeConnection(SkypeObj):
         # First, start a Microsoft account login from Skype, which will redirect to login.live.com.
         loginResp = self("GET", "{0}/oauth/microsoft".format(self.API_LOGIN),
                          params={"client_id": "578134", "redirect_uri": "https://web.skype.com"})
-        # This is inside some embedded JavaScript, so can't easily parse with BeautifulSoup.
-        ppft = re.search(r"""<input.*?name="PPFT".*?value="(.*?)\"""", loginResp.text).group(1)
+        ppft = self._extract_ppft_from_source(loginResp.text)
         # Now pass the login credentials over.
         loginResp = self("POST", "{0}/ppsecure/post.srf".format(self.API_MSACC),
                          params={"wa": "wsignin1.0", "wp": "MBI_SSL",
@@ -485,6 +484,24 @@ class SkypeConnection(SkypeObj):
                          params={"view": "expanded"}, auth=self.Auth.RegToken).json().get("endpointPresenceDocs", []):
             id = json.get("link", "").split("/")[7]
             self.endpoints["all"].append(SkypeEndpoint(self, id))
+
+    @staticmethod
+    def _extract_ppft_from_source(html):
+        """
+        Extracts parameter PPFT from the passed HTML source. Given the value is within Javascript, it's not
+        trivially retrievable with BeautifulSoup.
+        """
+
+        pattern = r'<input.*?name="PPFT".*?value="(.*?)\"'
+        matches = re.search(pattern, html)
+
+        if matches is None:
+            raise SkypeApiException(
+                'Skype or Microsoft authentication endpoints may be down - PPFT parameter could not be parsed.'
+            )
+
+        return matches.group(1)
+
 
 
 class SkypeEndpoint(SkypeObj):
