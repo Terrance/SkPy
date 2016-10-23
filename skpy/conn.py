@@ -372,7 +372,11 @@ class SkypeConnection(SkypeObj):
         loginPage = BeautifulSoup(loginResp.text, "html.parser")
         tokenField = loginPage.find("input", {"name": "skypetoken"})
         if not tokenField:
-            raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
+            raise SkypeApiException(
+                "Couldn't retrieve Skype token from login response. Verify your account by "
+                "logging into Skype on a browser.",
+                loginResp
+            )
         self.tokens["skype"] = tokenField.get("value")
         expiryField = loginPage.find("input", {"name": "expires_in"})
         if expiryField:
