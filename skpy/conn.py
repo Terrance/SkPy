@@ -363,14 +363,7 @@ class SkypeConnection(SkypeObj):
                                   "MSPOK": loginResp.cookies.get("MSPOK"),
                                   "CkTst": str(int(time.time() * 1000))},
                          data={"login": user, "passwd": pwd, "PPFT": ppft})
-        tField = BeautifulSoup(loginResp.text, "html.parser").find(id="t")
-        if tField is None:
-            if "{0}/GetSessionState.srf".format(self.API_MSACC) in loginResp.text:
-                # Two-factor authentication, not supported as it's rather unwieldy to implement.
-                raise SkypeAuthException("Two-factor authentication not supported", loginResp)
-            err = re.search(r"sErrTxt:'([^'\\]*(\\.[^'\\]*)*)'", loginResp.text)
-            if err:
-                raise SkypeAuthException(err.group(1), loginResp)
+        tField = self._extract_t_field_from_source(loginResp)
         # Now exchange the 't' value for a Skype token.
         loginResp = self("POST", "{0}/microsoft".format(self.API_LOGIN),
                          params={"client_id": "578134", "redirect_uri": "https://web.skype.com"},
@@ -485,6 +478,33 @@ class SkypeConnection(SkypeObj):
             id = json.get("link", "").split("/")[7]
             self.endpoints["all"].append(SkypeEndpoint(self, id))
 
+    def _extract_t_field_from_source(self, login_response):
+        """
+        Extracts the 't' value from the response text for later exchange with a Skype token. This breaks execution
+        in case the value can't be parsed from the received response.
+        """
+        html = login_response.text
+        t_field = BeautifulSoup(html, "html.parser").find(id="t")
+
+        if t_field is not None:
+            return t_field
+
+        if "{0}/GetSessionState.srf".format(self.API_MSACC) in html:
+            # Two-factor authentication, not supported as it's rather unwieldy to implement.
+            raise SkypeAuthException("Two-factor authentication not supported", login_response)
+
+        err = re.search(r"sErrTxt:'([^'\\]*(\\.[^'\\]*)*)'", html)
+        if err:
+            raise SkypeAuthException(err.group(1), login_response)
+
+        raise SkypeAuthException(
+            'Something might be wrong with your account - it\'s advisable to log into Skype using the same '
+            'credentials (and IP) you intend to run the code from. Situations that could lead into this error '
+            'might include incorrect passwords, 2FA, captchas, locked account, and pending acceptance of Skype\'s '
+            'TOU.'
+        )
+
+
     @staticmethod
     def _extract_ppft_from_source(html):
         """
@@ -501,7 +521,6 @@ class SkypeConnection(SkypeObj):
             )
 
         return matches.group(1)
-
 
 
 class SkypeEndpoint(SkypeObj):
