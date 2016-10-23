@@ -353,8 +353,7 @@ class SkypeConnection(SkypeObj):
         # First, start a Microsoft account login from Skype, which will redirect to login.live.com.
         loginResp = self("GET", "{0}/oauth/microsoft".format(self.API_LOGIN),
                          params={"client_id": "578134", "redirect_uri": "https://web.skype.com"})
-        # This is inside some embedded JavaScript, so can't easily parse with BeautifulSoup.
-        ppft = re.search(r"""<input.*?name="PPFT".*?value="(.*?)\"""", loginResp.text).group(1)
+        ppft = self._extract_ppft_from_source(loginResp.text)
         # Now pass the login credentials over.
         loginResp = self("POST", "{0}/ppsecure/post.srf".format(self.API_MSACC),
                          params={"wa": "wsignin1.0", "wp": "MBI_SSL",
@@ -364,14 +363,7 @@ class SkypeConnection(SkypeObj):
                                   "MSPOK": loginResp.cookies.get("MSPOK"),
                                   "CkTst": str(int(time.time() * 1000))},
                          data={"login": user, "passwd": pwd, "PPFT": ppft})
-        tField = BeautifulSoup(loginResp.text, "html.parser").find(id="t")
-        if tField is None:
-            if "{0}/GetSessionState.srf".format(self.API_MSACC) in loginResp.text:
-                # Two-factor authentication, not supported as it's rather unwieldy to implement.
-                raise SkypeAuthException("Two-factor authentication not supported", loginResp)
-            err = re.search(r"sErrTxt:'([^'\\]*(\\.[^'\\]*)*)'", loginResp.text)
-            if err:
-                raise SkypeAuthException(err.group(1), loginResp)
+        tField = self._extract_t_field_from_source(loginResp)
         # Now exchange the 't' value for a Skype token.
         loginResp = self("POST", "{0}/microsoft".format(self.API_LOGIN),
                          params={"client_id": "578134", "redirect_uri": "https://web.skype.com"},
@@ -380,7 +372,11 @@ class SkypeConnection(SkypeObj):
         loginPage = BeautifulSoup(loginResp.text, "html.parser")
         tokenField = loginPage.find("input", {"name": "skypetoken"})
         if not tokenField:
-            raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
+            raise SkypeApiException(
+                "Couldn't retrieve Skype token from login response. Verify your account by "
+                "logging into Skype on a browser.",
+                loginResp
+            )
         self.tokens["skype"] = tokenField.get("value")
         expiryField = loginPage.find("input", {"name": "expires_in"})
         if expiryField:
@@ -485,6 +481,50 @@ class SkypeConnection(SkypeObj):
                          params={"view": "expanded"}, auth=self.Auth.RegToken).json().get("endpointPresenceDocs", []):
             id = json.get("link", "").split("/")[7]
             self.endpoints["all"].append(SkypeEndpoint(self, id))
+
+    def _extract_t_field_from_source(self, login_response):
+        """
+        Extracts the 't' value from the response text for later exchange with a Skype token. This breaks execution
+        in case the value can't be parsed from the received response.
+        """
+        html = login_response.text
+        t_field = BeautifulSoup(html, "html.parser").find(id="t")
+
+        if t_field is not None:
+            return t_field
+
+        if "{0}/GetSessionState.srf".format(self.API_MSACC) in html:
+            # Two-factor authentication, not supported as it's rather unwieldy to implement.
+            raise SkypeAuthException("Two-factor authentication not supported", login_response)
+
+        err = re.search(r"sErrTxt:'([^'\\]*(\\.[^'\\]*)*)'", html)
+        if err:
+            raise SkypeAuthException(err.group(1), login_response)
+
+        raise SkypeAuthException(
+            'Something might be wrong with your account - it\'s advisable to log into Skype using the same '
+            'credentials (and IP) you intend to run the code from. Situations that could lead into this error '
+            'might include incorrect passwords, 2FA, captchas, locked account, and pending acceptance of Skype\'s '
+            'TOU.'
+        )
+
+
+    @staticmethod
+    def _extract_ppft_from_source(html):
+        """
+        Extracts parameter PPFT from the passed HTML source. Given the value is within Javascript, it's not
+        trivially retrievable with BeautifulSoup.
+        """
+
+        pattern = r'<input.*?name="PPFT".*?value="(.*?)\"'
+        matches = re.search(pattern, html)
+
+        if matches is None:
+            raise SkypeApiException(
+                'Skype or Microsoft authentication endpoints may be down - PPFT parameter could not be parsed.'
+            )
+
+        return matches.group(1)
 
 
 class SkypeEndpoint(SkypeObj):
