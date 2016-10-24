@@ -9,7 +9,7 @@ import hashlib
 from bs4 import BeautifulSoup
 import requests
 
-from .core import SkypeObj, SkypeEnum, SkypeException, SkypeApiException
+from .core import SkypeObj, SkypeEnum, SkypeApiException, SkypeAuthException
 
 if os.getenv("SKPY_DEBUG_HTTP"):
     from pprint import pformat
@@ -105,7 +105,7 @@ class SkypeConnection(SkypeObj):
             requests.Response: response object provided by :mod:`requests`
 
         Raises:
-            SkypeAuthException: if an authentication rate limit is reached
+            .SkypeAuthException: if an authentication rate limit is reached
             .SkypeApiException: if a successful status code is not received
         """
         if os.getenv("SKPY_DEBUG_HTTP"):
@@ -186,7 +186,7 @@ class SkypeConnection(SkypeObj):
             requests.Response: response object provided by :mod:`requests`
 
         Raises:
-            SkypeAuthException: if an authentication rate limit is reached
+            .SkypeAuthException: if an authentication rate limit is reached
             .SkypeApiException: if a successful status code is not received
         """
         self.verifyToken(auth)
@@ -277,7 +277,7 @@ class SkypeConnection(SkypeObj):
         If the Skype token is valid but the registration token is invalid, a new endpoint will be registered.
 
         Raises:
-            SkypeAuthException: if the token file cannot be used to authenticate
+            .SkypeAuthException: if the token file cannot be used to authenticate
         """
         if not self.tokenFile:
             raise SkypeAuthException("No token file specified")
@@ -324,7 +324,7 @@ class SkypeConnection(SkypeObj):
             auth (Auth): authentication type to check
 
         Raises:
-            SkypeAuthException: if Skype auth is required, and the current token has expired and can't be renewed
+            .SkypeAuthException: if Skype auth is required, and the current token has expired and can't be renewed
         """
         if auth in (self.Auth.SkypeToken, self.Auth.Authorize):
             if "skype" not in self.tokenExpiry or datetime.now() >= self.tokenExpiry["skype"]:
@@ -349,7 +349,7 @@ class SkypeConnection(SkypeObj):
             pwd (str): password of the connecting account
 
         Raises:
-            SkypeAuthException: if a captcha is required, or the login fails
+            .SkypeAuthException: if the login request is rejected
             .SkypeApiException: if the login form can't be processed
         """
         # First, start a Microsoft account login from Skype, which will redirect to login.live.com.
@@ -432,7 +432,7 @@ class SkypeConnection(SkypeObj):
         A wrapper for :meth:`login` or :meth:`liveLogin` that applies the previously given username and password.
 
         Raises:
-            SkypeAuthException: if credentials were never provided
+            .SkypeAuthException: if credentials were never provided
         """
         raise SkypeAuthException("No username or password provided, and no valid token file")
 
@@ -571,23 +571,6 @@ class SkypeEndpoint(SkypeObj):
             self.subscribe()
         return self.conn("POST", "{0}/users/ME/endpoints/{1}/subscriptions/0/poll".format(self.conn.msgsHost, self.id),
                          auth=SkypeConnection.Auth.RegToken).json().get("eventMessages", [])
-
-
-class SkypeAuthException(SkypeException):
-    """
-    An exception thrown when authentication cannot be completed.
-
-    Arguments will usually be of the form (``message``, ``response``).  If the server provided an error message, it
-    will be present in a third argument.
-
-    Unfortunately there are many possible reasons why a login may be rejected, including but not limited to:
-
-    - an incorrect username or password
-    - two-factor authentication
-    - rate-limiting after multiple failed login attempts
-    - a captcha being required
-    - an update to the Terms of Service that must be accepted
-    """
 
 
 def getMac256Hash(challenge, appId, key):

@@ -229,3 +229,20 @@ class SkypeApiException(SkypeException):
 
     Arguments will usually be of the form (``message``, ``response``).
     """
+
+
+class SkypeAuthException(SkypeException):
+    """
+    An exception thrown when authentication cannot be completed.
+
+    Arguments will usually be of the form (``message``, ``response``).  If the server provided an error message, it
+    will be present in a third argument.
+
+    Unfortunately there are many possible reasons why a login may be rejected, including but not limited to:
+
+    - an incorrect username or password
+    - two-factor authentication
+    - rate-limiting after multiple failed login attempts
+    - a captcha being required
+    - an update to the Terms of Service that must be accepted
+    """
