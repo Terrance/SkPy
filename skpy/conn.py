@@ -340,7 +340,9 @@ class SkypeConnection(SkypeObj):
         Obtain connection parameters from the Microsoft account login page, and perform a login with the given email
         address or Skype username, and its password.  This emulates a login to Skype for Web on ``login.live.com``.
 
-        .. note:: Microsoft accounts with two-factor authentication enabled are not supported.
+        .. note::
+            Microsoft accounts with two-factor authentication enabled are not supported, and will cause a
+            :class:`.SkypeAuthException` to be raised.  See the exception definitions for other possible causes.
 
         Args:
             user (str): username or email address of the connecting account
@@ -354,7 +356,9 @@ class SkypeConnection(SkypeObj):
         loginResp = self("GET", "{0}/oauth/microsoft".format(self.API_LOGIN),
                          params={"client_id": "578134", "redirect_uri": "https://web.skype.com"})
         # This is inside some embedded JavaScript, so can't easily parse with BeautifulSoup.
-        ppft = re.search(r"""<input.*?name="PPFT".*?value="(.*?)\"""", loginResp.text).group(1)
+        ppftReg = re.search(r"""<input.*?name="PPFT".*?value="(.*?)\"""", loginResp.text)
+        if not ppftReg:
+            raise SkypeApiException("Couldn't retrieve PPFT from login form")
         # Now pass the login credentials over.
         loginResp = self("POST", "{0}/ppsecure/post.srf".format(self.API_MSACC),
                          params={"wa": "wsignin1.0", "wp": "MBI_SSL",
@@ -363,15 +367,12 @@ class SkypeConnection(SkypeObj):
                          cookies={"MSPRequ": loginResp.cookies.get("MSPRequ"),
                                   "MSPOK": loginResp.cookies.get("MSPOK"),
                                   "CkTst": str(int(time.time() * 1000))},
-                         data={"login": user, "passwd": pwd, "PPFT": ppft})
+                         data={"login": user, "passwd": pwd, "PPFT": ppftReg.group(1)})
         tField = BeautifulSoup(loginResp.text, "html.parser").find(id="t")
         if tField is None:
-            if "{0}/GetSessionState.srf".format(self.API_MSACC) in loginResp.text:
-                # Two-factor authentication, not supported as it's rather unwieldy to implement.
-                raise SkypeAuthException("Two-factor authentication not supported", loginResp)
             err = re.search(r"sErrTxt:'([^'\\]*(\\.[^'\\]*)*)'", loginResp.text)
-            if err:
-                raise SkypeAuthException(err.group(1), loginResp)
+            errMsg = re.sub(r"<.*?>", "", err.group(1)).replace("\\'", "'").replace("\\\\", "\\") if err else None
+            raise SkypeAuthException("Microsoft authentication failed", loginResp, errMsg)
         # Now exchange the 't' value for a Skype token.
         loginResp = self("POST", "{0}/microsoft".format(self.API_LOGIN),
                          params={"client_id": "578134", "redirect_uri": "https://web.skype.com"},
@@ -576,8 +577,16 @@ class SkypeAuthException(SkypeException):
     """
     An exception thrown when authentication cannot be completed.
 
-    Generally this means the request should not be retried (e.g. because of an incorrect password), or it should be
-    delayed (e.g. rate limits).
+    Arguments will usually be of the form (``message``, ``response``).  If the server provided an error message, it
+    will be present in a third argument.
+
+    Unfortunately there are many possible reasons why a login may be rejected, including but not limited to:
+
+    - an incorrect username or password
+    - two-factor authentication
+    - rate-limiting after multiple failed login attempts
+    - a captcha being required
+    - an update to the Terms of Service that must be accepted
     """
 
 

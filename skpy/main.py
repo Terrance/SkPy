@@ -51,6 +51,10 @@ class Skype(SkypeObj):
             pwd (str): corresponding Skype account password
             tokenFile (str): path to file used for token storage
             connect (bool): whether to try and connect straight away
+
+        Raises:
+            .SkypeAuthException: if connecting, and the login request is rejected
+            .SkypeApiException: if connecting, and the login form can't be processed
         """
         super(Skype, self).__init__(self)
         self.conn = SkypeConnection()
