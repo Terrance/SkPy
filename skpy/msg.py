@@ -225,6 +225,9 @@ class SkypeMsg(SkypeObj):
                   "RichText/Media_GenericFile": SkypeFileMsg,
                   "RichText/UriObject": SkypeImageMsg,
                   "Event/Call": SkypeCallMsg,
+                  "ThreadActivity/TopicUpdate": SkypeTopicPropertyMsg,
+                  "ThreadActivity/JoiningEnabledUpdate": SkypeOpenPropertyMsg,
+                  "ThreadActivity/HistoryDisclosedUpdate": SkypeHistoryPropertyMsg,
                   "ThreadActivity/AddMember": SkypeAddMemberMsg,
                   "ThreadActivity/RoleUpdate": SkypeChangeMemberMsg,
                   "ThreadActivity/DeleteMember": SkypeRemoveMemberMsg}.get(raw.get("messagetype"), cls)
@@ -458,6 +461,79 @@ class SkypeCallMsg(SkypeMsg):
 
 
 @SkypeUtils.initAttrs
+class SkypePropertyMsg(SkypeMsg):
+    """
+    A base message type for changes to conversation properties.
+    """
+
+
+@SkypeUtils.initAttrs
+class SkypeTopicPropertyMsg(SkypePropertyMsg):
+    """
+    A message representing a change in a group conversation's topic.
+
+    Attributes:
+        topic (str):
+            Description of the conversation, shown to all participants.
+    """
+
+    attrs = SkypeMsg.attrs + ("topic",)
+
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeTopicPropertyMsg, cls).rawToFields(raw)
+        propInfo = BeautifulSoup(raw.get("content"), "html.parser").find("topicupdate")
+        if propInfo:
+            fields.update({"userId": SkypeUtils.noPrefix(propInfo.find("initiator").text),
+                           "topic": propInfo.find("value").text})
+        return fields
+
+
+@SkypeUtils.initAttrs
+class SkypeOpenPropertyMsg(SkypePropertyMsg):
+    """
+    A message representing a change to joining the conversation by link.
+
+    Attributes:
+        open (bool):
+            Whether new participants can join via a public join link.
+    """
+
+    attrs = SkypeMsg.attrs + ("open",)
+
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeOpenPropertyMsg, cls).rawToFields(raw)
+        propInfo = BeautifulSoup(raw.get("content"), "html.parser").find("joiningenabledupdate")
+        if propInfo:
+            fields.update({"userId": SkypeUtils.noPrefix(propInfo.find("initiator").text),
+                           "open": propInfo.find("value").text == "true"})
+        return fields
+
+
+@SkypeUtils.initAttrs
+class SkypeHistoryPropertyMsg(SkypePropertyMsg):
+    """
+    A message representing a change to history disclosure.
+
+    Attributes:
+        history (bool):
+            Whether message history is provided to new participants.
+    """
+
+    attrs = SkypeMsg.attrs + ("history",)
+
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeHistoryPropertyMsg, cls).rawToFields(raw)
+        propInfo = BeautifulSoup(raw.get("content"), "html.parser").find("historydisclosedupdate")
+        if propInfo:
+            fields.update({"userId": SkypeUtils.noPrefix(propInfo.find("initiator").text),
+                           "history": propInfo.find("value").text == "true"})
+        return fields
+
+
+@SkypeUtils.initAttrs
 @SkypeUtils.convertIds(user=("member",))
 class SkypeMemberMsg(SkypeMsg):
     """
@@ -483,9 +559,10 @@ class SkypeAddMemberMsg(SkypeMemberMsg):
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeAddMemberMsg, cls).rawToFields(raw)
-        memInfo = (BeautifulSoup(raw.get("content"), "html.parser").find("addmember") or {})
-        fields.update({"userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
-                       "memberId": SkypeUtils.noPrefix(memInfo.find("target").text)})
+        memInfo = BeautifulSoup(raw.get("content"), "html.parser").find("addmember")
+        if memInfo:
+            fields.update({"userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
+                           "memberId": SkypeUtils.noPrefix(memInfo.find("target").text)})
         return fields
 
 
@@ -504,10 +581,11 @@ class SkypeChangeMemberMsg(SkypeMemberMsg):
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeChangeMemberMsg, cls).rawToFields(raw)
-        memInfo = (BeautifulSoup(raw.get("content"), "html.parser").find("roleupdate") or {})
-        fields.update({"userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
-                       "memberId": SkypeUtils.noPrefix(memInfo.find("target").find("id").text),
-                       "admin": memInfo.find("target").find("role").text == "admin"})
+        memInfo = BeautifulSoup(raw.get("content"), "html.parser").find("roleupdate")
+        if memInfo:
+            fields.update({"userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
+                           "memberId": SkypeUtils.noPrefix(memInfo.find("target").find("id").text),
+                           "admin": memInfo.find("target").find("role").text == "admin"})
         return fields
 
 
@@ -520,7 +598,8 @@ class SkypeRemoveMemberMsg(SkypeMemberMsg):
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeRemoveMemberMsg, cls).rawToFields(raw)
-        memInfo = (BeautifulSoup(raw.get("content"), "html.parser").find("deletemember") or {})
-        fields.update({"userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
-                       "memberId": SkypeUtils.noPrefix(memInfo.find("target").text)})
+        memInfo = BeautifulSoup(raw.get("content"), "html.parser").find("deletemember")
+        if memInfo:
+            fields.update({"userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
+                           "memberId": SkypeUtils.noPrefix(memInfo.find("target").text)})
         return fields
