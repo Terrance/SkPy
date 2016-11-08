@@ -233,41 +233,6 @@ class SkypeMsg(SkypeObj):
                   "ThreadActivity/DeleteMember": SkypeRemoveMemberMsg}.get(raw.get("messagetype"), cls)
         return msgCls(skype, raw, **msgCls.rawToFields(raw))
 
-    def plain(self, entities=False):
-        """
-        Attempt to convert the message to plain text.
-
-        Hyperlinks are replaced with their target, and message edit tags are stripped.
-
-        With ``entities`` set, instead of stripping all tags altogether, the following replacements are made:
-
-        ========================  =========================
-        Rich text                 Plain text
-        ========================  =========================
-        ``<b>bold</b>``           ``*bold*``
-        ``<i>italic</i>``         ``_italic_``
-        ``<s>strikethrough</s>``  ``~strikethrough~``
-        ``<pre>monospace</pre>``  ``{code}monospace{code}``
-        ========================  =========================
-
-        Args:
-            entities (bool): whether to preserve formatting using the plain text equivalents
-        """
-        if self.type == "RichText":
-            text = re.sub(r"<e.*?/>", "", self.content)
-            text = re.sub(r"""<a.*?href="(.*?)">.*?</a>""", r"\1", text)
-            text = re.sub(r"</?b.*?>", "*" if entities else "", text)
-            text = re.sub(r"</?i.*?>", "_" if entities else "", text)
-            text = re.sub(r"</?s.*?>", "~" if entities else "", text)
-            text = re.sub(r"</?pre.*?>", "{code}" if entities else "", text)
-            text = re.sub(r"""<at.*?id="8:(.*?)">.*?</at>""", r"@\1", text)
-            text = text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&") \
-                       .replace("&quot;", "\"").replace("&apos;", "'")
-            return text
-        else:
-            # It's already plain, or it's something we can't handle.
-            return self.content
-
     def read(self):
         """
         Mark this message as read by sending an updated consumption horizon.
@@ -299,7 +264,53 @@ class SkypeMsg(SkypeObj):
 class SkypeTextMsg(SkypeMsg):
     """
     A message containing rich or plain text.
+
+    Attributes:
+        plain (str):
+            Message content converted to plain text.
+
+            Hyperlinks are replaced with their target, and all HTML tags are stripped.
+        markup (str):
+            Message converted to plain text, retaining formatting markup.
+
+            Hyperlinks become their target, message edit tags are stripped, and the following replacements are made:
+
+            ===============================  =========================
+            Rich text                        Plain text
+            ===============================  =========================
+            ``<b>bold</b>``                  ``*bold*``
+            ``<i>italic</i>``                ``_italic_``
+            ``<s>strikethrough</s>``         ``~strikethrough~``
+            ``<pre>monospace</pre>``         ``{code}monospace{code}``
+            ``<at id="8:fred.2">Fred</at>``  ``@fred.2``
+            ===============================  =========================
     """
+
+    @property
+    def plain(self):
+        if self.content is None:
+            return None
+        text = re.sub(r"</?(e|b|i|s|pre).*?>", "", self.content)
+        text = re.sub(r"""<a.*?href="(.*?)">.*?</a>""", r"\1", text)
+        text = re.sub(r"""<at.*?id="8:(.*?)">.*?</at>""", r"@\1", text)
+        text = text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&") \
+                   .replace("&quot;", "\"").replace("&apos;", "'")
+        return text
+
+    @property
+    def markup(self):
+        if self.content is None:
+            return None
+        text = re.sub(r"<e.*?/>", "", self.content)
+        text = re.sub(r"</?b.*?>", "*", text)
+        text = re.sub(r"</?i.*?>", "_", text)
+        text = re.sub(r"</?s.*?>", "~", text)
+        text = re.sub(r"</?pre.*?>", "{code}", text)
+        text = re.sub(r"""<a.*?href="(.*?)">.*?</a>""", r"\1", text)
+        text = re.sub(r"""<at.*?id="8:(.*?)">.*?</at>""", r"@\1", text)
+        text = text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&") \
+                   .replace("&quot;", "\"").replace("&apos;", "'")
+        return text
 
 
 @SkypeUtils.initAttrs
