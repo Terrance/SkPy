@@ -7,7 +7,7 @@ import unittest
 
 import responses
 
-from skpy import Skype, SkypeConnection, SkypeContact, SkypeMsg
+from skpy import Skype, SkypeConnection, SkypeContact, SkypeMsg, SkypeTextMsg, SkypeUtils
 
 
 class Data:
@@ -24,9 +24,12 @@ class Data:
     chatShortId = "c" * 12
     chatLongId = "c" * 32
     chatThreadId = "19:{0}@thread.skype".format(chatLongId)
+    chatP2PThreadId = "19:{0}@p2p.thread.skype".format(chatLongId)
     guestId = "guest:name_gggggggg"
     contactId = "joe.4"
+    liveContactId = "live:joe.4"
     nonContactId = "anna.7"
+    botContactId = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
     asmId = "0-weu-aa-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     msgTime = 1451606400000
     msgTimeStr = "{0}".format(msgTime)
@@ -274,11 +277,16 @@ class SkypeClientTest(unittest.TestCase):
         Complete the auth flow with a dummy username and password.
         """
         registerMocks()
+        # Do the authentication.
         sk = Skype("fred.2", "password")
+        # Tokens should be set.
         self.assertEqual(sk.conn.tokens["skype"], Data.skypeToken)
         self.assertEqual(sk.conn.tokens["reg"], "registrationToken={0}".format(Data.regToken))
+        # Messenger host should be the default.
         self.assertEqual(sk.conn.msgsHost, SkypeConnection.API_MSGSHOST)
+        # Main endpoint should exist.
         self.assertEqual(sk.conn.endpoints["main"].id, "{{{0}}}".format(Data.endpointId))
+        # Connected as our user, not a guest.
         self.assertTrue(sk.conn.connected)
         self.assertFalse(sk.conn.guest)
         self.assertEqual(sk.userId, Data.userId)
@@ -289,11 +297,16 @@ class SkypeClientTest(unittest.TestCase):
         Complete the auth flow with a dummy username and password, including a messenger hostname redirect.
         """
         registerMocks(regTokenRedirect=True)
+        # Do the authentication.
         sk = Skype("fred.2", "password")
+        # Tokens should be set.
         self.assertEqual(sk.conn.tokens["skype"], Data.skypeToken)
         self.assertEqual(sk.conn.tokens["reg"], "registrationToken={0}".format(Data.regToken))
+        # Messenger host should be the alternative domain.
         self.assertEqual(sk.conn.msgsHost, Data.msgsHost)
+        # Main endpoint should exist.
         self.assertEqual(sk.conn.endpoints["main"].id, "{{{0}}}".format(Data.endpointId))
+        # Connected as our user, not a guest.
         self.assertTrue(sk.conn.connected)
         self.assertFalse(sk.conn.guest)
         self.assertEqual(sk.userId, Data.userId)
@@ -304,12 +317,19 @@ class SkypeClientTest(unittest.TestCase):
         Complete the auth flow as a guest joining a conversation.
         """
         registerMocks(guest=True)
+        # Don't connect to start with.
         sk = Skype()
+        self.assertFalse(sk.conn.connected)
+        # Do the authentication.
         sk.conn.guestLogin(Data.chatShortId, "Name")
+        # Tokens should be set.
         self.assertEqual(sk.conn.tokens["skype"], Data.skypeToken)
         self.assertEqual(sk.conn.tokens["reg"], "registrationToken={0}".format(Data.regToken))
+        # Messenger host should be the default.
         self.assertEqual(sk.conn.msgsHost, SkypeConnection.API_MSGSHOST)
+        # Main endpoint should exist.
         self.assertEqual(sk.conn.endpoints["main"].id, "{{{0}}}".format(Data.endpointId))
+        # Connected as a guest user.
         self.assertTrue(sk.conn.connected)
         self.assertTrue(sk.conn.guest)
         self.assertEqual(sk.userId, Data.guestId)
@@ -320,7 +340,9 @@ class SkypeClientTest(unittest.TestCase):
         Collect a list of contacts for the current user.
         """
         sk = mockSkype()
+        # Expecting one contact.
         self.assertEqual(len(sk.contacts), 1)
+        # Contact profile fields should be set.
         con = sk.contacts[Data.contactId]
         self.assertTrue(isinstance(con, SkypeContact))
         self.assertEqual(con.id, Data.contactId)
@@ -328,6 +350,7 @@ class SkypeClientTest(unittest.TestCase):
         self.assertEqual(len(con.phones), 3)
         self.assertEqual(con.authorised, True)
         self.assertEqual(con.blocked, False)
+        # Check we can retrieve a user outside of the contact list.
         nonCon = sk.contacts[Data.nonContactId]
         self.assertTrue(isinstance(con, SkypeContact))
         self.assertEqual(nonCon.id, Data.nonContactId)
@@ -339,11 +362,14 @@ class SkypeClientTest(unittest.TestCase):
         Collect a list of conversations for the current user.
         """
         sk = mockSkype()
+        # Expecting two conversations.
         recent = sk.chats.recent()
         self.assertEqual(len(recent), 2)
+        # Check the 1-to-1 chat is present.
         chat = recent["8:{0}".format(Data.contactId)]
         self.assertEqual(chat.userId, Data.contactId)
         self.assertEqual(chat.userIds, [Data.contactId])
+        # Check the group chat is present.
         groupChat = recent[Data.chatThreadId]
         self.assertEqual(groupChat.creatorId, Data.nonContactId)
         self.assertEqual(groupChat.adminIds, [Data.nonContactId])
@@ -355,26 +381,69 @@ class SkypeClientTest(unittest.TestCase):
         self.assertTrue(groupChat.history)
 
     @responses.activate
-    def testChatMsgs(self):
+    def testChatGetMsgs(self):
         """
-        Collect a list of messages for a conversation, and send a message.
+        Collect a list of messages for a conversation.
         """
         sk = mockSkype()
         chat = sk.chats[Data.chatThreadId]
+        # Expecting one message.
         msgs = chat.getMsgs()
         self.assertEqual(len(msgs), 1)
+        # Message properties should be present.
         msg = msgs[0]
-        self.assertTrue(isinstance(msg, SkypeMsg))
+        self.assertTrue(isinstance(msg, SkypeTextMsg))
         self.assertEqual(msg.id, Data.msgTimeStr)
         self.assertEqual(msg.time, datetime(2016, 1, 1))
         self.assertEqual(msg.userId, Data.nonContactId)
         self.assertEqual(msg.type, "Text")
         self.assertEqual(msg.content, "A message for the team.")
-        msg = chat.sendMsg("Word.", rich=True)
-        self.assertTrue(isinstance(msg, SkypeMsg))
+
+    @responses.activate
+    def testChatSendMsgs(self):
+        """
+        Send various types of messages, and check the resulting :class:`SkypeMsg` instances.
+        """
+        sk = mockSkype()
+        chat = sk.chats[Data.chatThreadId]
+        # Send a plain text message.
+        msg = chat.sendMsg("Word")
+        self.assertTrue(isinstance(msg, SkypeTextMsg))
         self.assertEqual(msg.userId, Data.userId)
+        self.assertEqual(msg.type, "Text")
+        self.assertEqual(msg.content, "Word")
+        # Send a rich text message.
+        msg = chat.sendMsg(SkypeMsg.bold("Bold"), rich=True)
+        self.assertTrue(isinstance(msg, SkypeTextMsg))
         self.assertEqual(msg.type, "RichText")
-        self.assertEqual(msg.content, "Word.")
+
+    def testUtils(self):
+        """
+        Various tests for parsing provided by :class:`.SkypeUtils`.
+        """
+        # Remove thread prefixes from thread identifiers.
+        self.assertEqual(SkypeUtils.noPrefix("8:{0}".format(Data.userId)), Data.userId)
+        self.assertEqual(SkypeUtils.noPrefix(Data.chatThreadId), Data.chatThreadId[3:])
+        self.assertEqual(SkypeUtils.noPrefix(Data.liveContactId), Data.liveContactId)
+        self.assertEqual(SkypeUtils.noPrefix("28:concierge"), "concierge")
+        self.assertEqual(SkypeUtils.noPrefix("28:{0}".format(Data.botContactId)), Data.botContactId)
+        # Extract user identifiers from URLs.
+        self.assertEqual(SkypeUtils.userToId(""), None)
+        self.assertEqual(SkypeUtils.userToId("{0}/users/8:{1}".format(Data.msgsHost, Data.contactId)), Data.contactId)
+        self.assertEqual(SkypeUtils.userToId("{0}/users/8:{1}".format(Data.msgsHost, Data.liveContactId)),
+                         Data.liveContactId)
+        self.assertEqual(SkypeUtils.userToId("{0}/users/ME/contacts/8:{1}".format(Data.msgsHost, Data.contactId)),
+                         Data.contactId)
+        self.assertEqual(SkypeUtils.userToId("{0}/users/ME/contacts/8:{1}".format(Data.msgsHost, Data.liveContactId)),
+                         Data.liveContactId)
+        # Extract chat identifiers from URLs.
+        self.assertEqual(SkypeUtils.chatToId(""), None)
+        self.assertEqual(SkypeUtils.chatToId("{0}/conversations/8:{1}".format(Data.msgsHost, Data.liveContactId)),
+                         "8:{0}".format(Data.liveContactId))
+        self.assertEqual(SkypeUtils.chatToId("{0}/conversations/{1}".format(Data.msgsHost, Data.chatThreadId)),
+                         Data.chatThreadId)
+        self.assertEqual(SkypeUtils.chatToId("{0}/conversations/{1}".format(Data.msgsHost, Data.chatP2PThreadId)),
+                         Data.chatP2PThreadId)
 
 
 if __name__ == "__main__":
