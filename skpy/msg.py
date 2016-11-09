@@ -2,11 +2,21 @@ import re
 from datetime import datetime, date
 import time
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Tag
 
 from .core import SkypeObj, SkypeEnum
 from .util import SkypeUtils
 from .conn import SkypeConnection
+
+
+def makeTag(name, string=None, **kwargs):
+    tag = Tag(name=name, attrs=kwargs)
+    for key in kwargs:
+        if kwargs[key] is None:
+            kwargs[key] = ""
+    if string:
+        tag.string = string
+    return tag
 
 
 @SkypeUtils.initAttrs
@@ -32,6 +42,8 @@ class SkypeMsg(SkypeObj):
             Conversation where this message was received.
         content (str):
             Raw message content, as received from the API.
+        html (str):
+            Recreated content string based on the field values.
     """
 
     @staticmethod
@@ -233,6 +245,11 @@ class SkypeMsg(SkypeObj):
                   "ThreadActivity/DeleteMember": SkypeRemoveMemberMsg}.get(raw.get("messagetype"), cls)
         return msgCls(skype, raw, **msgCls.rawToFields(raw))
 
+    @property
+    def html(self):
+        # If not overridden in a subclass, just return the existing content.
+        return self.content
+
     def read(self):
         """
         Mark this message as read by sending an updated consumption horizon.
@@ -338,6 +355,13 @@ class SkypeContactMsg(SkypeMsg):
             fields["contactNames"].append(tag.get("f"))
         return fields
 
+    @property
+    def html(self):
+        tag = makeTag("contacts")
+        for con in self.contacts:
+            tag.append(makeTag("c", t="s", s=con.id, f=con.name))
+        return tag
+
 
 @SkypeUtils.initAttrs
 class SkypeLocationMsg(SkypeMsg):
@@ -376,6 +400,24 @@ class SkypeLocationMsg(SkypeMsg):
         fields.update({"address": locTag.get("address"),
                        "mapUrl": locTag.find("a").get("href")})
         return fields
+
+    @property
+    def html(self):
+        timestamp = self.time or datetime.now()
+        params = {}
+        for attr in ("latitude", "longitude", "altitude", "speed", "course"):
+            if getattr(self, attr):
+                params[attr] = getattr(self, attr)
+        for attr in ("latitude", "longitude"):
+            if attr in params:
+                params[attr] = int(params[attr] * 1e6)
+        if self.address:
+            params["address"] = self.address
+        params.update({"pointOfInterest": "",
+                       "timeStamp": str(int(time.mktime(timestamp.timetuple())))})
+        tag = makeTag("location", **params)
+        tag.append(makeTag("a", self.address, href=self.mapUrl))
+        return tag
 
 
 @SkypeUtils.initAttrs
@@ -432,6 +474,16 @@ class SkypeFileMsg(SkypeMsg):
         return self.skype.conn("GET", "{0}/views/original".format(self.file.urlFull),
                                auth=SkypeConnection.Auth.Authorize).content
 
+    @property
+    def html(self):
+        tag = makeTag("URIObject", type="File.1", uri=self.file.urlFull, url_thumbnail=self.file.urlThumb)
+        tag.append(makeTag("Title", "Title: {0}".format(self.file.name) if self.file.name else ""))
+        tag.append(makeTag("Description", "Description: {0}".format(self.file.name) if self.file.name else ""))
+        tag.append(makeTag("FileSize", v=self.file.size))
+        tag.append(makeTag("OriginalName", v=self.file.name))
+        tag.append(makeTag("a", self.file.urlView, href=self.file.urlView))
+        return tag
+
 
 @SkypeUtils.initAttrs
 class SkypeImageMsg(SkypeFileMsg):
@@ -444,6 +496,16 @@ class SkypeImageMsg(SkypeFileMsg):
     def fileContent(self):
         return self.skype.conn("GET", "{0}/views/imgpsh_fullsize".format(self.file.urlFull),
                                auth=SkypeConnection.Auth.Authorize).content
+
+    @property
+    def html(self):
+        tag = makeTag("URIObject", type="Picture.1", uri=self.file.urlFull, url_thumbnail=self.file.urlThumb)
+        tag.append(makeTag("Title"))
+        tag.append(makeTag("Description"))
+        tag.append(makeTag("OriginalName", v=self.file.name))
+        tag.append(makeTag("a", self.file.urlView, href=self.file.urlView))
+        tag.append(makeTag("meta", type="photo", originalName=self.file.name))
+        return tag
 
 
 @SkypeUtils.initAttrs
@@ -485,12 +547,30 @@ class SkypeCallMsg(SkypeMsg):
             fields["userNames"].append(partTag.find("name").text)
         return fields
 
+    @property
+    def html(self):
+        partType = {self.State.Started: "started", self.State.Ended: "ended"}[self.state]
+        tag = makeTag("partlist", type=partType, alt="")
+        for user in self.users:
+            conTag = makeTag("part", identity=user.id)
+            conTag.append(makeTag("name", user.name))
+            tag.append(conTag)
+        return tag
+
 
 @SkypeUtils.initAttrs
 class SkypePropertyMsg(SkypeMsg):
     """
     A base message type for changes to conversation properties.
     """
+
+    def tagTemplate(self, root):
+        # Subclasses of this class have the same message structure.
+        timestamp = self.time or datetime.now()
+        tag = makeTag(root)
+        tag.append(makeTag("eventtime", str(int(time.mktime(timestamp.timetuple())))))
+        tag.append(makeTag("initiator", "8:{0}".format(self.userId) if self.userId else ""))
+        return tag
 
 
 @SkypeUtils.initAttrs
@@ -514,6 +594,12 @@ class SkypeTopicPropertyMsg(SkypePropertyMsg):
                            "topic": propInfo.find("value").text})
         return fields
 
+    @property
+    def html(self):
+        tag = self.tagTemplate("topicupdate")
+        tag.append(makeTag("value", self.topic))
+        return tag
+
 
 @SkypeUtils.initAttrs
 class SkypeOpenPropertyMsg(SkypePropertyMsg):
@@ -535,6 +621,12 @@ class SkypeOpenPropertyMsg(SkypePropertyMsg):
             fields.update({"userId": SkypeUtils.noPrefix(propInfo.find("initiator").text),
                            "open": propInfo.find("value").text == "true"})
         return fields
+
+    @property
+    def html(self):
+        tag = self.tagTemplate("joiningenabledupdate")
+        tag.append(makeTag("value", "true" if self.open else "false"))
+        return tag
 
 
 @SkypeUtils.initAttrs
@@ -558,10 +650,16 @@ class SkypeHistoryPropertyMsg(SkypePropertyMsg):
                            "history": propInfo.find("value").text == "true"})
         return fields
 
+    @property
+    def html(self):
+        tag = self.tagTemplate("historydisclosedupdate")
+        tag.append(makeTag("value", "true" if self.history else "false"))
+        return tag
+
 
 @SkypeUtils.initAttrs
 @SkypeUtils.convertIds(user=("member",))
-class SkypeMemberMsg(SkypeMsg):
+class SkypeMemberMsg(SkypePropertyMsg):
     """
     A message representing a change in a group conversation's participants.
 
@@ -591,6 +689,12 @@ class SkypeAddMemberMsg(SkypeMemberMsg):
                            "memberId": SkypeUtils.noPrefix(memInfo.find("target").text)})
         return fields
 
+    @property
+    def html(self):
+        tag = self.tagTemplate("addmember")
+        tag.append(makeTag("target", "8:{0}".format(self.memberId) if self.memberId else ""))
+        return tag
+
 
 @SkypeUtils.initAttrs
 class SkypeChangeMemberMsg(SkypeMemberMsg):
@@ -614,6 +718,15 @@ class SkypeChangeMemberMsg(SkypeMemberMsg):
                            "admin": memInfo.find("target").find("role").text == "admin"})
         return fields
 
+    @property
+    def html(self):
+        tag = self.tagTemplate("addmember")
+        valTag = makeTag("target")
+        valTag.append(makeTag("id", "8:{0}".format(self.memberId) if self.memberId else ""))
+        valTag.append(makeTag("role", "admin" if self.admin else "user"))
+        tag.append(valTag)
+        return tag
+
 
 @SkypeUtils.initAttrs
 class SkypeRemoveMemberMsg(SkypeMemberMsg):
@@ -629,3 +742,9 @@ class SkypeRemoveMemberMsg(SkypeMemberMsg):
             fields.update({"userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
                            "memberId": SkypeUtils.noPrefix(memInfo.find("target").text)})
         return fields
+
+    @property
+    def html(self):
+        tag = self.tagTemplate("addmember")
+        tag.append(makeTag("target", "8:{0}".format(self.memberId) if self.memberId else ""))
+        return tag
