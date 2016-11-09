@@ -351,23 +351,29 @@ class SkypeLocationMsg(SkypeMsg):
             East-West coordinate of the user's location.
         altitude (int):
             Vertical position from sea level.
+        speed (int):
+            Current velocity during the reading.
+        course (int):
+            Current direction during the recording.
         address (str):
             Geocoded address provided by the sender.
         mapUrl (str):
             Link to map displaying the location.
     """
 
-    attrs = SkypeMsg.attrs + ("latitude", "longitude", "altitude", "address", "mapUrl")
+    attrs = SkypeMsg.attrs + ("latitude", "longitude", "altitude", "speed", "course", "address", "mapUrl")
 
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeLocationMsg, cls).rawToFields(raw)
         locTag = BeautifulSoup(raw.get("content"), "html.parser").find("location")
+        for attr in ("latitude", "longitude", "altitude", "speed", "course"):
+            fields[attr] = int(locTag.get(attr)) if locTag.get(attr) else None
         # Exponent notation produces a float, meaning lat/long will always be floats too.
-        fields.update({"latitude": int(locTag.get("latitude")) / 1e6,
-                       "longitude": int(locTag.get("longitude")) / 1e6,
-                       "altitude": int(locTag.get("altitude")),
-                       "address": locTag.get("address"),
+        for attr in ("latitude", "longitude"):
+            if fields[attr]:
+                fields[attr] /= 1e6
+        fields.update({"address": locTag.get("address"),
                        "mapUrl": locTag.find("a").get("href")})
         return fields
 
