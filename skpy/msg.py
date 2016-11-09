@@ -447,6 +447,7 @@ class SkypeImageMsg(SkypeFileMsg):
 
 
 @SkypeUtils.initAttrs
+@SkypeUtils.convertIds("users")
 class SkypeCallMsg(SkypeMsg):
     """
     A message representing a change in state to a voice or video call inside the conversation.
@@ -454,6 +455,10 @@ class SkypeCallMsg(SkypeMsg):
     Attributes:
         state (:class:`.State`):
             New state of the call.
+        users (:class:`.SkypeUser` list):
+            User objects embedded in the message.
+        userNames (str list):
+            Names of the users, as seen by the initiator of the call.
     """
 
     State = SkypeEnum("SkypeCallMsg.State", ("Started", "Ended"))
@@ -467,13 +472,17 @@ class SkypeCallMsg(SkypeMsg):
             All call participants have hung up.
     """
 
-    attrs = SkypeMsg.attrs + ("state",)
+    attrs = SkypeMsg.attrs + ("state", "userIds", "userNames")
 
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeCallMsg, cls).rawToFields(raw)
-        partType = (BeautifulSoup(raw.get("content"), "html.parser").find("partlist") or {}).get("type")
-        fields["state"] = {"started": cls.State.Started, "ended": cls.State.Ended}[partType]
+        listTag = BeautifulSoup(raw.get("content"), "html.parser").find("partlist")
+        fields.update({"state": {"started": cls.State.Started, "ended": cls.State.Ended}[listTag.get("type")],
+                       "userIds": [], "userNames": []})
+        for partTag in listTag.find_all("part"):
+            fields["userIds"].append(partTag.get("identity"))
+            fields["userNames"].append(partTag.find("name").text)
         return fields
 
 
