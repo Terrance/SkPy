@@ -46,8 +46,8 @@ def registerMocks(regTokenRedirect=False, guest=False):
         guest (bool): whether to emulate a guest account
     """
     # Retrieve the login form.
-    responses.add(responses.GET, "{0}/oauth/microsoft".format(SkypeConnection.API_LOGIN),
-                  status=200, content_type="text/html",
+    responses.add(responses.GET, "{0}/oauth/microsoft".format(SkypeConnection.API_LOGIN), status=200,
+                  adding_headers={"Set-Cookie": "MSPRequ=MSPRequ; MSPOK=MSPOK"}, content_type="text/html",
                   body="""<html><body><input name="PPFT" value="ppftvalue"></body></html>""")
     # Submit username/password to form.
     responses.add(responses.POST, "{0}/ppsecure/post.srf".format(SkypeConnection.API_MSACC),

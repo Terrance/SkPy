@@ -258,7 +258,14 @@ class SkypeConnection(SkypeObj):
             pwd (str): password of the connecting account
         """
         def getSkypeToken(self):
-            self.liveLogin(user, pwd)
+            self.tokens["skype"], self.tokenExpiry["skype"] = SkypeLiveAuthProvider(self).auth(user, pwd)
+            # Figure out what the username is.
+            self.userId = self("GET", "{0}/users/self/profile".format(self.API_USER),
+                               auth=self.Auth.SkypeToken).json().get("username")
+            # (Re)generate the registration token.
+            self.tokens.pop("reg", None)
+            self.tokenExpiry.pop("reg", None)
+            self.getRegToken()
         self.getSkypeToken = MethodType(getSkypeToken, self)
 
     def setTokenFile(self, path):
@@ -335,66 +342,6 @@ class SkypeConnection(SkypeObj):
             if "reg" not in self.tokenExpiry or datetime.now() >= self.tokenExpiry["reg"]:
                 self.getRegToken()
 
-    def liveLogin(self, user, pwd):
-        """
-        Obtain connection parameters from the Microsoft account login page, and perform a login with the given email
-        address or Skype username, and its password.  This emulates a login to Skype for Web on ``login.live.com``.
-
-        .. note::
-            Microsoft accounts with two-factor authentication enabled are not supported, and will cause a
-            :class:`.SkypeAuthException` to be raised.  See the exception definitions for other possible causes.
-
-        Args:
-            user (str): username or email address of the connecting account
-            pwd (str): password of the connecting account
-
-        Raises:
-            .SkypeAuthException: if the login request is rejected
-            .SkypeApiException: if the login form can't be processed
-        """
-        # First, start a Microsoft account login from Skype, which will redirect to login.live.com.
-        loginResp = self("GET", "{0}/oauth/microsoft".format(self.API_LOGIN),
-                         params={"client_id": "578134", "redirect_uri": "https://web.skype.com"})
-        # This is inside some embedded JavaScript, so can't easily parse with BeautifulSoup.
-        ppftReg = re.search(r"""<input.*?name="PPFT".*?value="(.*?)\"""", loginResp.text)
-        if not ppftReg:
-            raise SkypeApiException("Couldn't retrieve PPFT from login form")
-        # Now pass the login credentials over.
-        loginResp = self("POST", "{0}/ppsecure/post.srf".format(self.API_MSACC),
-                         params={"wa": "wsignin1.0", "wp": "MBI_SSL",
-                                 "wreply": "https://lw.skype.com/login/oauth/proxy?client_id=578134&site_name="
-                                           "lw.skype.com&redirect_uri=https%3A%2F%2Fweb.skype.com%2F"},
-                         cookies={"MSPRequ": loginResp.cookies.get("MSPRequ"),
-                                  "MSPOK": loginResp.cookies.get("MSPOK"),
-                                  "CkTst": str(int(time.time() * 1000))},
-                         data={"login": user, "passwd": pwd, "PPFT": ppftReg.group(1)})
-        tField = BeautifulSoup(loginResp.text, "html.parser").find(id="t")
-        if tField is None:
-            err = re.search(r"sErrTxt:'([^'\\]*(\\.[^'\\]*)*)'", loginResp.text)
-            errMsg = re.sub(r"<.*?>", "", err.group(1)).replace("\\'", "'").replace("\\\\", "\\") if err else None
-            raise SkypeAuthException("Microsoft authentication failed", loginResp, errMsg)
-        # Now exchange the 't' value for a Skype token.
-        loginResp = self("POST", "{0}/microsoft".format(self.API_LOGIN),
-                         params={"client_id": "578134", "redirect_uri": "https://web.skype.com"},
-                         data={"t": tField.get("value"), "client_id": "578134", "oauthPartner": "999",
-                               "site_name": "lw.skype.com", "redirect_uri": "https://web.skype.com"})
-        loginPage = BeautifulSoup(loginResp.text, "html.parser")
-        tokenField = loginPage.find("input", {"name": "skypetoken"})
-        if not tokenField:
-            raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
-        self.tokens["skype"] = tokenField.get("value")
-        expiryField = loginPage.find("input", {"name": "expires_in"})
-        if expiryField:
-            secs = int(time.time())
-            self.tokenExpiry["skype"] = datetime.fromtimestamp(secs + int(expiryField.get("value")))
-        # Figure out what the username is.
-        self.userId = self("GET", "{0}/users/self/profile".format(self.API_USER),
-                           auth=self.Auth.SkypeToken).json().get("username")
-        # (Re)generate the registration token.
-        self.tokens.pop("reg", None)
-        self.tokenExpiry.pop("reg", None)
-        self.getRegToken()
-
     def guestLogin(self, url, name):
         """
         Connect to Skype as a guest, joining a given conversation.
@@ -406,23 +353,8 @@ class SkypeConnection(SkypeObj):
             url (str): public join URL for conversation, or identifier from it
             name (str): display name as shown to other participants
         """
-        urlId = url.split("/")[-1]
-        # Pretend to be Chrome on Windows (required to avoid "unsupported device" messages).
-        agent = "Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) " \
-                "Chrome/33.0.1750.117 Safari/537.36"
-        cookies = self("GET", "{0}/{1}".format(self.API_JOIN, urlId), headers={"User-Agent": agent}).cookies
-        ids = self("POST", "{0}/api/v2/conversation/".format(self.API_JOIN),
-                   json={"shortId": urlId, "type": "wl"}).json()
-        self.tokens["skype"] = self("POST", "{0}/api/v1/users/guests".format(self.API_JOIN),
-                                    headers={"csrf_token": cookies.get("csrf_token"),
-                                             "X-Skype-Request-Id": cookies.get("launcher_session_id")},
-                                    json={"flowId": cookies.get("launcher_session_id"),
-                                          "shortId": urlId,
-                                          "longId": ids.get("Long"),
-                                          "threadId": ids.get("Resource"),
-                                          "name": name}).json().get("skypetoken")
-        # Assume the token lasts 24 hours, as a guest account only lasts that long anyway.
-        self.tokenExpiry["skype"] = datetime.now() + timedelta(days=1)
+        self.tokens["skype"], self.tokenExpiry["skype"] = SkypeGuestAuthProvider(self).auth(url, name)
+        # Figure out what the username is.
         self.userId = self("GET", "{0}/users/self/profile".format(self.API_USER),
                            auth=self.Auth.SkypeToken).json().get("username")
         self.getRegToken()
@@ -486,6 +418,142 @@ class SkypeConnection(SkypeObj):
                          params={"view": "expanded"}, auth=self.Auth.RegToken).json().get("endpointPresenceDocs", []):
             id = json.get("link", "").split("/")[7]
             self.endpoints["all"].append(SkypeEndpoint(self, id))
+
+
+class SkypeAuthProvider(SkypeObj):
+    """
+    A base class for authentication providers.  Subclasses should implement the :meth:`auth` method.
+    """
+
+    def __init__(self, conn):
+        self.conn = conn
+
+    def auth(self, *args, **kwargs):
+        """
+        Authenticate a user, given some form of identification.
+
+        Returns:
+            (str, datetime.datetime): Skype token, and associated expiry if known
+
+        Raises:
+            .SkypeAuthException: if the login request is rejected
+            .SkypeApiException: if the login forms can't be processed
+        """
+        raise NotImplementedError
+
+
+class SkypeLiveAuthProvider(SkypeAuthProvider):
+    """
+    An authentication provider that connects via Microsoft account authentication.
+    """
+
+    def auth(self, user, pwd):
+        """
+        Obtain connection parameters from the Microsoft account login page, and perform a login with the given email
+        address or Skype username, and its password.  This emulates a login to Skype for Web on ``login.live.com``.
+
+        .. note::
+            Microsoft accounts with two-factor authentication enabled are not supported, and will cause a
+            :class:`.SkypeAuthException` to be raised.  See the exception definitions for other possible causes.
+
+        Args:
+            user (str): username or email address of the connecting account
+            pwd (str): password of the connecting account
+
+        Raises:
+            .SkypeAuthException: if the login request is rejected
+            .SkypeApiException: if the login form can't be processed
+        """
+        # Do the authentication dance.
+        params = self.getParams()
+        t = self.sendCreds(user, pwd, params)
+        return self.getToken(t)
+
+    def getParams(self):
+        # First, start a Microsoft account login from Skype, which will redirect to login.live.com.
+        loginResp = self.conn("GET", "{0}/oauth/microsoft".format(SkypeConnection.API_LOGIN),
+                              params={"client_id": "578134", "redirect_uri": "https://web.skype.com"})
+        # This is inside some embedded JavaScript, so can't easily parse with BeautifulSoup.
+        ppftReg = re.search(r"""<input.*?name="PPFT".*?value="(.*?)""" + "\"", loginResp.text)
+        if not ppftReg:
+            raise SkypeApiException("Couldn't retrieve PPFT from login form", loginResp)
+        if "MSPRequ" not in loginResp.cookies or "MSPOK" not in loginResp.cookies:
+            raise SkypeApiException("Couldn't retrieve MSPRequ/MSPOK cookies", loginResp)
+        return {"MSPRequ": loginResp.cookies.get("MSPRequ"),
+                "MSPOK": loginResp.cookies.get("MSPOK"),
+                "PPFT": ppftReg.group(1)}
+
+    def sendCreds(self, user, pwd, params):
+        # Now pass the login credentials over.
+        loginResp = self.conn("POST", "{0}/ppsecure/post.srf".format(SkypeConnection.API_MSACC),
+                              params={"wa": "wsignin1.0", "wp": "MBI_SSL",
+                                      "wreply": "https://lw.skype.com/login/oauth/proxy?client_id=578134&site_name="
+                                                "lw.skype.com&redirect_uri=https%3A%2F%2Fweb.skype.com%2F"},
+                              cookies={"MSPRequ": params["MSPRequ"],
+                                       "MSPOK": params["MSPOK"],
+                                       "CkTst": str(int(time.time() * 1000))},
+                              data={"login": user, "passwd": pwd, "PPFT": params["PPFT"]})
+        tField = BeautifulSoup(loginResp.text, "html.parser").find(id="t")
+        if tField is None:
+            err = re.search(r"sErrTxt:'([^'\\]*(\\.[^'\\]*)*)'", loginResp.text)
+            errMsg = re.sub(r"<.*?>", "", err.group(1)).replace("\\'", "'").replace("\\\\", "\\") if err else None
+            raise SkypeAuthException("Microsoft authentication failed", loginResp, errMsg)
+        return tField.get("value")
+
+    def getToken(self, t):
+        # Now exchange the 't' value for a Skype token.
+        loginResp = self.conn("POST", "{0}/microsoft".format(SkypeConnection.API_LOGIN),
+                              params={"client_id": "578134", "redirect_uri": "https://web.skype.com"},
+                              data={"t": t, "client_id": "578134", "oauthPartner": "999",
+                                    "site_name": "lw.skype.com", "redirect_uri": "https://web.skype.com"})
+        loginPage = BeautifulSoup(loginResp.text, "html.parser")
+        # Collect the Skype token, and expiry if present.
+        tokenField = loginPage.find("input", {"name": "skypetoken"})
+        if not tokenField:
+            raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
+        token = tokenField.get("value")
+        expiryField = loginPage.find("input", {"name": "expires_in"})
+        expiry = None
+        if expiryField:
+            expiry = datetime.fromtimestamp(int(time.time()) + int(expiryField.get("value")))
+        return (token, expiry)
+
+
+class SkypeGuestAuthProvider(SkypeAuthProvider):
+    """
+    An authentication provider that connects and joins a public conversation via a join URL.
+    """
+
+    def auth(self, url, name):
+        """
+        Connect to Skype as a guest, joining a given conversation.
+
+        In this state, some APIs (such as contacts) will return 401 status codes.  A guest can only communicate with
+        the conversation they originally joined.
+
+        Args:
+            url (str): public join URL for conversation, or identifier from it
+            name (str): display name as shown to other participants
+        """
+        urlId = url.split("/")[-1]
+        # Pretend to be Chrome on Windows (required to avoid "unsupported device" messages).
+        agent = "Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) " \
+                "Chrome/33.0.1750.117 Safari/537.36"
+        cookies = self.conn("GET", "{0}/{1}".format(SkypeConnection.API_JOIN, urlId),
+                            headers={"User-Agent": agent}).cookies
+        ids = self.conn("POST", "{0}/api/v2/conversation/".format(SkypeConnection.API_JOIN),
+                        json={"shortId": urlId, "type": "wl"}).json()
+        token = self.conn("POST", "{0}/api/v1/users/guests".format(SkypeConnection.API_JOIN),
+                          headers={"csrf_token": cookies.get("csrf_token"),
+                                   "X-Skype-Request-Id": cookies.get("launcher_session_id")},
+                          json={"flowId": cookies.get("launcher_session_id"),
+                                "shortId": urlId,
+                                "longId": ids.get("Long"),
+                                "threadId": ids.get("Resource"),
+                                "name": name}).json().get("skypetoken")
+        # Assume the token lasts 24 hours, as a guest account only lasts that long anyway.
+        expiry = datetime.now() + timedelta(days=1)
+        return token, expiry
 
 
 class SkypeEndpoint(SkypeObj):
