@@ -5,7 +5,8 @@ Root of the SkPy module.  Classes from all submodules are imported here for conv
 from skpy.core import SkypeObj, SkypeObjs, SkypeEnum, SkypeException, SkypeApiException, SkypeAuthException
 from skpy.util import SkypeUtils
 from skpy.main import Skype, SkypeEventLoop, SkypeSettings, SkypeTranslator
-from skpy.conn import SkypeConnection, SkypeEndpoint
+from skpy.conn import SkypeConnection, SkypeAuthProvider, SkypeAPIAuthProvider, SkypeLiveAuthProvider, \
+                      SkypeGuestAuthProvider, SkypeEndpoint
 from skpy.user import SkypeUser, SkypeContact, SkypeBotUser, SkypeContacts, SkypeContactGroup, SkypeRequest
 from skpy.chat import SkypeChat, SkypeSingleChat, SkypeGroupChat, SkypeChats
 from skpy.msg import SkypeMsg, SkypeTextMsg, SkypeContactMsg, SkypeLocationMsg, SkypeFileMsg, SkypeImageMsg, \

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import time
 from types import MethodType
 import hashlib
+import base64
 
 from bs4 import BeautifulSoup
 import requests
@@ -440,6 +441,36 @@ class SkypeAuthProvider(SkypeObj):
             .SkypeApiException: if the login forms can't be processed
         """
         raise NotImplementedError
+
+
+class SkypeAPIAuthProvider(SkypeAuthProvider):
+    """
+    An authentication provider that connects via the Skype API.  Only compatible with Skype usernames.
+    """
+
+    def auth(self, user, pwd):
+        """
+        Perform a login with the given Skype username and its password.  This emulates a login to Skype for Web on
+        ``api.skype.com``.
+
+        Args:
+            user (str): username of the connecting account
+            pwd (str): password of the connecting account
+
+        Raises:
+            .SkypeAuthException: if the login request is rejected
+            .SkypeApiException: if the login form can't be processed
+        """
+        # Wrap up the credentials ready to send.
+        pwdHash = hashlib.md5(user + "\nskyper\n" + pwd).digest()
+        json = self.conn("POST", "{0}/login/skypetoken".format(SkypeConnection.API_USER),
+                         json={"username": user, "passwordHash": base64.b64encode(pwdHash)}).json()
+        if "skypetoken" not in json:
+            raise SkypeAuthException("Couldn't retrieve Skype token from response")
+        expiry = None
+        if "expiresIn" in json:
+            expiry = datetime.fromtimestamp(int(time.time()) + int(json["expiresIn"]))
+        return json["skypetoken"], expiry
 
 
 class SkypeLiveAuthProvider(SkypeAuthProvider):
