@@ -388,6 +388,17 @@ class SkypeConnection(SkypeObj):
         """
         raise SkypeAuthException("No username or password provided, and no valid token file")
 
+    def refreshSkypeToken(self):
+        """
+        Take the existing Skype token and refresh it, to extend the expiry time without other credentials.
+
+        Raises:
+            .SkypeAuthException: if the login request is rejected
+            .SkypeApiException: if the login form can't be processed
+        """
+        self.tokens["skype"], self.tokenExpiry["skype"] = SkypeRefreshAuthProvider(self).auth(self.tokens["skype"])
+        self.getRegToken()
+
     def getUserId(self):
         """
         Ask Skype for the authenticated user's identifier, and store it on the connection object.
@@ -626,6 +637,61 @@ class SkypeGuestAuthProvider(SkypeAuthProvider):
         # Assume the token lasts 24 hours, as a guest account only lasts that long anyway.
         expiry = datetime.now() + timedelta(days=1)
         return token, expiry
+
+
+class SkypeRefreshAuthProvider(SkypeAuthProvider):
+    """
+    An authentication provider that connects via the Skype API.  Only compatible with Skype usernames.
+    """
+
+    def auth(self, token):
+        """
+        Take an existing Skype token and refresh it, to extend the expiry time without other credentials.
+
+        Args:
+            token (str): existing Skype token
+
+        Returns:
+            (str, datetime.datetime) tuple: Skype token, and associated expiry if known
+
+        Raises:
+            .SkypeAuthException: if the login request is rejected
+            .SkypeApiException: if the login form can't be processed
+        """
+        t = self.sendToken(token)
+        return self.getToken(t)
+
+    def sendToken(self, token):
+        # Send the existing token over.
+        loginResp = self.conn("GET", "{0}/login".format(SkypeConnection.API_LOGIN),
+                              params={"client_id": "578134", "redirect_uri": "https://web.skype.com"},
+                              cookies={"refresh-token": token})
+        tField = BeautifulSoup(loginResp.text, "html.parser").find(id="t")
+        if tField is None:
+            err = re.search(r"sErrTxt:'([^'\\]*(\\.[^'\\]*)*)'", loginResp.text)
+            errMsg = "Couldn't retrieve t field from login response"
+            if err:
+                errMsg = re.sub(r"<.*?>", "", err.group(1)).replace("\\'", "'").replace("\\\\", "\\")
+            raise SkypeAuthException(errMsg, loginResp)
+        return tField.get("value")
+
+    def getToken(self, t):
+        # Now exchange the 't' value for a Skype token.
+        loginResp = self.conn("POST", "{0}/microsoft".format(SkypeConnection.API_LOGIN),
+                              params={"client_id": "578134", "redirect_uri": "https://web.skype.com"},
+                              data={"t": t, "client_id": "578134", "oauthPartner": "999",
+                                    "site_name": "lw.skype.com", "redirect_uri": "https://web.skype.com"})
+        loginPage = BeautifulSoup(loginResp.text, "html.parser")
+        # Collect the Skype token, and expiry if present.
+        tokenField = loginPage.find("input", {"name": "skypetoken"})
+        if not tokenField:
+            raise SkypeApiException("Couldn't retrieve Skype token from login response", loginResp)
+        token = tokenField.get("value")
+        expiryField = loginPage.find("input", {"name": "expires_in"})
+        expiry = None
+        if expiryField:
+            expiry = datetime.fromtimestamp(int(time.time()) + int(expiryField.get("value")))
+        return (token, expiry)
 
 
 class SkypeEndpoint(SkypeObj):
