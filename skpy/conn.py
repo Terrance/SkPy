@@ -259,14 +259,7 @@ class SkypeConnection(SkypeObj):
             pwd (str): password of the connecting account
         """
         def getSkypeToken(self):
-            self.tokens["skype"], self.tokenExpiry["skype"] = SkypeLiveAuthProvider(self).auth(user, pwd)
-            # Figure out what the username is.
-            self.userId = self("GET", "{0}/users/self/profile".format(self.API_USER),
-                               auth=self.Auth.SkypeToken).json().get("username")
-            # (Re)generate the registration token.
-            self.tokens.pop("reg", None)
-            self.tokenExpiry.pop("reg", None)
-            self.getRegToken()
+            self.liveLogin(user, pwd)
         self.getSkypeToken = MethodType(getSkypeToken, self)
 
     def setTokenFile(self, path):
@@ -343,6 +336,30 @@ class SkypeConnection(SkypeObj):
             if "reg" not in self.tokenExpiry or datetime.now() >= self.tokenExpiry["reg"]:
                 self.getRegToken()
 
+    def liveLogin(self, user, pwd):
+        """
+        Obtain connection parameters from the Microsoft account login page, and perform a login with the given email
+        address or Skype username, and its password.  This emulates a login to Skype for Web on ``login.live.com``.
+
+        .. note::
+            Microsoft accounts with two-factor authentication enabled are not supported, and will cause a
+            :class:`.SkypeAuthException` to be raised.  See the exception definitions for other possible causes.
+
+        Args:
+            user (str): username or email address of the connecting account
+            pwd (str): password of the connecting account
+
+        Returns:
+            (str, datetime.datetime) tuple: Skype token, and associated expiry if known
+
+        Raises:
+            .SkypeAuthException: if the login request is rejected
+            .SkypeApiException: if the login form can't be processed
+        """
+        self.tokens["skype"], self.tokenExpiry["skype"] = SkypeLiveAuthProvider(self).auth(user, pwd)
+        self.getUserId()
+        self.getRegToken()
+
     def guestLogin(self, url, name):
         """
         Connect to Skype as a guest, joining a given conversation.
@@ -353,21 +370,30 @@ class SkypeConnection(SkypeObj):
         Args:
             url (str): public join URL for conversation, or identifier from it
             name (str): display name as shown to other participants
+
+        Raises:
+            .SkypeAuthException: if the login request is rejected
+            .SkypeApiException: if the login form can't be processed
         """
         self.tokens["skype"], self.tokenExpiry["skype"] = SkypeGuestAuthProvider(self).auth(url, name)
-        # Figure out what the username is.
-        self.userId = self("GET", "{0}/users/self/profile".format(self.API_USER),
-                           auth=self.Auth.SkypeToken).json().get("username")
+        self.getUserId()
         self.getRegToken()
 
     def getSkypeToken(self):
         """
-        A wrapper for :meth:`login` or :meth:`liveLogin` that applies the previously given username and password.
+        A wrapper for :meth:`liveLogin` that applies the previously given username and password.
 
         Raises:
             .SkypeAuthException: if credentials were never provided
         """
         raise SkypeAuthException("No username or password provided, and no valid token file")
+
+    def getUserId(self):
+        """
+        Ask Skype for the authenticated user's identifier, and store it on the connection object.
+        """
+        self.userId = self("GET", "{0}/users/self/profile".format(self.API_USER),
+                           auth=self.Auth.SkypeToken).json().get("username")
 
     def getRegToken(self):
         """
@@ -434,7 +460,7 @@ class SkypeAuthProvider(SkypeObj):
         Authenticate a user, given some form of identification.
 
         Returns:
-            (str, datetime.datetime): Skype token, and associated expiry if known
+            (str, datetime.datetime) tuple: Skype token, and associated expiry if known
 
         Raises:
             .SkypeAuthException: if the login request is rejected
@@ -457,14 +483,17 @@ class SkypeAPIAuthProvider(SkypeAuthProvider):
             user (str): username of the connecting account
             pwd (str): password of the connecting account
 
+        Returns:
+            (str, datetime.datetime) tuple: Skype token, and associated expiry if known
+
         Raises:
             .SkypeAuthException: if the login request is rejected
             .SkypeApiException: if the login form can't be processed
         """
         # Wrap up the credentials ready to send.
-        pwdHash = hashlib.md5(user + "\nskyper\n" + pwd).digest()
+        pwdHash = base64.b64encode(hashlib.md5((user + "\nskyper\n" + pwd).encode("utf-8")).digest()).decode("utf-8")
         json = self.conn("POST", "{0}/login/skypetoken".format(SkypeConnection.API_USER),
-                         json={"username": user, "passwordHash": base64.b64encode(pwdHash)}).json()
+                         json={"username": user, "passwordHash": pwdHash, "scopes": "client"}).json()
         if "skypetoken" not in json:
             raise SkypeAuthException("Couldn't retrieve Skype token from response")
         expiry = None
@@ -490,6 +519,9 @@ class SkypeLiveAuthProvider(SkypeAuthProvider):
         Args:
             user (str): username or email address of the connecting account
             pwd (str): password of the connecting account
+
+        Returns:
+            (str, datetime.datetime) tuple: Skype token, and associated expiry if known
 
         Raises:
             .SkypeAuthException: if the login request is rejected
@@ -527,8 +559,10 @@ class SkypeLiveAuthProvider(SkypeAuthProvider):
         tField = BeautifulSoup(loginResp.text, "html.parser").find(id="t")
         if tField is None:
             err = re.search(r"sErrTxt:'([^'\\]*(\\.[^'\\]*)*)'", loginResp.text)
-            errMsg = re.sub(r"<.*?>", "", err.group(1)).replace("\\'", "'").replace("\\\\", "\\") if err else None
-            raise SkypeAuthException("Microsoft authentication failed", loginResp, errMsg)
+            errMsg = "Couldn't retrieve t field from login response"
+            if err:
+                errMsg = re.sub(r"<.*?>", "", err.group(1)).replace("\\'", "'").replace("\\\\", "\\")
+            raise SkypeAuthException(errMsg, loginResp)
         return tField.get("value")
 
     def getToken(self, t):
@@ -565,6 +599,13 @@ class SkypeGuestAuthProvider(SkypeAuthProvider):
         Args:
             url (str): public join URL for conversation, or identifier from it
             name (str): display name as shown to other participants
+
+        Returns:
+            (str, datetime.datetime) tuple: Skype token, and associated expiry if known
+
+        Raises:
+            .SkypeAuthException: if the login request is rejected
+            .SkypeApiException: if the login form can't be processed
         """
         urlId = url.split("/")[-1]
         # Pretend to be Chrome on Windows (required to avoid "unsupported device" messages).
