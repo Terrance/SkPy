@@ -518,6 +518,19 @@ class SkypeLiveAuthProvider(SkypeAuthProvider):
     An authentication provider that connects via Microsoft account authentication.
     """
 
+    def checkUser(self, user):
+        """
+        Query a username or email address to see if a corresponding Microsoft account exists.
+
+        Args:
+            user (str): username or email address of an account
+
+        Returns:
+            bool: whether the account exists
+        """
+        return not self.conn("POST", "{0}/GetCredentialType.srf".format(SkypeConnection.API_MSACC),
+                             json={"username": user}).json().get("IfExistsResult")
+
     def auth(self, user, pwd):
         """
         Obtain connection parameters from the Microsoft account login page, and perform a login with the given email
