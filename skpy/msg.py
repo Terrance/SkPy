@@ -553,7 +553,7 @@ class SkypeCallMsg(SkypeMsg):
         tag = makeTag("partlist", type=partType, alt="")
         for user in self.users:
             conTag = makeTag("part", identity=user.id)
-            conTag.append(makeTag("name", user.name))
+            conTag.append(makeTag("name", str(user.name)))
             tag.append(conTag)
         return tag
 
