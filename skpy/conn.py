@@ -408,42 +408,19 @@ class SkypeConnection(SkypeObj):
 
     def getRegToken(self):
         """
-        Acquire a registration token.  See :meth:`getMac256Hash` for the hash generation.
+        Acquire a new registration token.
 
         Once successful, all tokens and expiry times are written to the token file (if specified on initialisation).
         """
         self.verifyToken(self.Auth.SkypeToken)
-        self.tokens.pop("reg", None)
-        self.tokenExpiry.pop("reg", None)
-        while "reg" not in self.tokens:
-            secs = int(time.time())
-            hash = getMac256Hash(str(secs), "msmsgs@msnmsgr.com", "Q1P7W2E4J9R8U3S5")
-            headers = {"LockAndKey": "appId=msmsgs@msnmsgr.com; time={0}; lockAndKeyResponse={1}".format(secs, hash),
-                       "Authentication": "skypetoken=" + self.tokens["skype"]}
-            endpointResp = self("POST", "{0}/users/ME/endpoints".format(self.msgsHost), codes=(200, 201, 404),
-                                headers=headers, json={"endpointFeatures": "Agent"})
-            regTokenHead = endpointResp.headers.get("Set-RegistrationToken")
-            locHead = endpointResp.headers.get("Location")
-            if regTokenHead:
-                self.tokens["reg"] = re.search(r"(registrationToken=[a-z0-9\+/=]+)", regTokenHead, re.I).group(1)
-                regExpiry = re.search(r"expires=(\d+)", regTokenHead).group(1)
-                self.tokenExpiry["reg"] = datetime.fromtimestamp(int(regExpiry))
-                regEndMatch = re.search(r"endpointId=({[a-z0-9\-]+})", regTokenHead)
-                if regEndMatch:
-                    self.endpoints["main"] = SkypeEndpoint(self, regEndMatch.group(1))
-            if locHead:
-                locParts = re.search(r"(https://[^/]+/v1)/users/ME/endpoints(/(%7B[a-z0-9\-]+%7D))?", locHead).groups()
-                if not locParts[0] == self.msgsHost:
-                    # Skype is requiring the use of a different hostname.
-                    self.msgsHost = locHead.rsplit("/", 4 if locParts[2] else 3)[0]
-                if locParts[2]:
-                    self.endpoints["main"] = SkypeEndpoint(self, locParts[2].replace("%7B", "{").replace("%7D", "}"))
-            if endpointResp.status_code == 200 and "main" not in self.endpoints and endpointResp.json():
-                # Use the most recent endpoint listed in the JSON response.
-                self.endpoints["main"] = SkypeEndpoint(self, endpointResp.json()[0]["id"])
-        if "main" in self.endpoints:
-            self.endpoints["main"].config()
-            self.syncEndpoints()
+        token, expiry, msgsHost, endpoint = SkypeRegistrationTokenProvider(self).auth(self.tokens["skype"])
+        self.tokens["reg"] = token
+        self.tokenExpiry["reg"] = expiry
+        self.msgsHost = msgsHost
+        if endpoint:
+            endpoint.config()
+            self.endpoints["main"] = endpoint
+        self.syncEndpoints()
         if self.tokenFile:
             self.writeToken()
 
@@ -707,6 +684,141 @@ class SkypeRefreshAuthProvider(SkypeAuthProvider):
         return (token, expiry)
 
 
+class SkypeRegistrationTokenProvider(SkypeAuthProvider):
+    """
+    An authentication provider that handles the handshake for a registration token.
+    """
+
+    def auth(self, skypeToken):
+        """
+        Request a new registration token using a current Skype token.
+
+        Args:
+            skypeToken (str): existing Skype token
+
+        Returns:
+            (str, datetime.datetime, str, SkypeEndpoint) tuple: registration token, associated expiry if known,
+                                                                resulting endpoint hostname, endpoint if provided
+
+        Raises:
+            .SkypeAuthException: if the login request is rejected
+            .SkypeApiException: if the login form can't be processed
+        """
+        token = expiry = endpoint = None
+        msgsHost = SkypeConnection.API_MSGSHOST
+        while not token:
+            secs = int(time.time())
+            hash = self.getMac256Hash(str(secs))
+            headers = {"LockAndKey": "appId=msmsgs@msnmsgr.com; time={0}; lockAndKeyResponse={1}".format(secs, hash),
+                       "Authentication": "skypetoken=" + skypeToken}
+            endpointResp = self.conn("POST", "{0}/users/ME/endpoints".format(msgsHost), codes=(200, 201, 404),
+                                     headers=headers, json={"endpointFeatures": "Agent"})
+            regTokenHead = endpointResp.headers.get("Set-RegistrationToken")
+            locHead = endpointResp.headers.get("Location")
+            if regTokenHead:
+                token = re.search(r"(registrationToken=[a-z0-9\+/=]+)", regTokenHead, re.I).group(1)
+                regExpiry = re.search(r"expires=(\d+)", regTokenHead).group(1)
+                expiry = datetime.fromtimestamp(int(regExpiry))
+                regEndMatch = re.search(r"endpointId=({[a-z0-9\-]+})", regTokenHead)
+                if regEndMatch:
+                    endpoint = SkypeEndpoint(self.conn, regEndMatch.group(1))
+            if locHead:
+                locParts = re.search(r"(https://[^/]+/v1)/users/ME/endpoints(/(%7B[a-z0-9\-]+%7D))?", locHead).groups()
+                if not locParts[0] == msgsHost:
+                    # Skype is requiring the use of a different hostname.
+                    msgsHost = locHead.rsplit("/", 4 if locParts[2] else 3)[0]
+                if locParts[2]:
+                    endpoint = SkypeEndpoint(self.conn, locParts[2].replace("%7B", "{").replace("%7D", "}"))
+            if not endpoint and endpointResp.status_code == 200 and endpointResp.json():
+                # Use the most recent endpoint listed in the JSON response.
+                endpoint = SkypeEndpoint(self.conn, endpointResp.json()[0]["id"])
+        return token, expiry, msgsHost, endpoint
+
+    @staticmethod
+    def getMac256Hash(challenge, appId="msmsgs@msnmsgr.com", key="Q1P7W2E4J9R8U3S5"):
+        """
+        Generate the lock-and-key response, needed to acquire registration tokens.
+        """
+        clearText = challenge + appId
+        clearText += "0" * (8 - len(clearText) % 8)
+
+        def int32ToHexString(n):
+            hexChars = "0123456789abcdef"
+            hexString = ""
+            for i in range(4):
+                hexString += hexChars[(n >> (i * 8 + 4)) & 15]
+                hexString += hexChars[(n >> (i * 8)) & 15]
+            return hexString
+
+        def int64Xor(a, b):
+            sA = "{0:b}".format(a)
+            sB = "{0:b}".format(b)
+            sC = ""
+            sD = ""
+            diff = abs(len(sA) - len(sB))
+            for i in range(diff):
+                sD += "0"
+            if len(sA) < len(sB):
+                sD += sA
+                sA = sD
+            elif len(sB) < len(sA):
+                sD += sB
+                sB = sD
+            for i in range(len(sA)):
+                sC += "0" if sA[i] == sB[i] else "1"
+            return int(sC, 2)
+
+        def cS64(pdwData, pInHash):
+            MODULUS = 2147483647
+            CS64_a = pInHash[0] & MODULUS
+            CS64_b = pInHash[1] & MODULUS
+            CS64_c = pInHash[2] & MODULUS
+            CS64_d = pInHash[3] & MODULUS
+            CS64_e = 242854337
+            pos = 0
+            qwDatum = 0
+            qwMAC = 0
+            qwSum = 0
+            for i in range(len(pdwData) // 2):
+                qwDatum = int(pdwData[pos])
+                pos += 1
+                qwDatum *= CS64_e
+                qwDatum = qwDatum % MODULUS
+                qwMAC += qwDatum
+                qwMAC *= CS64_a
+                qwMAC += CS64_b
+                qwMAC = qwMAC % MODULUS
+                qwSum += qwMAC
+                qwMAC += int(pdwData[pos])
+                pos += 1
+                qwMAC *= CS64_c
+                qwMAC += CS64_d
+                qwMAC = qwMAC % MODULUS
+                qwSum += qwMAC
+            qwMAC += CS64_b
+            qwMAC = qwMAC % MODULUS
+            qwSum += CS64_d
+            qwSum = qwSum % MODULUS
+            return [qwMAC, qwSum]
+
+        cchClearText = len(clearText) // 4
+        pClearText = []
+        for i in range(cchClearText):
+            pClearText = pClearText[:i] + [0] + pClearText[i:]
+            for pos in range(4):
+                pClearText[i] += ord(clearText[4 * i + pos]) * (256 ** pos)
+        sha256Hash = [0, 0, 0, 0]
+        hash = hashlib.sha256((challenge + key).encode("utf-8")).hexdigest().upper()
+        for i in range(len(sha256Hash)):
+            sha256Hash[i] = 0
+            for pos in range(4):
+                dpos = 8 * i + pos * 2
+                sha256Hash[i] += int(hash[dpos:dpos + 2], 16) * (256 ** pos)
+        macHash = cS64(pClearText, sha256Hash)
+        macParts = [macHash[0], macHash[1], macHash[0], macHash[1]]
+        return "".join(map(int32ToHexString, map(int64Xor, sha256Hash, macParts)))
+
+
 class SkypeEndpoint(SkypeObj):
     """
     An endpoint represents a single point of presence within Skype.
@@ -790,87 +902,3 @@ class SkypeEndpoint(SkypeObj):
             self.subscribe()
         return self.conn("POST", "{0}/users/ME/endpoints/{1}/subscriptions/0/poll".format(self.conn.msgsHost, self.id),
                          auth=SkypeConnection.Auth.RegToken).json().get("eventMessages", [])
-
-
-def getMac256Hash(challenge, appId, key):
-    """
-    Method to generate the lock-and-key response, needed to acquire registration tokens.
-    """
-    clearText = challenge + appId
-    clearText += "0" * (8 - len(clearText) % 8)
-
-    def int32ToHexString(n):
-        hexChars = "0123456789abcdef"
-        hexString = ""
-        for i in range(4):
-            hexString += hexChars[(n >> (i * 8 + 4)) & 15]
-            hexString += hexChars[(n >> (i * 8)) & 15]
-        return hexString
-
-    def int64Xor(a, b):
-        sA = "{0:b}".format(a)
-        sB = "{0:b}".format(b)
-        sC = ""
-        sD = ""
-        diff = abs(len(sA) - len(sB))
-        for i in range(diff):
-            sD += "0"
-        if len(sA) < len(sB):
-            sD += sA
-            sA = sD
-        elif len(sB) < len(sA):
-            sD += sB
-            sB = sD
-        for i in range(len(sA)):
-            sC += "0" if sA[i] == sB[i] else "1"
-        return int(sC, 2)
-
-    def cS64(pdwData, pInHash):
-        MODULUS = 2147483647
-        CS64_a = pInHash[0] & MODULUS
-        CS64_b = pInHash[1] & MODULUS
-        CS64_c = pInHash[2] & MODULUS
-        CS64_d = pInHash[3] & MODULUS
-        CS64_e = 242854337
-        pos = 0
-        qwDatum = 0
-        qwMAC = 0
-        qwSum = 0
-        for i in range(len(pdwData) // 2):
-            qwDatum = int(pdwData[pos])
-            pos += 1
-            qwDatum *= CS64_e
-            qwDatum = qwDatum % MODULUS
-            qwMAC += qwDatum
-            qwMAC *= CS64_a
-            qwMAC += CS64_b
-            qwMAC = qwMAC % MODULUS
-            qwSum += qwMAC
-            qwMAC += int(pdwData[pos])
-            pos += 1
-            qwMAC *= CS64_c
-            qwMAC += CS64_d
-            qwMAC = qwMAC % MODULUS
-            qwSum += qwMAC
-        qwMAC += CS64_b
-        qwMAC = qwMAC % MODULUS
-        qwSum += CS64_d
-        qwSum = qwSum % MODULUS
-        return [qwMAC, qwSum]
-
-    cchClearText = len(clearText) // 4
-    pClearText = []
-    for i in range(cchClearText):
-        pClearText = pClearText[:i] + [0] + pClearText[i:]
-        for pos in range(4):
-            pClearText[i] += ord(clearText[4 * i + pos]) * (256 ** pos)
-    sha256Hash = [0, 0, 0, 0]
-    hash = hashlib.sha256((challenge + key).encode("utf-8")).hexdigest().upper()
-    for i in range(len(sha256Hash)):
-        sha256Hash[i] = 0
-        for pos in range(4):
-            dpos = 8 * i + pos * 2
-            sha256Hash[i] += int(hash[dpos:dpos + 2], 16) * (256 ** pos)
-    macHash = cS64(pClearText, sha256Hash)
-    macParts = [macHash[0], macHash[1], macHash[0], macHash[1]]
-    return "".join(map(int32ToHexString, map(int64Xor, sha256Hash, macParts)))
