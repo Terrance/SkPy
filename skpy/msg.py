@@ -476,6 +476,8 @@ class SkypeFileMsg(SkypeMsg):
 
     @property
     def html(self):
+        if not self.file:
+            return ""
         tag = makeTag("URIObject", type="File.1", uri=self.file.urlFull, url_thumbnail=self.file.urlThumb)
         tag.append(makeTag("Title", "Title: {0}".format(self.file.name) if self.file.name else ""))
         tag.append(makeTag("Description", "Description: {0}".format(self.file.name) if self.file.name else ""))
@@ -499,6 +501,8 @@ class SkypeImageMsg(SkypeFileMsg):
 
     @property
     def html(self):
+        if not self.file:
+            return ""
         tag = makeTag("URIObject", type="Picture.1", uri=self.file.urlFull, url_thumbnail=self.file.urlThumb)
         tag.append(makeTag("Title"))
         tag.append(makeTag("Description"))
