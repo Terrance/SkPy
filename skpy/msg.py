@@ -44,6 +44,8 @@ class SkypeMsg(SkypeObj):
             Raw message content, as received from the API.
         html (str):
             Recreated content string based on the field values.
+        deleted (bool):
+            Whether the message content was deleted by the sender.
     """
 
     @staticmethod
@@ -250,6 +252,10 @@ class SkypeMsg(SkypeObj):
         # If not overridden in a subclass, just return the existing content.
         return self.content
 
+    @property
+    def deleted(self):
+        return self.html == ""
+
     def read(self):
         """
         Mark this message as read by sending an updated consumption horizon.
@@ -266,16 +272,22 @@ class SkypeMsg(SkypeObj):
             content (str): main message body
             me (bool): whether to send as an action, where the current account's name prefixes the message
             rich (bool): whether to send with rich text formatting
+
+        Returns:
+            .SkypeMsg: copy of the edited message object
         """
-        self.chat.sendMsg(content, me, rich, self.clientId)
+        return self.chat.sendMsg(content, me, rich, self.clientId)
 
     def delete(self):
         """
         Delete the message and remove it from the conversation.
 
         Equivalent to calling :meth:`edit` with an empty ``content`` string.
+
+        Returns:
+            .SkypeMsg: copy of the deleted message object
         """
-        self.edit("")
+        return self.edit("")
 
 
 class SkypeTextMsg(SkypeMsg):
