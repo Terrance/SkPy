@@ -136,15 +136,18 @@ class SkypeUser(SkypeObj):
     def chat(self):
         return self.skype.chats["8:" + self.id]
 
-    def invite(self, greeting):
+    def invite(self, greeting=None):
         """
         Send the user a contact request.
 
         Args:
             greeting (str): custom message to include with the request
         """
+        if not greeting:
+            greeting = "Hi, {0}, I'd like to add you as a contact.".format(self.name)
+        prefix = "28" if isinstance(self, SkypeBotUser) else "8"
         self.skype.conn("POST", "{0}/users/{1}/contacts".format(SkypeConnection.API_CONTACTS, self.skype.userId),
-                        auth=SkypeConnection.Auth.SkypeToken, json={"mri": "8:{0}".format(self.id),
+                        auth=SkypeConnection.Auth.SkypeToken, json={"mri": "{0}:{1}".format(prefix, self.id),
                                                                     "greeting": greeting})
 
     def block(self, report=False):
