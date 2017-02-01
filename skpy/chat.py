@@ -104,6 +104,9 @@ class SkypeChat(SkypeObj):
 
         Args:
             active (bool): whether to show as currently typing
+
+        Returns:
+            .SkypeMsg: copy of the sent message object
         """
         return self.sendRaw(messagetype="Control/{0}Typing".format("" if active else "Clear"), content=None)
 
@@ -127,17 +130,16 @@ class SkypeChat(SkypeObj):
             .SkypeMsg: copy of the sent message object
         """
         msgType = "Text"
-        meOffset = None
-        mentions = False
+        kwargs = {"Has-Mentions": "false"}
         if me:
             content = "{0} {1}".format(self.skype.user.name, content)
-            meOffset = len(str(self.skype.user.name)) + 1
+            kwargs["skypeemoteoffset"] = len(str(self.skype.user.name)) + 1
         elif rich:
             msgType = "RichText"
             if re.search(r"""<at id=".+?">.+</at>""", content):
-                mentions = True
-        return self.sendRaw(editId=edit, **{"messagetype": msgType, "content": content,
-                                            "Has-Mentions": mentions, "skypeemoteoffset": meOffset})
+                kwargs["Has-Mentions"] = "true"
+        return self.sendRaw(editId=edit, messagetype=msgType, content=content,
+                            imdisplayname="{0}".format(self.skype.user.name), **kwargs)
 
     def sendFile(self, content, name, image=False):
         """
