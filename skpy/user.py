@@ -134,7 +134,8 @@ class SkypeUser(SkypeObj):
     @property
     @SkypeUtils.cacheResult
     def chat(self):
-        return self.skype.chats["8:" + self.id]
+        prefix = "28" if isinstance(self, SkypeBotUser) else "8"
+        return self.skype.chats["{0}:{1}".format(prefix, self.id)]
 
     def invite(self, greeting=None):
         """
@@ -157,8 +158,9 @@ class SkypeUser(SkypeObj):
         Args:
             report (bool): whether to report this user to Skype
         """
-        self.skype.conn("PUT", "{0}/users/{1}/contacts/blocklist/8:{2}"
-                               .format(SkypeConnection.API_CONTACTS, self.skype.userId, self.id),
+        prefix = "28" if isinstance(self, SkypeBotUser) else "8"
+        self.skype.conn("PUT", "{0}/users/{1}/contacts/blocklist/{2}:{3}"
+                               .format(SkypeConnection.API_CONTACTS, self.skype.userId, prefix, self.id),
                         auth=SkypeConnection.Auth.SkypeToken, json={"report_abuse": report, "ui_version": "skype.com"})
         self.blocked = True
 
@@ -166,8 +168,9 @@ class SkypeUser(SkypeObj):
         """
         Unblock a previously blocked user.
         """
-        self.skype.conn("DELETE", "{0}/users/{1}/contacts/blocklist/8:{2}"
-                                  .format(SkypeConnection.API_CONTACTS, self.skype.userId, self.id),
+        prefix = "28" if isinstance(self, SkypeBotUser) else "8"
+        self.skype.conn("DELETE", "{0}/users/{1}/contacts/blocklist/{2}:{3}"
+                                  .format(SkypeConnection.API_CONTACTS, self.skype.userId, prefix, self.id),
                         auth=SkypeConnection.Auth.SkypeToken)
         self.blocked = False
 
