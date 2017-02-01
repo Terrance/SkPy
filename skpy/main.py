@@ -33,7 +33,7 @@ class Skype(SkypeObj):
 
     attrs = ("userId",)
 
-    def __init__(self, user=None, pwd=None, msEmail=None, msPwd=None, tokenFile=None, connect=True):
+    def __init__(self, user=None, pwd=None, tokenFile=None, connect=True):
         """
         Create a new Skype object and corresponding connection.
 
