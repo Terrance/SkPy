@@ -115,6 +115,7 @@ class SkypeConnection(SkypeObj):
         resp = cls.extSess.request(method, url, **kwargs)
         if os.getenv("SKPY_DEBUG_HTTP"):
             print("=> [{0}] {1}".format(datetime.now().strftime("%d/%m %H:%M:%S"), resp.status_code))
+            print(pformat(dict(resp.headers)))
             try:
                 print(pformat(resp.json()))
             except:
@@ -205,6 +206,7 @@ class SkypeConnection(SkypeObj):
         resp = self.sess.request(method, url, headers=headers, **kwargs)
         if os.getenv("SKPY_DEBUG_HTTP"):
             print("=> [{0}] {1}".format(datetime.now().strftime("%d/%m %H:%M:%S"), resp.status_code))
+            print(pformat(dict(resp.headers)))
             try:
                 print(pformat(resp.json()))
             except:
