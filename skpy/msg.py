@@ -1,3 +1,5 @@
+import base64
+import json
 import re
 from datetime import datetime, date
 import time
@@ -238,6 +240,7 @@ class SkypeMsg(SkypeObj):
                   "RichText/Location": SkypeLocationMsg,
                   "RichText/Media_GenericFile": SkypeFileMsg,
                   "RichText/UriObject": SkypeImageMsg,
+                  "RichText/Media_Card": SkypeCardMsg,
                   "Event/Call": SkypeCallMsg,
                   "ThreadActivity/TopicUpdate": SkypeTopicPropertyMsg,
                   "ThreadActivity/JoiningEnabledUpdate": SkypeOpenPropertyMsg,
@@ -429,6 +432,72 @@ class SkypeLocationMsg(SkypeMsg):
                        "timeStamp": str(int(time.mktime(timestamp.timetuple())))})
         tag = makeTag("location", **params)
         tag.append(makeTag("a", self.address, href=self.mapUrl))
+        return tag
+
+
+@SkypeUtils.initAttrs
+class SkypeCardMsg(SkypeMsg):
+    """
+    A message containing an interactive card.
+
+    Attributes:
+        title (str):
+            Heading text at the top of the card.
+        body (str):
+            Main text content in the card.
+        buttons (:class:`Button` list):
+            Available actions for this card.
+    """
+
+    @SkypeUtils.initAttrs
+    class Button(SkypeObj):
+        """
+        A clickable button within a card.
+
+        Attributes:
+            type (str):
+                Type of action to be performed on click.
+            title (str):
+                Text displayed on the button.
+            value (str):
+                Parameter to the action.
+        """
+
+        attrs = ("type", "title", "value")
+
+        @property
+        def data(self):
+            return dict((k, getattr(self, k)) for k in self.attrs)
+
+    attrs = SkypeMsg.attrs + ("title", "body", "buttons")
+
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeCardMsg, cls).rawToFields(raw)
+        swiftTag = BeautifulSoup(raw.get("content"), "html.parser").find("swift")
+        data = json.loads(base64.b64decode(swiftTag.get("b64")))
+        card = data.get("attachments", [{}])[0].get("content", {})
+        fields.update({"title": card.get("title"),
+                       "body": card.get("text"),
+                       "buttons": [cls.Button(**button) for button in card.get("buttons")]})
+        return fields
+
+    @property
+    def html(self):
+        data = {"attachments": [{"content": {"title": self.title,
+                                             "text": self.body,
+                                             "buttons": [button.data for button in self.buttons]},
+                                 "contentType": "application/vnd.microsoft.card.hero"}],
+                "type": "message/card"}
+        b64 = base64.b64encode(json.dumps(data, separators=(",", ":")).encode("utf-8")).decode("utf-8")
+        tag = makeTag("URIObject", "Card - access it on ", type="SWIFT.1",
+                      url_thumbnail="https://urlp.asm.skype.com/v1/url/content?url=https://"
+                                    "neu1-urlp.secure.skypeassets.com/static/card-128x128.png")
+        tag.append(makeTag("a", "https://go.skype.com/cards.unsupported",
+                           href="https://go.skype.com/cards.unsupported"))
+        tag.append(". ")
+        tag.append(makeTag("Swift", b64=b64))
+        tag.append(makeTag("Description"))
         return tag
 
 
