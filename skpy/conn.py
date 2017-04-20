@@ -712,7 +712,7 @@ class SkypeRegistrationTokenProvider(SkypeAuthProvider):
             secs = int(time.time())
             hash = self.getMac256Hash(str(secs))
             headers = {"LockAndKey": "appId=msmsgs@msnmsgr.com; time={0}; lockAndKeyResponse={1}".format(secs, hash),
-                       "Authentication": "skypetoken=" + skypeToken}
+                       "Authentication": "skypetoken=" + skypeToken, "BehaviorOverride": "redirectAs404"}
             endpointResp = self.conn("POST", "{0}/users/ME/endpoints".format(msgsHost), codes=(200, 201, 404),
                                      headers=headers, json={"endpointFeatures": "Agent"})
             regTokenHead = endpointResp.headers.get("Set-RegistrationToken")
