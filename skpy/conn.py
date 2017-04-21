@@ -717,6 +717,15 @@ class SkypeRegistrationTokenProvider(SkypeAuthProvider):
                                      headers=headers, json={"endpointFeatures": "Agent"})
             regTokenHead = endpointResp.headers.get("Set-RegistrationToken")
             locHead = endpointResp.headers.get("Location")
+            if locHead:
+                locParts = re.search(r"(https://[^/]+/v1)/users/ME/endpoints(/(%7B[a-z0-9\-]+%7D))?", locHead).groups()
+                if locParts[2]:
+                    endpoint = SkypeEndpoint(self.conn, locParts[2].replace("%7B", "{").replace("%7D", "}"))
+                if not locParts[0] == msgsHost:
+                    # Skype is requiring the use of a different hostname.
+                    msgsHost = locHead.rsplit("/", 4 if locParts[2] else 3)[0]
+                    # Don't accept the token if present, we need to re-register first.
+                    continue
             if regTokenHead:
                 token = re.search(r"(registrationToken=[a-z0-9\+/=]+)", regTokenHead, re.I).group(1)
                 regExpiry = re.search(r"expires=(\d+)", regTokenHead).group(1)
@@ -724,13 +733,6 @@ class SkypeRegistrationTokenProvider(SkypeAuthProvider):
                 regEndMatch = re.search(r"endpointId=({[a-z0-9\-]+})", regTokenHead)
                 if regEndMatch:
                     endpoint = SkypeEndpoint(self.conn, regEndMatch.group(1))
-            if locHead:
-                locParts = re.search(r"(https://[^/]+/v1)/users/ME/endpoints(/(%7B[a-z0-9\-]+%7D))?", locHead).groups()
-                if not locParts[0] == msgsHost:
-                    # Skype is requiring the use of a different hostname.
-                    msgsHost = locHead.rsplit("/", 4 if locParts[2] else 3)[0]
-                if locParts[2]:
-                    endpoint = SkypeEndpoint(self.conn, locParts[2].replace("%7B", "{").replace("%7D", "}"))
             if not endpoint and endpointResp.status_code == 200 and endpointResp.json():
                 # Use the most recent endpoint listed in the JSON response.
                 endpoint = SkypeEndpoint(self.conn, endpointResp.json()[0]["id"])
