@@ -6,6 +6,7 @@ python:
   - "3.3"
   - "3.4"
   - "3.5"
+  - "3.6"
 install:
   - if [[ $TRAVIS_PYTHON_VERSION == 3.2 ]]; then pip install 'requests<2.11.0'; fi
   - pip install -r requirements.txt
