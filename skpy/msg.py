@@ -301,11 +301,14 @@ class SkypeTextMsg(SkypeMsg):
         plain (str):
             Message content converted to plain text.
 
-            Hyperlinks are replaced with their target, and all HTML tags are stripped.
+            Hyperlinks are replaced with their target, quotes are converted to the legacy format, and all other HTML
+            tags are stripped from the text.
         markup (str):
             Message converted to plain text, retaining formatting markup.
 
-            Hyperlinks become their target, message edit tags are stripped, and the following replacements are made:
+            Hyperlinks become their target, message edit tags are stripped, and legacy quote text is used.
+
+            In addition, the following replacements are made:
 
             ===============================  =========================
             Rich text                        Plain text
@@ -322,26 +325,26 @@ class SkypeTextMsg(SkypeMsg):
     def plain(self):
         if self.content is None:
             return None
-        text = re.sub(r"</?(e|b|i|s|pre).*?>", "", self.content)
+        text = re.sub(r"</?(e|b|i|s|pre|quote|legacyquote).*?>", "", self.content)
         text = re.sub(r"""<a.*?href="(.*?)">.*?</a>""", r"\1", text)
         text = re.sub(r"""<at.*?id="8:(.*?)">.*?</at>""", r"@\1", text)
-        text = text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&") \
-                   .replace("&quot;", "\"").replace("&apos;", "'")
+        text = (text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+                    .replace("&quot;", "\"").replace("&apos;", "'"))
         return text
 
     @property
     def markup(self):
         if self.content is None:
             return None
-        text = re.sub(r"<e.*?/>", "", self.content)
+        text = re.sub(r"</?(e|quote|legacyquote).*?>", "", self.content)
         text = re.sub(r"</?b.*?>", "*", text)
         text = re.sub(r"</?i.*?>", "_", text)
         text = re.sub(r"</?s.*?>", "~", text)
         text = re.sub(r"</?pre.*?>", "{code}", text)
         text = re.sub(r"""<a.*?href="(.*?)">.*?</a>""", r"\1", text)
         text = re.sub(r"""<at.*?id="8:(.*?)">.*?</at>""", r"@\1", text)
-        text = text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&") \
-                   .replace("&quot;", "\"").replace("&apos;", "'")
+        text = (text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
+                    .replace("&quot;", "\"").replace("&apos;", "'"))
         return text
 
 
