@@ -491,7 +491,16 @@ class SkypeCardMsg(SkypeMsg):
                                              "text": self.body,
                                              "buttons": [button.data for button in self.buttons]},
                                  "contentType": "application/vnd.microsoft.card.hero"}],
-                "type": "message/card"}
+                "type": "message/card",
+                "timestamp": datetime.now().strftime("%Y-%m-%dT%H:%M:%S.%fZ")}
+        if self.chatId:
+            data["recipient"] = {"id": self.chatId}
+            userType, userId = self.chatId.split(":", 1)
+            if userType == "19":
+                # Cards haven't been seen in group conversations yet, so assuming a sensible behaviour.
+                data["recipient"]["name"] = self.chat.topic
+            elif self.skype:
+                data["recipient"]["name"] = str(self.skype.contacts[userId].name)
         b64 = base64.b64encode(json.dumps(data, separators=(",", ":")).encode("utf-8")).decode("utf-8")
         tag = makeTag("URIObject", "Card - access it on ", type="SWIFT.1",
                       url_thumbnail="https://urlp.asm.skype.com/v1/url/content?url=https://"
