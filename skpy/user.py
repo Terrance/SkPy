@@ -391,9 +391,9 @@ class SkypeContacts(SkypeObjs):
             SkypeContact: resulting contact object
         """
         try:
-            json = self.skype.conn("GET", "{0}/users/{1}/profile".format(SkypeConnection.API_USER, id),
-                                   auth=SkypeConnection.Auth.SkypeToken).json()
-            contact = SkypeContact.fromRaw(self.skype, json)
+            json = self.skype.conn("POST", "{0}/users/batch/profiles".format(SkypeConnection.API_USER),
+                                   json={"usernames": [id]}, auth=SkypeConnection.Auth.SkypeToken).json()
+            contact = SkypeContact.fromRaw(self.skype, json[0])
             if contact.id not in self.contactIds:
                 self.contactIds.append(contact.id)
             return self.merge(contact)
