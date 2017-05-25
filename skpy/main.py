@@ -201,7 +201,7 @@ class SkypeEventLoop(Skype):
         """
         try:
             events = self.getEvents()
-        except requests.ConnectionError:
+        except (requests.ConnectionError,AttributeError) as e:
             return
         for event in events:
             self.onEvent(event)
