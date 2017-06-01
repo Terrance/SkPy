@@ -90,6 +90,60 @@ class SkypeMsg(SkypeObj):
         return """<s raw_pre="~" raw_post="~">{0}</s>""".format(s)
 
     @staticmethod
+    def blink(s):
+        """
+        Format text to be blink.
+
+        Args:
+            s (str): string to format
+
+        Returns:
+            str: formatted string
+        """
+        return """<blink>{0}</blink>""".format(s)
+
+    @staticmethod
+    def color(s, c):
+        """
+        Format text to colored.
+
+        Args:
+            s (str): string to format
+            c (str): color for string
+
+        Returns:
+            str: formatted string
+        """
+        return """<font color="{0}">{1}</font>""".format(c, s)
+
+    @staticmethod
+    def size(s, size):
+        """
+        Format text to sized.
+
+        Args:
+            s (str): string to format
+            size (str): size for string
+
+        Returns:
+            str: formatted string
+        """
+        return """<font size="{0}">{1}</font>""".format(size, s)
+
+    @staticmethod
+    def center(s):
+        """
+        Format text to be centered.
+
+        Args:
+            s (str): string to format
+
+        Returns:
+            str: formatted string
+        """
+        return """<center>{0}</center>""".format(s)
+
+    @staticmethod
     def mono(s):
         """
         Format text to be monospaced.
