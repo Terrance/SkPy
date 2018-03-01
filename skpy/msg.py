@@ -545,6 +545,18 @@ class SkypeFileMsg(SkypeMsg):
 
         attrs = ("name", "size", "urlFull", "urlThumb", "urlView")
 
+        @property
+        def urlAsm(self):
+            # Workaround for Skype providing full URLs with the wrong domain.
+            # api.asm.skype.com/.../0-xxx-yy-zzz... -> xxx-api.asm.skype.com
+            if not self.urlFull:
+                return None
+            match = re.match("{}/0-([a-z0-9]+)-".format(SkypeConnection.API_ASM), self.urlFull)
+            if not match:
+                return self.urlFull
+            prefix = SkypeConnection.API_ASM_LOCAL.format(match.group(1))
+            return self.urlFull.replace(SkypeConnection.API_ASM, prefix, 1)
+
     attrs = SkypeMsg.attrs + ("file",)
 
     @classmethod
@@ -564,7 +576,7 @@ class SkypeFileMsg(SkypeMsg):
     @property
     @SkypeUtils.cacheResult
     def fileContent(self):
-        return self.skype.conn("GET", "{0}/views/original".format(self.file.urlFull),
+        return self.skype.conn("GET", "{0}/views/original".format(self.file.urlAsm),
                                auth=SkypeConnection.Auth.Authorize).content
 
     @property
@@ -589,7 +601,7 @@ class SkypeImageMsg(SkypeFileMsg):
     @property
     @SkypeUtils.cacheResult
     def fileContent(self):
-        return self.skype.conn("GET", "{0}/views/imgpsh_fullsize".format(self.file.urlFull),
+        return self.skype.conn("GET", "{0}/views/imgpsh_fullsize".format(self.file.urlAsm),
                                auth=SkypeConnection.Auth.Authorize).content
 
     @property
