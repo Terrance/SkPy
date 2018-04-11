@@ -160,7 +160,9 @@ class SkypeChat(SkypeObj):
         if not image:
             meta["filename"] = name
         objId = self.skype.conn("POST", "https://api.asm.skype.com/v1/objects",
-                                auth=SkypeConnection.Auth.Authorize, json=meta).json()["id"]
+                                auth=SkypeConnection.Auth.Authorize,
+                                headers={"X-Client-Version": "0/0.0.0.0"},
+                                json=meta).json()["id"]
         objType = "imgpsh" if image else "original"
         urlFull = "https://api.asm.skype.com/v1/objects/{0}".format(objId)
         self.skype.conn("PUT", "{0}/content/{1}".format(urlFull, objType),
