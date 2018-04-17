@@ -632,7 +632,7 @@ class SkypeCallMsg(SkypeMsg):
             Names of the users, as seen by the initiator of the call.
     """
 
-    State = SkypeEnum("SkypeCallMsg.State", ("Started", "Ended"))
+    State = SkypeEnum("SkypeCallMsg.State", ("Started", "Ended", "Missed"))
     """
     :class:`.SkypeEnum`: Possible call states (either started and incoming, or ended).
 
@@ -640,7 +640,9 @@ class SkypeCallMsg(SkypeMsg):
         State.Started:
             New call has just begun.
         State.Ended:
-            All call participants have hung up.
+            Call failed to connect, or all call participants have hung up.
+        State.Missed:
+            Missed the call as it ended.
     """
 
     attrs = SkypeMsg.attrs + ("state", "userIds", "userNames")
@@ -649,7 +651,9 @@ class SkypeCallMsg(SkypeMsg):
     def rawToFields(cls, raw={}):
         fields = super(SkypeCallMsg, cls).rawToFields(raw)
         listTag = BeautifulSoup(raw.get("content"), "html.parser").find("partlist")
-        fields.update({"state": {"started": cls.State.Started, "ended": cls.State.Ended}[listTag.get("type")],
+        fields.update({"state": {"started": cls.State.Started,
+                                 "ended": cls.State.Ended,
+                                 "missed": cls.State.Missed}.get(listTag.get("type")),
                        "userIds": [], "userNames": []})
         for partTag in listTag.find_all("part"):
             fields["userIds"].append(partTag.get("identity"))
@@ -658,7 +662,9 @@ class SkypeCallMsg(SkypeMsg):
 
     @property
     def html(self):
-        partType = {self.State.Started: "started", self.State.Ended: "ended"}[self.state]
+        partType = {self.State.Started: "started",
+                    self.State.Ended: "ended",
+                    self.State.Missed: "missed"}[self.state]
         tag = makeTag("partlist", type=partType, alt="")
         for user in self.users:
             conTag = makeTag("part", identity=user.id)
