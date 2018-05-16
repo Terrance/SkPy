@@ -1,3 +1,5 @@
+from uuid import uuid4
+
 import requests
 
 from .core import SkypeObj, SkypeEnum
@@ -21,8 +23,6 @@ class Skype(SkypeObj):
             Container of conversations for the connected user.
         settings (:class:`.SkypeSettings`):
             Read/write access to server-side account options.
-        profile (dict):
-            Email addresses and phone numbers associated with the account.
         services (dict):
             Skype credit and other paid services for the connected account.
         translate (:class:`.SkypeTranslator`):
@@ -82,17 +82,6 @@ class Skype(SkypeObj):
         json = self.conn("GET", "{0}/users/self/profile".format(SkypeConnection.API_USER),
                          auth=SkypeConnection.Auth.SkypeToken).json()
         return SkypeContact.fromRaw(self, json)
-
-    @property
-    @SkypeUtils.cacheResult
-    def profile(self):
-        json = self.conn("GET", SkypeConnection.API_PROFILE, auth=SkypeConnection.Auth.SkypeToken,
-                         headers={"PS-ApplicationId": "5c7a1e34-3a23-4a36-b2e6-7aa15be85f07"}).json()
-        raw = json.get("Views", [])[0].get("Attributes", [])
-        data = {}
-        for prop in raw:
-            data[prop["Name"]] = prop["Value"]
-        return data
 
     @property
     @SkypeUtils.cacheResult
@@ -268,9 +257,9 @@ class SkypeSettings(SkypeObj):
             Who to accept incoming video and screen-share requests from.
     """
 
-    attrs = ("notificationPopups", "notificationSounds", "webLinkPreviews", "youtubePlayer", "mentionNotifs",
-             "imagePaste", "shareTyping", "emoteSuggestions", "showEmotes", "animateEmotes", "largeEmotes",
-             "pinFavourites", "darkTheme", "autoAddFriends", "callPrivacy", "videoPrivacy")
+    attrs = ("notificationPopups", "notificationSounds", "callPopups", "callSounds", "webLinkPreviews",
+             "youtubePlayer", "mentionNotifs", "imagePaste", "shareTyping", "emoteSuggestions", "showEmotes",
+             "animateEmotes", "largeEmotes", "pinFavourites", "darkTheme", "callPrivacy", "videoPrivacy")
 
     Privacy = SkypeEnum("SkypeSettings.Privacy", ("Anyone", "Contacts", "Nobody"))
     """
@@ -290,31 +279,6 @@ class SkypeSettings(SkypeObj):
         if skype and skype.conn.connected:
             self.syncFlags()
 
-    @property
-    def profile(self):
-        # Retrieve a dict of all profile options.
-        json = self.skype.conn("GET", self.skype.conn.API_PEOPLE, auth=SkypeConnection.Auth.SkypeToken,
-                               headers={"X-AppId": "5c7a1e34-3a23-4a36-b2e6-7aa15be85f07",
-                                        "X-SerializeAs": "purejson"}).json()
-        # Defaults aren't returned, so specify them here.
-        res = {"Skype.AutoBuddy": False}
-        for opt in json.get("Settings", []):
-            res[opt["Name"]] = (opt["Value"] == "true")
-        return res
-
-    def profProp(id):
-        @property
-        def prof(self):
-            return self.profile.get(id)
-
-        @prof.setter
-        def prof(self, val):
-            self.skype.conn("POST", self.skype.conn.API_PEOPLE, auth=SkypeConnection.Auth.SkypeToken,
-                            headers={"X-AppId": "5c7a1e34-3a23-4a36-b2e6-7aa15be85f07",
-                                     "X-SerializeAs": "purejson"},
-                            json={"Settings": [{"Name": id, "Value": val}]})
-        return prof
-
     def syncFlags(self):
         """
         Update the cached list of all enabled flags, and store it in the :attr:`flags` attribute.
@@ -324,38 +288,56 @@ class SkypeSettings(SkypeObj):
 
     def flagProp(id, invert=False):
         @property
-        def flag(self):
+        def prop(self):
             return (id in self.flags) ^ invert
 
-        @flag.setter
-        def flag(self, val):
+        @prop.setter
+        def prop(self, val):
             val = bool(val) ^ invert
             self.syncFlags()
             if not val == (id in self.flags):
                 self.skype.conn("PUT" if val else "DELETE", "{0}/{1}".format(SkypeConnection.API_FLAGS, id),
                                 auth=SkypeConnection.Auth.SkypeToken)
                 self.flags.add(id) if val else self.flags.remove(id)
-        return flag
+        return prop
 
-    def optProp(id):
+    def apiProp(id):
         @property
-        def opt(self):
+        def prop(self):
             json = self.skype.conn("GET", "{0}/users/{1}/options/{2}".format(SkypeConnection.API_USER,
                                                                              self.skype.userId, id),
                                    auth=SkypeConnection.Auth.SkypeToken).json()
             return json.get("optionInt", json.get("optionStr", json.get("optionBin")))
 
-        @opt.setter
-        def opt(self, val):
+        @prop.setter
+        def prop(self, val):
             self.skype.conn("POST", "{0}/users/{1}/options/{2}".format(SkypeConnection.API_USER,
                                                                        self.skype.userId, id),
                             auth=SkypeConnection.Auth.SkypeToken, data={"integerValue": val})
-        return opt
+        return prop
 
-    autoAddFriends = profProp("Skype.AutoBuddy")
+    def optProp(id):
+        def idHeaders():
+            return {"X-Microsoft-Skype-Message-ID": str(uuid4()),
+                    "X-Microsoft-Skype-Chain-ID": str(uuid4())}
+
+        @property
+        def prop(self):
+            return self.skype.conn("GET", "{0}/{1}".format(SkypeConnection.API_OPTIONS, id),
+                                   auth=SkypeConnection.Auth.SkypeToken,
+                                   headers=idHeaders()).json().get("value")
+
+        @prop.setter
+        def prop(self, val):
+            self.skype.conn("PUT", "{0}/{1}".format(SkypeConnection.API_OPTIONS, id),
+                            auth=SkypeConnection.Auth.SkypeToken,
+                            headers=idHeaders(), json={"value": val})
+        return prop
 
     notificationPopups = flagProp(21, True)
-    notificationSounds = flagProp(22, True)
+    notificationSounds = flagProp(31, True)
+    callPopups = flagProp(32, True)
+    callSounds = flagProp(33, True)
     webLinkPreviews = flagProp(11, True)
     youtubePlayer = flagProp(12)
     mentionNotifs = flagProp(13, True)
@@ -369,18 +351,17 @@ class SkypeSettings(SkypeObj):
     darkTheme = flagProp(28)
 
     # Hidden options, which are abstracted below to avoid the flag nonsense.
-    callPrivacyOpt = optProp("OPT_SKYPE_CALL_POLICY")
+    callPrivacyOpt = optProp("calling.skype-call-policy")
     videoPrivacyContacts = flagProp(15)
     videoPrivacyNobody = flagProp(16)
 
     @property
     def callPrivacy(self):
-        # Behaviour here is consistent with Skype for Web (neither 0 nor 1 displays as contacts only).
-        return self.Privacy.Anyone if self.callPrivacyOpt == 0 else self.Privacy.Contacts
+        return self.Privacy.Anyone if self.callPrivacyOpt == "EVERYONE_CAN_CALL" else self.Privacy.Contacts
 
     @callPrivacy.setter
     def callPrivacy(self, val):
-        self.callPrivacyOpt = 0 if val == self.Privacy.Anyone else 2
+        self.callPrivacyOpt = "EVERYONE_CAN_CALL" if val == self.Privacy.Anyone else "AUTHORIZED_CAN_CALL"
 
     @property
     def videoPrivacy(self):

@@ -127,6 +127,7 @@ class SkypeConnection(SkypeObj):
     API_LOGIN = "https://login.skype.com/login"
     API_MSACC = "https://login.live.com"
     API_USER = "https://api.skype.com"
+    API_OPTIONS = "https://options.skype.com/options/v1/users/self/options"
     API_JOIN = "https://join.skype.com"
     API_BOT = "https://api.aps.skype.com/v1"
     API_FLAGS = "https://flagsapi.skype.com/flags/v1"
@@ -138,9 +139,7 @@ class SkypeConnection(SkypeObj):
     API_URL = "https://urlp.asm.skype.com/v1/url/info"
     API_CONTACTS = "https://contacts.skype.com/contacts/v2"
     API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1"
-    API_PEOPLE = "https://people.directory.live.com/people/account/settings"
     API_DIRECTORY = "https://skypegraph.skype.com/search/v1.1/namesearch/swx/"
-    API_PROFILE = "https://pf.directory.live.com/profile/mine/System.ShortCircuitProfile.json"
     # Version doesn't seem to be important, at least not for what we need.
     API_CONFIG = "https://a.config.skype.com/config/v1"
 
@@ -170,7 +169,7 @@ class SkypeConnection(SkypeObj):
     def guest(self):
         return self.userId.startswith("guest:") if self.userId else None
 
-    def __call__(self, method, url, codes=(200, 201, 204, 207), auth=None, headers=None, **kwargs):
+    def __call__(self, method, url, codes=(200, 201, 202, 204, 207), auth=None, headers=None, **kwargs):
         """
         Make an API call.  Most parameters are passed directly to :mod:`requests`.
 
