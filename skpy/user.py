@@ -417,8 +417,8 @@ class SkypeContacts(SkypeObjs):
         Returns:
             SkypeUser: resulting user object
         """
-        json = self.skype.conn("POST", "{0}/users/self/contacts/profiles".format(SkypeConnection.API_USER),
-                               auth=SkypeConnection.Auth.SkypeToken, data={"contacts[]": id}).json()
+        json = self.skype.conn("POST", "{0}/batch/profiles".format(SkypeConnection.API_PROFILE),
+                               auth=SkypeConnection.Auth.SkypeToken, json={"usernames": [id]}).json()
         return self.merge(SkypeUser.fromRaw(self.skype, json[0])) if json else None
 
     @SkypeUtils.cacheResult

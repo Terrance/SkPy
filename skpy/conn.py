@@ -127,6 +127,7 @@ class SkypeConnection(SkypeObj):
     API_LOGIN = "https://login.skype.com/login"
     API_MSACC = "https://login.live.com"
     API_USER = "https://api.skype.com"
+    API_PROFILE = "https://profile.skype.com/profile/v1"
     API_OPTIONS = "https://options.skype.com/options/v1/users/self/options"
     API_JOIN = "https://join.skype.com"
     API_BOT = "https://api.aps.skype.com/v1"
