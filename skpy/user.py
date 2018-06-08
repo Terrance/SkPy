@@ -3,6 +3,7 @@ from datetime import datetime
 from .core import SkypeObj, SkypeObjs, SkypeEnum, SkypeApiException
 from .util import SkypeUtils
 from .conn import SkypeConnection
+from .chat import SkypeSingleChat
 
 
 @SkypeUtils.initAttrs
@@ -135,7 +136,11 @@ class SkypeUser(SkypeObj):
     @SkypeUtils.cacheResult
     def chat(self):
         prefix = "28" if isinstance(self, SkypeBotUser) else "8"
-        return self.skype.chats["{0}:{1}".format(prefix, self.id)]
+        try:
+            return self.skype.chats["{0}:{1}".format(prefix, self.id)]
+        except SkypeApiException:
+            # Maybe a conversation doesn't exist yet, return a disconnected one instead.
+            return SkypeSingleChat(self.skype, id="{}:{}".format(prefix, self.id), alerts=True, userId=self.id)
 
     def invite(self, greeting=None):
         """
