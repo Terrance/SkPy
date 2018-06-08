@@ -412,10 +412,6 @@ class SkypeContacts(SkypeObjs):
         """
         Retrieve public information about a user.
 
-        Note that it is not possible to distinguish if a contacts exists or not.
-
-        An unregistered identifier produces a profile with only the identifier populated.
-
         Args:
             id (str): user identifier to lookup
 
@@ -424,7 +420,10 @@ class SkypeContacts(SkypeObjs):
         """
         json = self.skype.conn("POST", "{0}/batch/profiles".format(SkypeConnection.API_PROFILE),
                                auth=SkypeConnection.Auth.SkypeToken, json={"usernames": [id]}).json()
-        return self.merge(SkypeUser.fromRaw(self.skype, json[0])) if json else None
+        if json and "status" not in json[0]:
+            return self.merge(SkypeUser.fromRaw(self.skype, json[0]))
+        else:
+            return None
 
     @SkypeUtils.cacheResult
     def bots(self):
