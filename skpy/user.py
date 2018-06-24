@@ -506,7 +506,7 @@ class SkypeContactGroup(SkypeObj):
     def rawToFields(cls, raw={}):
         return {"id": raw.get("id"),
                 "name": raw.get("name"),
-                "userIds": [SkypeUtils.noPrefix(id) for id in raw.get("contacts")]}
+                "userIds": [SkypeUtils.noPrefix(id) for id in raw.get("contacts", [])]}
 
 
 @SkypeUtils.initAttrs
