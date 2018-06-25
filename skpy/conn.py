@@ -314,6 +314,8 @@ class SkypeConnection(SkypeObj):
         """
         # Write token file privately.
         with os.fdopen(os.open(self.tokenFile, os.O_WRONLY | os.O_CREAT, 0o600), "w") as f:
+            # When opening files via os, truncation must be done manually.
+            f.truncate()
             f.write(self.userId + "\n")
             f.write(self.tokens["skype"] + "\n")
             f.write(str(int(time.mktime(self.tokenExpiry["skype"].timetuple()))) + "\n")
