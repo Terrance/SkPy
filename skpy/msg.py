@@ -325,9 +325,9 @@ class SkypeTextMsg(SkypeMsg):
     def plain(self):
         if self.content is None:
             return None
-        text = re.sub(r"</?(e|b|i|s|pre|quote|legacyquote).*?>", "", self.content)
-        text = re.sub(r"""<a.*?href="(.*?)">.*?</a>""", r"\1", text)
-        text = re.sub(r"""<at.*?id="8:(.*?)">.*?</at>""", r"@\1", text)
+        text = re.sub(r"</?(e|b|i|ss?|pre|quote|legacyquote)\b.*?>", "", self.content)
+        text = re.sub(r"""<a\b.*?href="(.*?)">.*?</a>""", r"\1", text)
+        text = re.sub(r"""<at\b.*?id="8:(.*?)">.*?</at>""", r"@\1", text)
         text = (text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
                     .replace("&quot;", "\"").replace("&apos;", "'"))
         return text
@@ -336,13 +336,13 @@ class SkypeTextMsg(SkypeMsg):
     def markup(self):
         if self.content is None:
             return None
-        text = re.sub(r"</?(e|quote|legacyquote).*?>", "", self.content)
-        text = re.sub(r"</?b.*?>", "*", text)
-        text = re.sub(r"</?i.*?>", "_", text)
-        text = re.sub(r"</?s.*?>", "~", text)
-        text = re.sub(r"</?pre.*?>", "{code}", text)
-        text = re.sub(r"""<a.*?href="(.*?)">.*?</a>""", r"\1", text)
-        text = re.sub(r"""<at.*?id="8:(.*?)">.*?</at>""", r"@\1", text)
+        text = re.sub(r"</?(e|ss|quote|legacyquote)\b.*?>", "", self.content)
+        text = re.sub(r"</?b\b.*?>", "*", text)
+        text = re.sub(r"</?i\b.*?>", "_", text)
+        text = re.sub(r"</?s\b.*?>", "~", text)
+        text = re.sub(r"</?pre\b.*?>", "{code}", text)
+        text = re.sub(r"""<a\b.*?href="(.*?)">.*?</a>""", r"\1", text)
+        text = re.sub(r"""<at\b.*?id="8:(.*?)">.*?</at>""", r"@\1", text)
         text = (text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
                     .replace("&quot;", "\"").replace("&apos;", "'"))
         return text
