@@ -118,7 +118,7 @@ class SkypeConnection(SkypeObj):
             print(pformat(dict(resp.headers)))
             try:
                 print(pformat(resp.json()))
-            except:
+            except ValueError:
                 print(resp.text)
         if resp.status_code not in codes:
             raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
@@ -211,7 +211,7 @@ class SkypeConnection(SkypeObj):
             print(pformat(dict(resp.headers)))
             try:
                 print(pformat(resp.json()))
-            except:
+            except ValueError:
                 print(resp.text)
         if resp.status_code not in codes:
             if resp.status_code == 429:
@@ -243,7 +243,7 @@ class SkypeConnection(SkypeObj):
         resp = self(method, url, params=params, **kwargs)
         try:
             json = resp.json()
-        except:
+        except ValueError:
             # Don't do anything if not a JSON response.
             pass
         else:
@@ -286,13 +286,16 @@ class SkypeConnection(SkypeObj):
         """
         if not self.tokenFile:
             raise SkypeAuthException("No token file specified")
-        with open(self.tokenFile, "r") as f:
-            lines = f.read().splitlines()
+        try:
+            with open(self.tokenFile, "r") as f:
+                lines = f.read().splitlines()
+        except OSError:
+            raise SkypeAuthException("Token file doesn't exist or not readable")
         try:
             user, skypeToken, skypeExpiry, regToken, regExpiry, msgsHost = lines
             skypeExpiry = datetime.fromtimestamp(int(skypeExpiry))
             regExpiry = datetime.fromtimestamp(int(regExpiry))
-        except:
+        except ValueError:
             raise SkypeAuthException("Token file is malformed")
         if datetime.now() >= skypeExpiry:
             raise SkypeAuthException("Token file has expired")

@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import requests
 
-from .core import SkypeObj, SkypeEnum
+from .core import SkypeObj, SkypeEnum, SkypeAuthException
 from .util import SkypeUtils
 from .conn import SkypeConnection
 from .user import SkypeUser, SkypeContact, SkypeContacts
@@ -65,7 +65,7 @@ class Skype(SkypeObj):
         if connect and ((user and pwd) or tokenFile):
             try:
                 self.conn.readToken()
-            except:
+            except SkypeAuthException:
                 self.conn.getSkypeToken()
         self.contacts = SkypeContacts(self)
         self.chats = SkypeChats(self)
