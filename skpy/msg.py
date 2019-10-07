@@ -279,7 +279,7 @@ class SkypeMsg(SkypeObj):
         Returns:
             .SkypeMsg: copy of the edited message object
         """
-        return self.chat.sendMsg(content, me, rich, self.clientId)
+        return self.chat.sendMsg(content, me, rich, self.id)
 
     def delete(self):
         """

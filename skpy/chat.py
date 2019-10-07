@@ -2,7 +2,7 @@ from datetime import datetime
 import re
 import time
 
-from .core import SkypeObj, SkypeObjs
+from .core import SkypeObj, SkypeObjs, SkypeApiException
 from .util import SkypeUtils
 from .conn import SkypeConnection
 from .msg import SkypeMsg
@@ -47,6 +47,35 @@ class SkypeChat(SkypeObj):
         resp = self.skype.conn.syncStateCall("GET", url, params, auth=SkypeConnection.Auth.RegToken).json()
         return [SkypeMsg.fromRaw(self.skype, json) for json in resp.get("messages", [])]
 
+    def createRaw(self, msg):
+        resp = self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages"
+                                       .format(self.skype.conn.msgsHost, self.id),
+                               auth=SkypeConnection.Auth.RegToken, json=msg)
+        url = resp.headers.get("Location")
+        msgId = url.rsplit("/", 1)[-1] if url else None
+        arriveTime = resp.json().get("OriginalArrivalTime")
+        return (msgId, arriveTime)
+
+    def editRaw(self, msgId, msg):
+        resp = self.skype.conn("PUT", "{0}/users/ME/conversations/{1}/messages/{2}"
+                                      .format(self.skype.conn.msgsHost, self.id, msgId),
+                               auth=SkypeConnection.Auth.RegToken, json=msg)
+        json = resp.json()
+        if "errorCode" in json:
+            raise SkypeApiException("Error code {0} from message edit".format(json["errorCode"]), resp)
+        else:
+            return json.get("edittime")
+
+    def deleteRaw(self, msgId):
+        resp = self.skype.conn("DELETE", "{0}/users/ME/conversations/{1}/messages/{2}"
+                                         .format(self.skype.conn.msgsHost, self.id, msgId),
+                               auth=SkypeConnection.Auth.RegToken)
+        json = resp.json()
+        if "errorCode" in json:
+            raise SkypeApiException("Error code {0} from message delete".format(json["errorCode"]), resp)
+        else:
+            return json.get("deletetime")
+
     def sendRaw(self, editId=None, **kwargs):
         """
         Send a raw message to the conversation.  At a minimum, values for ``content``, ``messagetype`` and
@@ -71,22 +100,30 @@ class SkypeChat(SkypeObj):
             .SkypeMsg: copy of the sent message object
         """
         msg = {"contenttype": "text", "messagetype": "Text"}
-        # Skype timestamps are integers and in milliseconds, whereas Python's are floats and in seconds.
-        clientTime = int(time.time() * 1000)
-        clientDate = datetime.fromtimestamp(clientTime / 1000)
-        msg["skypeeditedid" if editId else "clientmessageid"] = str(editId or clientTime)
         msg.update(kwargs)
-        arriveTime = self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages"
-                                             .format(self.skype.conn.msgsHost, self.id),
-                                     auth=SkypeConnection.Auth.RegToken, json=msg).json().get("OriginalArrivalTime")
+        if editId:
+            msgId = editId
+            clientTime = None
+            if msg.get("content"):
+                arriveTime = self.editRaw(editId, msg)
+            else:
+                arriveTime = self.deleteRaw(editId)
+        else:
+            # Skype timestamps are integers and in milliseconds, whereas Python's are floats and in seconds.
+            clientTime = int(time.time() * 1000)
+            msg["clientmessageid"] = str(clientTime)
+            msgId, arriveTime = self.createRaw(msg)
         arriveDate = datetime.fromtimestamp(arriveTime / 1000) if arriveTime else datetime.now()
-        msg.update({"composetime": datetime.strftime(clientDate, "%Y-%m-%dT%H:%M:%S.%fZ"),
+        msg.update({"id": msgId,
                     "conversationLink": "{0}/users/ME/conversations/{1}".format(self.skype.conn.msgsHost, self.id),
                     "from": "{0}/users/ME/contacts/8:{1}".format(self.skype.conn.msgsHost, self.skype.userId),
                     "imdisplayname": str(self.skype.user.name),
                     "isactive": True,
                     "originalarrivaltime": datetime.strftime(arriveDate, "%Y-%m-%dT%H:%M:%S.%fZ"),
                     "type": "Message"})
+        if clientTime:
+            clientDate = datetime.fromtimestamp(clientTime / 1000)
+            msg["composetime"] = datetime.strftime(clientDate, "%Y-%m-%dT%H:%M:%S.%fZ")
         if arriveTime:
             arriveDate = datetime.fromtimestamp(arriveTime / 1000)
             msg["originalarrivaltime"] = datetime.strftime(arriveDate, "%Y-%m-%dT%H:%M:%S.%fZ")
@@ -266,9 +303,9 @@ class SkypeGroupChat(SkypeChat):
             Users currently participating in the conversation.
         admins (:class:`.SkypeUser` list):
             Participants with admin privileges.
-        open (boolean):
+        open (bool):
             Whether new participants can join via a public join link.
-        history (boolean):
+        history (bool):
             Whether message history is provided to new participants.
         picture (str):
             URL to retrieve the conversation picture.
