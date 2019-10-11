@@ -276,8 +276,7 @@ class SkypeSettings(SkypeObj):
 
     def __init__(self, skype=None, raw=None):
         super(SkypeSettings, self).__init__(skype, raw)
-        if skype and skype.conn.connected:
-            self.syncFlags()
+        self.flags = set()
 
     def syncFlags(self):
         """
