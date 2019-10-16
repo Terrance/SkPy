@@ -338,10 +338,9 @@ class SkypeGroupChat(SkypeChat):
     @property
     @SkypeUtils.cacheResult
     def joinUrl(self):
-        return self.skype.conn("POST", "{0}/threads".format(SkypeConnection.API_SCHEDULE),
+        return self.skype.conn("POST", "{0}/meetings".format(SkypeConnection.API_JOIN_CREATE),
                                auth=SkypeConnection.Auth.SkypeToken,
-                               json={"baseDomain": "https://join.skype.com/launch/",
-                                     "threadId": self.id}).json().get("JoinUrl")
+                               json={"threadId": self.id}).json().get("url")
 
     def setTopic(self, topic):
         """
