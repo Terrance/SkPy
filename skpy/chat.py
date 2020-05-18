@@ -45,7 +45,7 @@ class SkypeChat(SkypeObj):
                   "view": "supportsExtendedHistory|msnp24Equivalent|supportsMessageProperties",
                   "pageSize": 30
                   }
-        headers = {"BehaviorOverride": "redirectAs404"
+        headers = {"BehaviorOverride": "redirectAs404",
                    "Sec-Fetch-Dest": "empty",
                    "Sec-Fetch-Mode": "cors",
                    "Sec-Fetch-Site": "cross-site"}
