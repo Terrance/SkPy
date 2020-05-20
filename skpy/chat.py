@@ -42,9 +42,13 @@ class SkypeChat(SkypeObj):
         """
         url = "{0}/users/ME/conversations/{1}/messages".format(self.skype.conn.msgsHost, self.id)
         params = {"startTime": 0,
-                  "view": "msnp24Equivalent",
-                  "targetType": "Passport|Skype|Lync|Thread"}
-        resp = self.skype.conn.syncStateCall("GET", url, params, auth=SkypeConnection.Auth.RegToken).json()
+                  "view": "supportsExtendedHistory|msnp24Equivalent|supportsMessageProperties",
+                  "pageSize": 30}
+        headers = {"BehaviorOverride": "redirectAs404",
+                   "Sec-Fetch-Dest": "empty",
+                   "Sec-Fetch-Mode": "cors",
+                   "Sec-Fetch-Site": "cross-site"}
+        resp = self.skype.conn.syncStateCall("GET", url, params, auth=SkypeConnection.Auth.RegToken, headers=headers).json()
         return [SkypeMsg.fromRaw(self.skype, json) for json in resp.get("messages", [])]
 
     def createRaw(self, msg):
