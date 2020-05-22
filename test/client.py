@@ -5,6 +5,8 @@ import time
 import re
 import unittest
 
+from urllib3.connection import HTTPHeaderDict
+
 import responses
 
 from skpy import Skype, SkypeConnection, SkypeContact, SkypeMsg, SkypeTextMsg, SkypeUtils
@@ -47,7 +49,8 @@ def registerMocks(regTokenRedirect=False, guest=False):
     """
     # Retrieve the login form.
     responses.add(responses.GET, "{0}/oauth/microsoft".format(SkypeConnection.API_LOGIN), status=200,
-                  adding_headers={"Set-Cookie": "MSPRequ=MSPRequ; MSPOK=MSPOK"}, content_type="text/html",
+                  adding_headers=HTTPHeaderDict((("Set-Cookie", "MSPRequ=MSPRequ"),
+                                                 ("Set-Cookie", "MSPOK=MSPOK"))), content_type="text/html",
                   body="""<html><body><input name="PPFT" value="ppftvalue"></body></html>""")
     # Submit username/password to form.
     responses.add(responses.POST, "{0}/ppsecure/post.srf".format(SkypeConnection.API_MSACC),
