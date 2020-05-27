@@ -841,6 +841,10 @@ class SkypeEndpoint(SkypeObj):
 
     attrs = ("id",)
 
+    resources = ["/v1/users/ME/conversations/ALL/properties",
+                 "/v1/users/ME/conversations/ALL/messages",
+                 "/v1/threads/ALL"]
+
     def __init__(self, conn, id):
         """
         Create a new instance based on a newly-created endpoint identifier.
@@ -853,6 +857,7 @@ class SkypeEndpoint(SkypeObj):
         self.conn = conn
         self.id = id
         self.subscribed = False
+        self.subscribedPresence = False
 
     def config(self, name="skype"):
         """
@@ -890,13 +895,28 @@ class SkypeEndpoint(SkypeObj):
         """
         self.conn("POST", "{0}/users/ME/endpoints/{1}/subscriptions".format(self.conn.msgsHost, self.id),
                   auth=SkypeConnection.Auth.RegToken,
-                  json={"interestedResources": ["/v1/threads/ALL",
-                                                "/v1/users/ME/contacts/ALL",
-                                                "/v1/users/ME/conversations/ALL/messages",
-                                                "/v1/users/ME/conversations/ALL/properties"],
-                        "template": "raw",
-                        "channelType": "httpLongPoll"})
+                  json={"interestedResources": self.resources,
+                        "channelType": "HttpLongPoll",
+                        "conversationType": 2047})
         self.subscribed = True
+
+    def subscribePresence(self, contacts):
+        """
+        Enable presence subscriptions for the authenticated user's contacts.
+
+        Args:
+            contacts (.SkypeContacts): contact list to select user IDs
+        """
+        if not self.subscribed:
+            self.subscribe()
+        resources = list(self.resources)
+        for contact in contacts:
+            resources.append("/v1/users/ME/contacts/8:{}".format(contact.id))
+        self.conn("PUT", "{0}/users/ME/endpoints/{1}/subscriptions/0".format(self.conn.msgsHost, self.id),
+                  auth=SkypeConnection.Auth.RegToken,
+                  params={"name": "interestedResources"},
+                  json={"interestedResources": resources})
+        self.subscribedPresence = True
 
     def getEvents(self):
         """

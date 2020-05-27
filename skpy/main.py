@@ -89,6 +89,12 @@ class Skype(SkypeObj):
         return self.conn("GET", "{0}/users/{1}/services".format(SkypeConnection.API_ENTITLEMENT, self.userId),
                          auth=SkypeConnection.Auth.SkypeToken, headers={"Accept": "application/json; ver=3.0"}).json()
 
+    def subscribePresence(self):
+        """
+        Subscribe to contact presence events.
+        """
+        self.conn.endpoints["self"].subscribePresence(self.contacts)
+
     @SkypeConnection.handle(404, regToken=True)
     @SkypeConnection.handle(404, subscribe="self")
     def getEvents(self):
