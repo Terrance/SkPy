@@ -656,7 +656,7 @@ class SkypeCallMsg(SkypeMsg):
                                  "missed": cls.State.Missed}.get(listTag.get("type")),
                        "userIds": [], "userNames": []})
         for partTag in listTag.find_all("part"):
-            fields["userIds"].append(partTag.get("identity"))
+            fields["userIds"].append(SkypeUtils.noPrefix(partTag.get("identity")))
             fields["userNames"].append(partTag.find("name").text)
         return fields
 
