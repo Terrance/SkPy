@@ -257,7 +257,7 @@ class SkypeMsg(SkypeObj):
 
     @property
     def deleted(self):
-        return self.html == ""
+        return self.content == ""
 
     def read(self):
         """
