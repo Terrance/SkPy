@@ -576,6 +576,8 @@ class SkypeFileMsg(SkypeMsg):
     @property
     @SkypeUtils.cacheResult
     def fileContent(self):
+        if not self.file:
+            return None
         return self.skype.conn("GET", "{0}/views/original".format(self.file.urlAsm),
                                auth=SkypeConnection.Auth.Authorize).content
 
@@ -601,6 +603,8 @@ class SkypeImageMsg(SkypeFileMsg):
     @property
     @SkypeUtils.cacheResult
     def fileContent(self):
+        if not self.file:
+            return None
         return self.skype.conn("GET", "{0}/views/imgpsh_fullsize".format(self.file.urlAsm),
                                auth=SkypeConnection.Auth.Authorize).content
 
