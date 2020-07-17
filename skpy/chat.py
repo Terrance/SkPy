@@ -29,6 +29,25 @@ class SkypeChat(SkypeObj):
         return {"id": raw.get("id"),
                 "alerts": False if raw.get("properties", {}).get("alerts") == "false" else True}
 
+    @classmethod
+    def fromRaw(cls, skype=None, raw={}):
+        id = raw.get("id")
+        if "threadProperties" in raw:
+            active = True
+            try:
+                info = skype.conn("GET", "{0}/threads/{1}".format(skype.conn.msgsHost, raw.get("id")),
+                                  auth=SkypeConnection.Auth.RegToken,
+                                  params={"view": "msnp24Equivalent"}).json()
+            except SkypeApiException as e:
+                if e.args[1].status_code != 404:
+                    raise
+                active = False
+            else:
+                raw.update(info)
+            return SkypeGroupChat(skype, raw, **SkypeGroupChat.rawToFields(raw, active=active))
+        else:
+            return SkypeSingleChat(skype, raw, **SkypeSingleChat.rawToFields(raw))
+
     def getMsgs(self):
         """
         Retrieve a batch of messages from the conversation.
@@ -315,12 +334,15 @@ class SkypeGroupChat(SkypeChat):
             URL to retrieve the conversation picture.
         joinUrl (str):
             Public ``join.skype.com`` URL for any other users to access the conversation.
+        active (bool):
+            Whether the full group chat was retrieved from the server.  This may be ``False`` if a group conversation
+            still appears in the recent list despite being left or deleted.
     """
 
-    attrs = SkypeChat.attrs + ("topic", "creatorId", "userIds", "adminIds", "open", "history", "picture")
+    attrs = SkypeChat.attrs + ("topic", "creatorId", "userIds", "adminIds", "open", "history", "picture", "active")
 
     @classmethod
-    def rawToFields(cls, raw={}):
+    def rawToFields(cls, raw={}, active=False):
         fields = super(SkypeGroupChat, cls).rawToFields(raw)
         props = raw.get("properties", {})
         userIds = []
@@ -336,7 +358,8 @@ class SkypeGroupChat(SkypeChat):
                        "adminIds": adminIds,
                        "open": props.get("joiningenabled", "") == "true",
                        "history": props.get("historydisclosed", "") == "true",
-                       "picture": props.get("picture", "")[4:] or None})
+                       "picture": props.get("picture", "")[4:] or None,
+                       "active": active})
         return fields
 
     @property
@@ -450,14 +473,8 @@ class SkypeChats(SkypeObjs):
         resp = self.skype.conn.syncStateCall("GET", url, params, auth=SkypeConnection.Auth.RegToken).json()
         chats = {}
         for json in resp.get("conversations", []):
-            cls = SkypeSingleChat
-            if "threadProperties" in json:
-                info = self.skype.conn("GET", "{0}/threads/{1}".format(self.skype.conn.msgsHost, json.get("id")),
-                                       auth=SkypeConnection.Auth.RegToken,
-                                       params={"view": "msnp24Equivalent"}).json()
-                json.update(info)
-                cls = SkypeGroupChat
-            chats[json.get("id")] = self.merge(cls.fromRaw(self.skype, json))
+            chat = SkypeChat.fromRaw(self.skype, json)
+            chats[chat.id] = self.merge(chat)
         return chats
 
     def chat(self, id):
@@ -466,16 +483,13 @@ class SkypeChats(SkypeObjs):
 
         Args:
             id (str): single or group chat identifier
+
+        Returns:
+            :class:`SkypeChat`: retrieved conversation
         """
         json = self.skype.conn("GET", "{0}/users/ME/conversations/{1}".format(self.skype.conn.msgsHost, id),
                                auth=SkypeConnection.Auth.RegToken, params={"view": "msnp24Equivalent"}).json()
-        cls = SkypeSingleChat
-        if "threadProperties" in json:
-            info = self.skype.conn("GET", "{0}/threads/{1}".format(self.skype.conn.msgsHost, json.get("id")),
-                                   auth=SkypeConnection.Auth.RegToken, params={"view": "msnp24Equivalent"}).json()
-            json.update(info)
-            cls = SkypeGroupChat
-        return self.merge(cls.fromRaw(self.skype, json))
+        return self.merge(SkypeChat.fromRaw(self.skype, json))
 
     def create(self, members=(), admins=()):
         """
@@ -487,6 +501,9 @@ class SkypeChats(SkypeObjs):
         Args:
             members (str list): user identifiers to initially join the conversation
             admins (str list): user identifiers to gain admin privileges
+
+        Returns:
+            :class:`SkypeGroupChat`: newly created group conversation
         """
         memberObjs = [{"id": "8:{0}".format(self.skype.userId), "role": "Admin"}]
         for id in members:
