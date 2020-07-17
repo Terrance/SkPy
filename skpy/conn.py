@@ -6,14 +6,12 @@ import time
 from types import MethodType
 import hashlib
 import base64
+from pprint import pformat
 
 from bs4 import BeautifulSoup
 import requests
 
 from .core import SkypeObj, SkypeEnum, SkypeApiException, SkypeAuthException
-
-if os.getenv("SKPY_DEBUG_HTTP"):
-    from pprint import pformat
 
 
 class SkypeConnection(SkypeObj):
