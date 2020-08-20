@@ -595,6 +595,9 @@ class SkypeLiveAuthProvider(SkypeAuthProvider):
 
 
 class SkypeSOAPAuthProvider(SkypeAuthProvider):
+    """
+    An authentication provider that connects via Microsoft account SOAP authentication.
+    """
 
     template = """
     <Envelope xmlns='http://schemas.xmlsoap.org/soap/envelope/'
@@ -631,6 +634,27 @@ class SkypeSOAPAuthProvider(SkypeAuthProvider):
     def encode(value):
         return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
+    def auth(self, user, pwd):
+        """
+        Perform a SOAP login with the given email address or Skype username, and its password.
+
+        .. note::
+            Microsoft accounts with two-factor authentication enabled must provide an application-specific password.
+
+        Args:
+            user (str): username or email address of the connecting account
+            pwd (str): password of the connecting account
+
+        Returns:
+            (str, datetime.datetime) tuple: Skype token, and associated expiry if known
+
+        Raises:
+            .SkypeAuthException: if the login request is rejected
+            .SkypeApiException: if the login form can't be processed
+        """
+        token = self.getSecToken(user, pwd)
+        return self.exchangeToken(token)
+
     def getSecToken(self, user, pwd):
         loginResp = self.conn("POST", "{0}/RST.srf".format(SkypeConnection.API_MSACC),
                               data=self.template.format(self.encode(user), self.encode(pwd)))
@@ -646,11 +670,14 @@ class SkypeSOAPAuthProvider(SkypeAuthProvider):
                         code = fnode.text
                     elif ftag == "faultstring":
                         msg = fnode.text
-                raise SkypeAuthException("{} - {}".format(code, msg), loginResp)
+                if code or msg:
+                    raise SkypeAuthException("{} - {}".format(code, msg), loginResp)
+                else:
+                    raise SkypeApiException("Unknown fault whilst requesting security token", loginResp)
             elif tag == "BinarySecurityToken":
                 token = node.text
         if not token:
-            raise SkypeAuthException("Couldn't retrieve security token from login response", loginResp)
+            raise SkypeApiException("Couldn't retrieve security token from login response", loginResp)
         return token
 
     def exchangeToken(self, token):
@@ -659,7 +686,7 @@ class SkypeSOAPAuthProvider(SkypeAuthProvider):
         try:
             edgeData = edgeResp.json()
         except ValueError:
-            raise SkypeAuthException("Couldn't parse edge response body", edgeResp)
+            raise SkypeApiException("Couldn't parse edge response body", edgeResp)
         if "skypetoken" in edgeData:
             token = edgeData["skypetoken"]
             expiry = None
@@ -668,13 +695,9 @@ class SkypeSOAPAuthProvider(SkypeAuthProvider):
             return (token, expiry)
         elif "status" in edgeData:
             status = edgeData["status"]
-            raise SkypeAuthException("{} - {}".format(status.get("code"), status.get("text")), edgeResp)
+            raise SkypeApiException("{} - {}".format(status.get("code"), status.get("text")), edgeResp)
         else:
-            raise SkypeAuthException("Couldn't retrieve token from edge response", edgeResp)
-
-    def auth(self, user, pwd):
-        token = self.getSecToken(user, pwd)
-        return self.exchangeToken(token)
+            raise SkypeApiException("Couldn't retrieve token from edge response", edgeResp)
 
 
 class SkypeGuestAuthProvider(SkypeAuthProvider):
