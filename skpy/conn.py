@@ -7,6 +7,7 @@ from types import MethodType
 import hashlib
 import base64
 from pprint import pformat
+from xml.etree import ElementTree
 
 from bs4 import BeautifulSoup
 import requests
@@ -124,6 +125,7 @@ class SkypeConnection(SkypeObj):
 
     API_LOGIN = "https://login.skype.com/login"
     API_MSACC = "https://login.live.com"
+    API_EDGE = "https://edge.skype.com/rps/v1/rps/skypetoken"
     API_USER = "https://api.skype.com"
     API_PROFILE = "https://profile.skype.com/profile/v1"
     API_OPTIONS = "https://options.skype.com/options/v1/users/self/options"
@@ -363,7 +365,7 @@ class SkypeConnection(SkypeObj):
             .SkypeAuthException: if the login request is rejected
             .SkypeApiException: if the login form can't be processed
         """
-        self.tokens["skype"], self.tokenExpiry["skype"] = SkypeLiveAuthProvider(self).auth(user, pwd)
+        self.tokens["skype"], self.tokenExpiry["skype"] = SkypeSOAPAuthProvider(self).auth(user, pwd)
         self.getUserId()
         self.getRegToken()
 
@@ -590,6 +592,89 @@ class SkypeLiveAuthProvider(SkypeAuthProvider):
         if expiryField:
             expiry = datetime.fromtimestamp(int(time.time()) + int(expiryField.get("value")))
         return (token, expiry)
+
+
+class SkypeSOAPAuthProvider(SkypeAuthProvider):
+
+    template = """
+    <Envelope xmlns='http://schemas.xmlsoap.org/soap/envelope/'
+       xmlns:wsse='http://schemas.xmlsoap.org/ws/2003/06/secext'
+       xmlns:wsp='http://schemas.xmlsoap.org/ws/2002/12/policy'
+       xmlns:wsa='http://schemas.xmlsoap.org/ws/2004/03/addressing'
+       xmlns:wst='http://schemas.xmlsoap.org/ws/2004/04/trust'
+       xmlns:ps='http://schemas.microsoft.com/Passport/SoapServices/PPCRL'>
+       <Header>
+           <wsse:Security>
+               <wsse:UsernameToken Id='user'>
+                   <wsse:Username>{}</wsse:Username>
+                   <wsse:Password>{}</wsse:Password>
+               </wsse:UsernameToken>
+           </wsse:Security>
+       </Header>
+       <Body>
+           <ps:RequestMultipleSecurityTokens Id='RSTS'>
+               <wst:RequestSecurityToken Id='RST0'>
+                   <wst:RequestType>http://schemas.xmlsoap.org/ws/2004/04/security/trust/Issue</wst:RequestType>
+                   <wsp:AppliesTo>
+                       <wsa:EndpointReference>
+                           <wsa:Address>wl.skype.com</wsa:Address>
+                       </wsa:EndpointReference>
+                   </wsp:AppliesTo>
+                   <wsse:PolicyReference URI='MBI_SSL'></wsse:PolicyReference>
+               </wst:RequestSecurityToken>
+           </ps:RequestMultipleSecurityTokens>
+       </Body>
+    </Envelope>
+    """
+
+    @staticmethod
+    def encode(value):
+        return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+    def getSecToken(self, user, pwd):
+        loginResp = self.conn("POST", "{0}/RST.srf".format(SkypeConnection.API_MSACC),
+                              data=self.template.format(self.encode(user), self.encode(pwd)))
+        loginData = ElementTree.fromstring(loginResp.text)
+        token = None
+        for node in loginData.iter():
+            tag = node.tag.split("}", 1)[-1]
+            if tag == "Fault":
+                code = msg = None
+                for fnode in node:
+                    ftag = fnode.tag.split("}", 1)[-1]
+                    if ftag == "faultcode":
+                        code = fnode.text
+                    elif ftag == "faultstring":
+                        msg = fnode.text
+                raise SkypeAuthException("{} - {}".format(code, msg), loginResp)
+            elif tag == "BinarySecurityToken":
+                token = node.text
+        if not token:
+            raise SkypeAuthException("Couldn't retrieve security token from login response", loginResp)
+        return token
+
+    def exchangeToken(self, token):
+        edgeResp = self.conn("POST", SkypeConnection.API_EDGE,
+                             data={"partner": 999, "access_token": token, "scopes": "client"})
+        try:
+            edgeData = edgeResp.json()
+        except ValueError:
+            raise SkypeAuthException("Couldn't parse edge response body", edgeResp)
+        if "skypetoken" in edgeData:
+            token = edgeData["skypetoken"]
+            expiry = None
+            if "expiresIn" in edgeData:
+                expiry = datetime.fromtimestamp(int(time.time()) + int(edgeData["expiresIn"]))
+            return (token, expiry)
+        elif "status" in edgeData:
+            status = edgeData["status"]
+            raise SkypeAuthException("{} - {}".format(status.get("code"), status.get("text")), edgeResp)
+        else:
+            raise SkypeAuthException("Couldn't retrieve token from edge response", edgeResp)
+
+    def auth(self, user, pwd):
+        token = self.getSecToken(user, pwd)
+        return self.exchangeToken(token)
 
 
 class SkypeGuestAuthProvider(SkypeAuthProvider):
