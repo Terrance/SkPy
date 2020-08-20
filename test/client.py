@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 from datetime import datetime, timedelta
+import json
 import time
 import re
 import unittest
@@ -18,6 +19,7 @@ class Data:
     """
 
     userId = "fred.2"
+    secToken = "t={}&amp;p=".format("s" * 1048)
     skypeToken = "s" * 424
     regToken = "r" * 886
     tokenExpiry = datetime.now() + timedelta(days=1)
@@ -47,12 +49,12 @@ def registerMocks(regTokenRedirect=False, guest=False):
         regTokenRedirect (bool): whether to emulate the 'user is on another cloud' host redirect
         guest (bool): whether to emulate a guest account
     """
-    # Retrieve the login form.
+    # Live login: retrieve the login form.
     responses.add(responses.GET, "{0}/oauth/microsoft".format(SkypeConnection.API_LOGIN), status=200,
                   adding_headers=HTTPHeaderDict((("Set-Cookie", "MSPRequ=MSPRequ"),
                                                  ("Set-Cookie", "MSPOK=MSPOK"))), content_type="text/html",
                   body="""<html><body><input name="PPFT" value="ppftvalue"></body></html>""")
-    # Submit username/password to form.
+    # Live login: submit username/password to form.
     responses.add(responses.POST, "{0}/ppsecure/post.srf".format(SkypeConnection.API_MSACC),
                   status=200, content_type="text/html",
                   body="""<html><body><input id="t" value="tvalue"></body></html>""")
@@ -60,6 +62,31 @@ def registerMocks(regTokenRedirect=False, guest=False):
                   status=200, content_type="text/html",
                   body="""<html><body><input name="skypetoken" value="{0}">
                           <input name="expires_in" value="86400"></body></html>""".format(Data.skypeToken))
+    # SOAP login: submit username/password.
+    secTokenBody = """<?xml version="1.0" encoding="utf-8" ?>
+    <S:Envelope xmlns:S="http://schemas.xmlsoap.org/soap/envelope/">
+        <S:Body>
+            <wst:RequestSecurityTokenResponseCollection
+             xmlns:S="http://schemas.xmlsoap.org/soap/envelope/"
+             xmlns:wst="http://schemas.xmlsoap.org/ws/2004/04/trust"
+             xmlns:wsse="http://schemas.xmlsoap.org/ws/2003/06/secext"
+             xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd"
+             xmlns:saml="urn:oasis:names:tc:SAML:1.0:assertion"
+             xmlns:wsp="http://schemas.xmlsoap.org/ws/2002/12/policy"
+             xmlns:psf="http://schemas.microsoft.com/Passport/SoapServices/SOAPFault">
+                <wst:RequestSecurityTokenResponse>
+                    <wst:RequestedSecurityToken>
+                        <wsse:BinarySecurityToken Id="Compact0">{}</wsse:BinarySecurityToken>
+                    </wst:RequestedSecurityToken>
+                </wst:RequestSecurityTokenResponse>
+            </wst:RequestSecurityTokenResponseCollection>
+        </S:Body>
+    </S:Envelope>""".format(Data.secToken)
+    responses.add(responses.POST, "{0}/RST.srf".format(SkypeConnection.API_MSACC),
+                  status=200, content_type="text/xml", body=secTokenBody)
+    # SOAP login: exchange edge token.
+    responses.add(responses.POST, SkypeConnection.API_EDGE, status=200, content_type="application/json",
+                  body=json.dumps({"skypetoken": Data.skypeToken, "expiresIn": 86400}))
     # Request registration token.
     expiry = int(time.mktime((datetime.now() + timedelta(days=1)).timetuple()))
     msgsHost = Data.msgsHost if regTokenRedirect else SkypeConnection.API_MSGSHOST
