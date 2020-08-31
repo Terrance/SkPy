@@ -156,6 +156,7 @@ class SkypeConnection(SkypeObj):
         self.tokens = {}
         self.tokenExpiry = {}
         self.tokenFile = None
+        self.hasUserPwd = False
         self.msgsHost = self.API_MSGSHOST
         self.sess = requests.Session()
         self.endpoints = {"self": SkypeEndpoint(self, "SELF")}
@@ -169,6 +170,23 @@ class SkypeConnection(SkypeObj):
     @property
     def guest(self):
         return self.userId.startswith("guest:") if self.userId else None
+
+    def closure(self, method, *args, **kwargs):
+        """
+        Create a generic closure to call a method with fixed arguments.
+
+        Args:
+            method (MethodType): bound method of the class
+            args (list): positional arguments for the method
+            kwargs (dict): keyword arguments for the method
+
+        Returns:
+            MethodType: bound method closure
+        """
+        @functools.wraps(method)
+        def inner(self):
+            return method(*args, **kwargs)
+        return MethodType(inner, self)
 
     def __call__(self, method, url, codes=(200, 201, 202, 204, 207), auth=None, headers=None, **kwargs):
         """
@@ -253,19 +271,6 @@ class SkypeConnection(SkypeObj):
                 states.append(state)
         return resp
 
-    def setUserPwd(self, user, pwd):
-        """
-        Replace the stub :meth:`getSkypeToken` method with one that connects via the Microsoft account flow using the
-        given credentials.  Avoids storing the account password in an accessible way.
-
-        Args:
-            user (str): username or email address of the connecting account
-            pwd (str): password of the connecting account
-        """
-        def getSkypeToken(self):
-            self.soapLogin(user, pwd)
-        self.getSkypeToken = MethodType(getSkypeToken, self)
-
     def setTokenFile(self, path):
         """
         Enable reading and writing session tokens to a file at the given location.
@@ -345,6 +350,25 @@ class SkypeConnection(SkypeObj):
             if "reg" not in self.tokenExpiry or datetime.now() >= self.tokenExpiry["reg"]:
                 self.getRegToken()
 
+    def skypeTokenClosure(self, method, *args, **kwargs):
+        """
+        Replace the stub :meth:`getSkypeToken` method with one that connects using the given credentials.  Avoids
+        storing the account password in an accessible way.
+        """
+        self.getSkypeToken = self.closure(method, *args, **kwargs)
+        self.hasUserPwd = True
+
+    def setUserPwd(self, user, pwd):
+        """
+        Replace the stub :meth:`getSkypeToken` method with one that connects via SOAP login using the given
+        credentials.  Avoids storing the account password in an accessible way.
+
+        Args:
+            user (str): username or email address of the connecting account
+            pwd (str): password of the connecting account
+        """
+        self.skypeTokenClosure(self.soapLogin, user, pwd)
+
     def liveLogin(self, user, pwd):
         """
         Obtain connection parameters from the Microsoft account login page, and perform a login with the given email
@@ -365,6 +389,8 @@ class SkypeConnection(SkypeObj):
             .SkypeAuthException: if the login request is rejected
             .SkypeApiException: if the login form can't be processed
         """
+        if not self.hasUserPwd:
+            self.skypeTokenClosure(self.liveLogin, user, pwd)
         self.tokens["skype"], self.tokenExpiry["skype"] = SkypeLiveAuthProvider(self).auth(user, pwd)
         self.getUserId()
         self.getRegToken()
@@ -390,6 +416,8 @@ class SkypeConnection(SkypeObj):
             .SkypeAuthException: if the login request is rejected
             .SkypeApiException: if the login form can't be processed
         """
+        if not self.hasUserPwd:
+            self.skypeTokenClosure(self.soapLogin, user, pwd)
         self.tokens["skype"], self.tokenExpiry["skype"] = SkypeSOAPAuthProvider(self).auth(user, pwd)
         self.getUserId()
         self.getRegToken()
