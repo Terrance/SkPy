@@ -564,14 +564,21 @@ class SkypeLiveAuthProvider(SkypeAuthProvider):
         """
         # Do the authentication dance.
         params = self.getParams()
-        params["opid"] = self.sendCreds(user, pwd, params)
-        t = self.sendOpid(params)
+        if isinstance(params, str):
+            t = params
+        else:
+            params["opid"] = self.sendCreds(user, pwd, params)
+            t = self.sendOpid(params)
         return self.getToken(t)
 
     def getParams(self):
         # First, start a Microsoft account login from Skype, which will redirect to login.live.com.
         loginResp = self.conn("GET", "{0}/oauth/microsoft".format(SkypeConnection.API_LOGIN),
                               params={"client_id": "578134", "redirect_uri": "https://web.skype.com"})
+        tField = BeautifulSoup(loginResp.text, "html.parser").find(id="t")
+        if tField is not None:
+            # We've already got an existing session, no further steps needed.
+            return tField.get("value")
         # This is inside some embedded JavaScript, so can't easily parse with BeautifulSoup.
         ppftReg = re.search(r"""<input.*?name="PPFT".*?value="(.*?)""" + "\"", loginResp.text)
         if not ppftReg:
