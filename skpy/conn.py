@@ -263,7 +263,7 @@ class SkypeConnection(SkypeObj):
             pwd (str): password of the connecting account
         """
         def getSkypeToken(self):
-            self.liveLogin(user, pwd)
+            self.soapLogin(user, pwd)
         self.getSkypeToken = MethodType(getSkypeToken, self)
 
     def setTokenFile(self, path):
@@ -365,6 +365,31 @@ class SkypeConnection(SkypeObj):
             .SkypeAuthException: if the login request is rejected
             .SkypeApiException: if the login form can't be processed
         """
+        self.tokens["skype"], self.tokenExpiry["skype"] = SkypeLiveAuthProvider(self).auth(user, pwd)
+        self.getUserId()
+        self.getRegToken()
+
+    def soapLogin(self, user, pwd):
+        """
+        Perform a login with the given email address or Skype username, and its password, using the Microsoft account
+        SOAP login APIs.
+
+        .. note::
+            Microsoft accounts with two-factor authentication enabled are supported if an application-specific password
+            is provided.  Skype accounts must be linked to a Microsoft account with an email address, otherwise
+            :class:`.SkypeAuthException` will be raised.  See the exception definitions for other possible causes.
+
+        Args:
+            user (str): username or email address of the connecting account
+            pwd (str): password of the connecting account
+
+        Returns:
+            (str, datetime.datetime) tuple: Skype token, and associated expiry if known
+
+        Raises:
+            .SkypeAuthException: if the login request is rejected
+            .SkypeApiException: if the login form can't be processed
+        """
         self.tokens["skype"], self.tokenExpiry["skype"] = SkypeSOAPAuthProvider(self).auth(user, pwd)
         self.getUserId()
         self.getRegToken()
@@ -390,7 +415,7 @@ class SkypeConnection(SkypeObj):
 
     def getSkypeToken(self):
         """
-        A wrapper for :meth:`liveLogin` that applies the previously given username and password.
+        A wrapper for the default login provider that applies the previously given username and password.
 
         Raises:
             .SkypeAuthException: if credentials were never provided
