@@ -55,9 +55,18 @@ def registerMocks(regTokenRedirect=False, guest=False):
                                                  ("Set-Cookie", "MSPOK=MSPOK"))), content_type="text/html",
                   body="""<html><body><input name="PPFT" value="ppftvalue"></body></html>""")
     # Live login: submit username/password to form.
+    liveBody = """<html>
+      <body>
+        <!-- Stage 1: opid -->
+        <script type="text/javascript">
+          f({urlPost:'https://login.live.com/ppsecure/post.srf?wa=wsignin1.0&opid=66AE4377820CC67F'});
+        </script>
+        <!-- Stage 2: t -->
+        <input id="t" value="tvalue">
+      </body>
+    </html>"""
     responses.add(responses.POST, "{0}/ppsecure/post.srf".format(SkypeConnection.API_MSACC),
-                  status=200, content_type="text/html",
-                  body="""<html><body><input id="t" value="tvalue"></body></html>""")
+                  status=200, content_type="text/html", body=liveBody)
     responses.add(responses.POST, "{0}/microsoft".format(SkypeConnection.API_LOGIN),
                   status=200, content_type="text/html",
                   body="""<html><body><input name="skypetoken" value="{0}">
