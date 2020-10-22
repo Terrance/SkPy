@@ -164,6 +164,9 @@ class SkypeMsg(SkypeObj):
         """
         return """<at id="8:{0}">{1}</at>""".format(user.id, user.name)
 
+    mention_all = """<at id="*">all</at>"""
+    """Mention all users of a group chat in a message."""
+
     @staticmethod
     def quote(user, chat, timestamp, content):
         """
