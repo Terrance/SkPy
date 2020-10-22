@@ -660,7 +660,7 @@ class SkypeLiveAuthProvider(SkypeAuthProvider):
             err = re.search(r"sErrTxt:'([^'\\]*(\\.[^'\\]*)*)'", loginResp.text)
             errMsg = "Couldn't retrieve t field from login response"
             if err:
-                errMsg = re.sub(r"<.*?>", "", err.group(1)).replace("\\'", "'").replace("\\\\", "\\")
+                errMsg = re.sub(r"<.*?>", "", err.group(1)).replace("\\'", "'").replace("\\\\", "\\") or errMsg
             raise SkypeApiException(errMsg, loginResp)
         return tField.get("value")
 
