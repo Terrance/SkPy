@@ -367,7 +367,8 @@ class SkypeConnection(SkypeObj):
             user (str): username or email address of the connecting account
             pwd (str): password of the connecting account
         """
-        self.skypeTokenClosure(self.soapLogin, user, pwd)
+        login = self.soapLogin if "@" in user else self.liveLogin
+        self.skypeTokenClosure(login, user, pwd)
 
     def liveLogin(self, user, pwd):
         """
