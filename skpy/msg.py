@@ -331,6 +331,7 @@ class SkypeTextMsg(SkypeMsg):
         text = re.sub(r"</?(e|b|i|ss?|pre|quote|legacyquote)\b.*?>", "", self.content)
         text = re.sub(r"""<a\b.*?href="(.*?)">.*?</a>""", r"\1", text)
         text = re.sub(r"""<at\b.*?id="8:(.*?)">.*?</at>""", r"@\1", text)
+        text = re.sub(r"""<e_m\b.*?>.*?</e_m>""", r"", text)
         text = (text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
                     .replace("&quot;", "\"").replace("&apos;", "'"))
         return text
@@ -346,6 +347,7 @@ class SkypeTextMsg(SkypeMsg):
         text = re.sub(r"</?pre\b.*?>", "{code}", text)
         text = re.sub(r"""<a\b.*?href="(.*?)">.*?</a>""", r"\1", text)
         text = re.sub(r"""<at\b.*?id="8:(.*?)">.*?</at>""", r"@\1", text)
+        text = re.sub(r"""<e_m\b.*?>.*?</e_m>""", r"", text)
         text = (text.replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&")
                     .replace("&quot;", "\"").replace("&apos;", "'"))
         return text
