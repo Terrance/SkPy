@@ -227,13 +227,20 @@ class SkypeMsg(SkypeObj):
             msgTime = datetime.strptime(raw.get("originalarrivaltime", ""), "%Y-%m-%dT%H:%M:%S.%fZ")
         except ValueError:
             msgTime = datetime.now()
-        return {"id": raw.get("id"),
-                "type": raw.get("messagetype"),
-                "time": msgTime,
-                "clientId": raw.get("clientmessageid", raw.get("skypeeditedid")),
-                "userId": SkypeUtils.userToId(raw.get("from", "")),
-                "chatId": SkypeUtils.chatToId(raw.get("conversationLink", "")),
-                "content": raw.get("content")}
+        fields = {"id": raw.get("id"),
+                  "type": raw.get("messagetype"),
+                  "time": msgTime,
+                  "clientId": raw.get("clientmessageid", raw.get("skypeeditedid")),
+                  "userId": SkypeUtils.userToId(raw.get("from", "")),
+                  "chatId": SkypeUtils.chatToId(raw.get("conversationLink", "")),
+                  "content": raw.get("content")}
+        if fields["content"]:
+            fields.update(cls.contentToFields(BeautifulSoup(fields["content"], "html.parser")))
+        return fields
+
+    @classmethod
+    def contentToFields(cls, content):
+        return {}
 
     @classmethod
     def fromRaw(cls, skype=None, raw={}):
@@ -369,10 +376,10 @@ class SkypeContactMsg(SkypeMsg):
     attrs = SkypeMsg.attrs + ("contactIds", "contactNames")
 
     @classmethod
-    def rawToFields(cls, raw={}):
-        fields = super(SkypeContactMsg, cls).rawToFields(raw)
+    def contentToFields(cls, content):
+        fields = super(SkypeContactMsg, cls).contentToFields(content)
         fields.update({"contactIds": [], "contactNames": []})
-        contactTags = BeautifulSoup(raw.get("content"), "html.parser").find_all("c")
+        contactTags = content.find_all("c")
         for tag in contactTags:
             fields["contactIds"].append(tag.get("s"))
             fields["contactNames"].append(tag.get("f"))
@@ -411,9 +418,9 @@ class SkypeLocationMsg(SkypeMsg):
     attrs = SkypeMsg.attrs + ("latitude", "longitude", "altitude", "speed", "course", "address", "mapUrl")
 
     @classmethod
-    def rawToFields(cls, raw={}):
-        fields = super(SkypeLocationMsg, cls).rawToFields(raw)
-        locTag = BeautifulSoup(raw.get("content"), "html.parser").find("location")
+    def contentToFields(cls, content):
+        fields = super(SkypeLocationMsg, cls).contentToFields(content)
+        locTag = content.find("location")
         for attr in ("latitude", "longitude", "altitude", "speed", "course"):
             fields[attr] = int(locTag.get(attr)) if locTag.get(attr) else None
         # Exponent notation produces a float, meaning lat/long will always be floats too.
@@ -480,9 +487,9 @@ class SkypeCardMsg(SkypeMsg):
     attrs = SkypeMsg.attrs + ("title", "body", "buttons")
 
     @classmethod
-    def rawToFields(cls, raw={}):
-        fields = super(SkypeCardMsg, cls).rawToFields(raw)
-        swiftTag = BeautifulSoup(raw.get("content"), "html.parser").find("swift")
+    def contentToFields(cls, content):
+        fields = super(SkypeCardMsg, cls).contentToFields(content)
+        swiftTag = content.find("swift")
         data = json.loads(base64.b64decode(swiftTag.get("b64")))
         card = data.get("attachments", [{}])[0].get("content", {})
         fields.update({"title": card.get("title"),
@@ -565,10 +572,10 @@ class SkypeFileMsg(SkypeMsg):
     attrs = SkypeMsg.attrs + ("file",)
 
     @classmethod
-    def rawToFields(cls, raw={}):
-        fields = super(SkypeFileMsg, cls).rawToFields(raw)
+    def contentToFields(cls, content):
+        fields = super(SkypeFileMsg, cls).contentToFields(content)
         # BeautifulSoup converts tag names to lower case, and find() is case-sensitive.
-        file = BeautifulSoup(raw.get("content"), "html.parser").find("uriobject")
+        file = content.find("uriobject")
         if file:
             fileFields = {"name": (file.find("originalname") or {}).get("v"),
                           "size": (file.find("filesize") or {}).get("v"),
@@ -657,9 +664,9 @@ class SkypeCallMsg(SkypeMsg):
     attrs = SkypeMsg.attrs + ("state", "userIds", "userNames")
 
     @classmethod
-    def rawToFields(cls, raw={}):
-        fields = super(SkypeCallMsg, cls).rawToFields(raw)
-        listTag = BeautifulSoup(raw.get("content"), "html.parser").find("partlist")
+    def contentToFields(cls, content):
+        fields = super(SkypeCallMsg, cls).contentToFields(content)
+        listTag = content.find("partlist")
         fields.update({"state": {"started": cls.State.Started,
                                  "ended": cls.State.Ended,
                                  "missed": cls.State.Missed}.get(listTag.get("type")),
@@ -710,9 +717,9 @@ class SkypeTopicPropertyMsg(SkypePropertyMsg):
     attrs = SkypeMsg.attrs + ("topic",)
 
     @classmethod
-    def rawToFields(cls, raw={}):
-        fields = super(SkypeTopicPropertyMsg, cls).rawToFields(raw)
-        propInfo = BeautifulSoup(raw.get("content"), "html.parser").find("topicupdate")
+    def contentToFields(cls, content):
+        fields = super(SkypeTopicPropertyMsg, cls).contentToFields(content)
+        propInfo = content.find("topicupdate")
         if propInfo:
             fields.update({"userId": SkypeUtils.noPrefix(propInfo.find("initiator").text),
                            "topic": propInfo.find("value").text})
@@ -738,9 +745,9 @@ class SkypeOpenPropertyMsg(SkypePropertyMsg):
     attrs = SkypeMsg.attrs + ("open",)
 
     @classmethod
-    def rawToFields(cls, raw={}):
-        fields = super(SkypeOpenPropertyMsg, cls).rawToFields(raw)
-        propInfo = BeautifulSoup(raw.get("content"), "html.parser").find("joiningenabledupdate")
+    def contentToFields(cls, content):
+        fields = super(SkypeOpenPropertyMsg, cls).contentToFields(content)
+        propInfo = content.find("joiningenabledupdate")
         if propInfo:
             fields.update({"userId": SkypeUtils.noPrefix(propInfo.find("initiator").text),
                            "open": propInfo.find("value").text == "true"})
@@ -766,9 +773,9 @@ class SkypeHistoryPropertyMsg(SkypePropertyMsg):
     attrs = SkypeMsg.attrs + ("history",)
 
     @classmethod
-    def rawToFields(cls, raw={}):
-        fields = super(SkypeHistoryPropertyMsg, cls).rawToFields(raw)
-        propInfo = BeautifulSoup(raw.get("content"), "html.parser").find("historydisclosedupdate")
+    def contentToFields(cls, content):
+        fields = super(SkypeHistoryPropertyMsg, cls).contentToFields(content)
+        propInfo = content.find("historydisclosedupdate")
         if propInfo:
             fields.update({"userId": SkypeUtils.noPrefix(propInfo.find("initiator").text),
                            "history": propInfo.find("value").text == "true"})
@@ -805,9 +812,9 @@ class SkypeAddMemberMsg(SkypeMemberMsg):
     """
 
     @classmethod
-    def rawToFields(cls, raw={}):
-        fields = super(SkypeAddMemberMsg, cls).rawToFields(raw)
-        memInfo = BeautifulSoup(raw.get("content"), "html.parser").find("addmember")
+    def contentToFields(cls, content):
+        fields = super(SkypeAddMemberMsg, cls).contentToFields(content)
+        memInfo = content.find("addmember")
         if memInfo:
             fields.update({"userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
                            "memberId": SkypeUtils.noPrefix(memInfo.find("target").text)})
@@ -833,9 +840,9 @@ class SkypeChangeMemberMsg(SkypeMemberMsg):
     attrs = SkypeMemberMsg.attrs + ("admin",)
 
     @classmethod
-    def rawToFields(cls, raw={}):
-        fields = super(SkypeChangeMemberMsg, cls).rawToFields(raw)
-        memInfo = BeautifulSoup(raw.get("content"), "html.parser").find("roleupdate")
+    def contentToFields(cls, content):
+        fields = super(SkypeChangeMemberMsg, cls).contentToFields(content)
+        memInfo = content.find("roleupdate")
         if memInfo:
             fields.update({"userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
                            "memberId": SkypeUtils.noPrefix(memInfo.find("target").find("id").text),
@@ -859,9 +866,9 @@ class SkypeRemoveMemberMsg(SkypeMemberMsg):
     """
 
     @classmethod
-    def rawToFields(cls, raw={}):
-        fields = super(SkypeRemoveMemberMsg, cls).rawToFields(raw)
-        memInfo = BeautifulSoup(raw.get("content"), "html.parser").find("deletemember")
+    def contentToFields(cls, content):
+        fields = super(SkypeRemoveMemberMsg, cls).contentToFields(content)
+        memInfo = content.find("deletemember")
         if memInfo:
             fields.update({"userId": SkypeUtils.noPrefix(memInfo.find("initiator").text),
                            "memberId": SkypeUtils.noPrefix(memInfo.find("target").text)})
