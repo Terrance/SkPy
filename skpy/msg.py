@@ -250,6 +250,8 @@ class SkypeMsg(SkypeObj):
                   "RichText/Location": SkypeLocationMsg,
                   "RichText/Media_GenericFile": SkypeFileMsg,
                   "RichText/UriObject": SkypeImageMsg,
+                  "RichText/Media_AudioMsg": SkypeAudioMsg,
+                  "RichText/Media_Video": SkypeVideoMsg,
                   "RichText/Media_Card": SkypeCardMsg,
                   "Event/Call": SkypeCallMsg,
                   "ThreadActivity/TopicUpdate": SkypeTopicPropertyMsg,
@@ -625,11 +627,57 @@ class SkypeImageMsg(SkypeFileMsg):
         if not self.file:
             return ""
         tag = makeTag("URIObject", type="Picture.1", uri=self.file.urlFull, url_thumbnail=self.file.urlThumb)
-        tag.append(makeTag("Title"))
-        tag.append(makeTag("Description"))
         tag.append(makeTag("OriginalName", v=self.file.name))
         tag.append(makeTag("a", self.file.urlView, href=self.file.urlView))
         tag.append(makeTag("meta", type="photo", originalName=self.file.name))
+        return tag
+
+
+@SkypeUtils.initAttrs
+class SkypeAudioMsg(SkypeFileMsg):
+    """
+    A message containing audio shared in a conversation.
+    """
+
+    @property
+    @SkypeUtils.cacheResult
+    def fileContent(self):
+        if not self.file:
+            return None
+        return self.skype.conn("GET", "{0}/views/audio".format(self.file.urlAsm),
+                               auth=SkypeConnection.Auth.Authorize).content
+
+    @property
+    def html(self):
+        if not self.file:
+            return ""
+        tag = makeTag("URIObject", type="Audio.1", uri=self.file.urlFull, url_thumbnail=self.file.urlThumb)
+        tag.append(makeTag("OriginalName", v=self.file.name))
+        tag.append(makeTag("a", self.file.urlView, href=self.file.urlView))
+        return tag
+
+
+@SkypeUtils.initAttrs
+class SkypeVideoMsg(SkypeFileMsg):
+    """
+    A message containing a video shared in a conversation.
+    """
+
+    @property
+    @SkypeUtils.cacheResult
+    def fileContent(self):
+        if not self.file:
+            return None
+        return self.skype.conn("GET", "{0}/views/video".format(self.file.urlAsm),
+                               auth=SkypeConnection.Auth.Authorize).content
+
+    @property
+    def html(self):
+        if not self.file:
+            return ""
+        tag = makeTag("URIObject", type="Video.1", uri=self.file.urlFull, url_thumbnail=self.file.urlThumb)
+        tag.append(makeTag("OriginalName", v=self.file.name))
+        tag.append(makeTag("a", self.file.urlView, href=self.file.urlView))
         return tag
 
 
