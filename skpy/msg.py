@@ -535,6 +535,8 @@ class SkypeFileMsg(SkypeMsg):
     Attributes:
         file (:class:`File`):
             File object embedded in the message.
+        urlContent (str):
+            URL to retrieve the raw file content.
         fileContent (bytes):
             Raw content of the file.
     """
@@ -573,6 +575,8 @@ class SkypeFileMsg(SkypeMsg):
 
     attrs = SkypeMsg.attrs + ("file",)
 
+    contentPath = "original"
+
     @classmethod
     def contentToFields(cls, content):
         fields = super(SkypeFileMsg, cls).contentToFields(content)
@@ -588,12 +592,17 @@ class SkypeFileMsg(SkypeMsg):
         return fields
 
     @property
+    def urlContent(self):
+        return "{0}/views/{1}".format(self.file.urlAsm, self.contentPath) if self.file else None
+
+    @property
     @SkypeUtils.cacheResult
     def fileContent(self):
-        if not self.file:
+        if self.file:
+            return self.skype.conn("GET", self.urlContent,
+                                   auth=SkypeConnection.Auth.Authorize).content
+        else:
             return None
-        return self.skype.conn("GET", "{0}/views/original".format(self.file.urlAsm),
-                               auth=SkypeConnection.Auth.Authorize).content
 
     @property
     def html(self):
@@ -614,13 +623,7 @@ class SkypeImageMsg(SkypeFileMsg):
     A message containing a picture shared in a conversation.
     """
 
-    @property
-    @SkypeUtils.cacheResult
-    def fileContent(self):
-        if not self.file:
-            return None
-        return self.skype.conn("GET", "{0}/views/imgpsh_fullsize".format(self.file.urlAsm),
-                               auth=SkypeConnection.Auth.Authorize).content
+    contentPath = "imgpsh_fullsize"
 
     @property
     def html(self):
@@ -639,13 +642,7 @@ class SkypeAudioMsg(SkypeFileMsg):
     A message containing audio shared in a conversation.
     """
 
-    @property
-    @SkypeUtils.cacheResult
-    def fileContent(self):
-        if not self.file:
-            return None
-        return self.skype.conn("GET", "{0}/views/audio".format(self.file.urlAsm),
-                               auth=SkypeConnection.Auth.Authorize).content
+    contentPath = "audio"
 
     @property
     def html(self):
@@ -663,13 +660,7 @@ class SkypeVideoMsg(SkypeFileMsg):
     A message containing a video shared in a conversation.
     """
 
-    @property
-    @SkypeUtils.cacheResult
-    def fileContent(self):
-        if not self.file:
-            return None
-        return self.skype.conn("GET", "{0}/views/video".format(self.file.urlAsm),
-                               auth=SkypeConnection.Auth.Authorize).content
+    contentPath = "video"
 
     @property
     def html(self):
