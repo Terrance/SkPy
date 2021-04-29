@@ -553,6 +553,16 @@ class SkypeAPIAuthProvider(SkypeAuthProvider):
         return json["skypetoken"], expiry
 
 
+class LiveAuthSuccess(Exception):
+    """
+    An exception used to capture the 't' value needed during Microsoft account authentication.
+    """
+
+    def __init__(self, t):
+        super(LiveAuthSuccess, self).__init__(t)
+        self.t = t
+
+
 class SkypeLiveAuthProvider(SkypeAuthProvider):
     """
     An authentication provider that connects via Microsoft account authentication.
@@ -591,79 +601,67 @@ class SkypeLiveAuthProvider(SkypeAuthProvider):
             .SkypeAuthException: if the login request is rejected
             .SkypeApiException: if the login form can't be processed
         """
-        # Do the authentication dance.
-        params = self.getParams()
-        if isinstance(params, str):
-            t = params
-        else:
-            params["opid"] = self.sendCreds(user, pwd, params)
-            t = self.sendOpid(params)
-        return self.getToken(t)
+        try:
+            self.getT(user, pwd)
+        except LiveAuthSuccess as ex:
+            return self.getToken(ex.t)
 
-    def getParams(self):
-        # First, start a Microsoft account login from Skype, which will redirect to login.live.com.
-        loginResp = self.conn("GET", "{0}/oauth/microsoft".format(SkypeConnection.API_LOGIN),
-                              params={"client_id": "578134", "redirect_uri": "https://web.skype.com"})
-        tField = BeautifulSoup(loginResp.text, "html.parser").find(id="t")
+    def check(self, resp):
+        page = BeautifulSoup(resp.text, "html.parser")
+        # Look for the 't' value we need to exchange for a Skype token, which might turn up at any stage.
+        tField = page.find(id="t")
         if tField is not None:
-            # We've already got an existing session, no further steps needed.
-            return tField.get("value")
-        # This is inside some embedded JavaScript, so can't easily parse with BeautifulSoup.
-        ppftReg = re.search(r"""<input.*?name="PPFT".*?value="(.*?)""" + "\"", loginResp.text)
-        if not ppftReg:
-            raise SkypeApiException("Couldn't retrieve PPFT from login form", loginResp)
-        if "MSPRequ" not in loginResp.cookies or "MSPOK" not in loginResp.cookies:
-            raise SkypeApiException("Couldn't retrieve MSPRequ/MSPOK cookies", loginResp)
-        return {"MSPRequ": loginResp.cookies.get("MSPRequ"),
-                "MSPOK": loginResp.cookies.get("MSPOK"),
-                "PPFT": ppftReg.group(1)}
-
-    def sendCreds(self, user, pwd, params):
-        # Now pass the login credentials over.
-        loginResp = self.conn("POST", "{0}/ppsecure/post.srf".format(SkypeConnection.API_MSACC),
-                              params={"wa": "wsignin1.0", "wp": "MBI_SSL",
-                                      "wreply": "https://lw.skype.com/login/oauth/proxy?client_id=578134&site_name="
-                                                "lw.skype.com&redirect_uri=https%3A%2F%2Fweb.skype.com%2F"},
-                              cookies={"MSPRequ": params["MSPRequ"], "MSPOK": params["MSPOK"],
-                                       "CkTst": "G{0}".format(int(time.time() * 1000))},
-                              data={"login": user, "passwd": pwd,
-                                    "PPFT": params["PPFT"], "loginoptions": "3"})
-        opid = re.search(r"""opid=([A-Z0-9]+)""", loginResp.text, re.I)
-        if opid:
-            return opid.group(1)
-        loginPage = BeautifulSoup(loginResp.text, "html.parser")
-        for form in loginPage.findAll("form"):
+            raise LiveAuthSuccess(tField.get("value"))
+        # Look for an error message within the response.
+        errReg = re.search(r"sErrTxt:'([^'\\]*(\\.[^'\\]*)+)'", resp.text)
+        if errReg:
+            errMsg = re.sub(r"<.*?>", "", errReg.group(1)).replace("\\'", "'").replace("\\\\", "\\")
+            raise SkypeApiException(errMsg, resp)
+        # Look for two-factor authentication device information (a non-empty array of factors) that we can't handle.
+        if re.search(r"\bV:\s*\[\s*{", resp.text):
+            raise SkypeAuthException("Two-factor authentication unsupported", resp)
+        # Look for a user consent form, meaning the user needs to accept terms or follow account security steps.
+        for form in page.findAll("form"):
             if form["name"] == "fmHF":
                 url = form["action"].split("?", 1)[0]
                 raise SkypeAuthException("Account action required ({0}), login with a web browser first"
-                                         .format(url), loginResp)
-        else:
-            raise SkypeApiException("Couldn't retrieve opid field from login response", loginResp)
+                                         .format(url), resp)
+        # No common elements, return the response for further processing.
+        return resp
 
-    def sendOpid(self, params):
-        # Now repeat with the opid parameter.
-        loginResp = self.conn("POST", "{0}/ppsecure/post.srf".format(SkypeConnection.API_MSACC),
-                              params={"wa": "wsignin1.0", "wp": "MBI_SSL",
-                                      "wreply": "https://lw.skype.com/login/oauth/proxy?client_id=578134&site_name="
-                                                "lw.skype.com&redirect_uri=https%3A%2F%2Fweb.skype.com%2F"},
-                              cookies={"MSPRequ": params["MSPRequ"],
-                                       "MSPOK": params["MSPOK"],
-                                       "CkTst": str(int(time.time() * 1000))},
-                              data={"opid": params["opid"],
-                                    "site_name": "lw.skype.com",
-                                    "oauthPartner": "999",
-                                    "client_id": "578134",
-                                    "redirect_uri": "https://web.skype.com",
-                                    "PPFT": params["PPFT"],
-                                    "type": "28"})
-        tField = BeautifulSoup(loginResp.text, "html.parser").find(id="t")
-        if tField is None:
-            err = re.search(r"sErrTxt:'([^'\\]*(\\.[^'\\]*)*)'", loginResp.text)
-            errMsg = "Couldn't retrieve t field from login response"
-            if err:
-                errMsg = re.sub(r"<.*?>", "", err.group(1)).replace("\\'", "'").replace("\\\\", "\\") or errMsg
-            raise SkypeApiException(errMsg, loginResp)
-        return tField.get("value")
+    def getT(self, user, pwd):
+        # Stage 1: Start a Microsoft account login from Skype, which will redirect to login.live.com.
+        stage1Resp = self.check(self.conn("GET", "{0}/oauth/microsoft".format(SkypeConnection.API_LOGIN),
+                                          params={"client_id": "578134", "redirect_uri": "https://web.skype.com"}))
+        # This is inside some embedded JavaScript, so can't easily parse with BeautifulSoup.
+        ppftReg = re.search(r"""<input.*?name="PPFT".*?value="(.*?)""" + "\"", stage1Resp.text)
+        if not ppftReg:
+            raise SkypeApiException("Couldn't retrieve PPFT from login form", stage1Resp)
+        ppft = ppftReg.group(1)
+        if "MSPRequ" not in stage1Resp.cookies or "MSPOK" not in stage1Resp.cookies:
+            raise SkypeApiException("Couldn't retrieve MSPRequ/MSPOK cookies", stage1Resp)
+        # Prepare the Live login page request parameters.
+        params = {"wa": "wsignin1.0", "wp": "MBI_SSL",
+                  "wreply": "https://lw.skype.com/login/oauth/proxy?client_id=578134&site_name="
+                            "lw.skype.com&redirect_uri=https%3A%2F%2Fweb.skype.com%2F"}
+        cookies = {"MSPRequ": stage1Resp.cookies.get("MSPRequ"), "MSPOK": stage1Resp.cookies.get("MSPOK")}
+        # Stage 2: Submit the user's credentials.
+        stage2Resp = self.check(self.conn("POST", "{0}/ppsecure/post.srf".format(SkypeConnection.API_MSACC),
+                                          params=params,
+                                          cookies=dict(cookies, CkTst="G{0}".format(int(time.time() * 1000))),
+                                          data={"login": user, "passwd": pwd, "PPFT": ppft, "loginoptions": "3"}))
+        opidReg = re.search(r"""opid=([A-Z0-9]+)""", stage2Resp.text, re.I)
+        if not opidReg:
+            raise SkypeApiException("Couldn't retrieve opid field from login response", stage2Resp)
+        # Stage 3: Repeat with the 'opid' parameter.
+        stage3Resp = self.check(self.conn("POST", "{0}/ppsecure/post.srf".format(SkypeConnection.API_MSACC),
+                                          params=params,
+                                          cookies=dict(cookies, CkTst="G{0}".format(int(time.time() * 1000))),
+                                          data={"opid": opidReg.group(1), "PPFT": ppft, "site_name": "lw.skype.com",
+                                                "oauthPartner": "999", "client_id": "578134",
+                                                "redirect_uri": "https://web.skype.com", "type": "28"}))
+        # No check matches, and no further actions we can take.
+        raise SkypeApiException("Couldn't retrieve t field from login response", stage3Resp)
 
     def getToken(self, t):
         # Now exchange the 't' value for a Skype token.
