@@ -465,7 +465,7 @@ class SkypeChats(SkypeObjs):
         Each conversation is only retrieved once, so subsequent calls will retrieve older conversations.
 
         Returns:
-            :class:`SkypeChat` list: collection of recent conversations
+            :class:`SkypeChat` dict: collection of recent conversations keyed by their ID
         """
         url = "{0}/users/ME/conversations".format(self.skype.conn.msgsHost)
         params = {"startTime": 0,
