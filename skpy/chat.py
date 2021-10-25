@@ -381,6 +381,17 @@ class SkypeGroupChat(SkypeChat):
                         auth=SkypeConnection.Auth.RegToken, params={"name": "topic"}, json={"topic": topic})
         self.topic = topic
 
+    def setIsModerateThread(self, moderate=True):
+        """
+        Update the chat type, and make chat moderated.  An empty value make chat moderating.
+
+        Args:
+            moderate (bool): moderating value
+        """
+        self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id),
+                        auth=SkypeConnection.Auth.RegToken, params={"name": "moderatedthread"}, json={"moderatedthread": moderate})
+        self.moderatedthread = moderate
+
     def setOpen(self, open):
         """
         Enable or disable joining by URL.  This does not affect current participants inviting others.
