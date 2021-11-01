@@ -338,9 +338,12 @@ class SkypeGroupChat(SkypeChat):
         active (bool):
             Whether the full group chat was retrieved from the server.  This may be ``False`` if a group conversation
             still appears in the recent list despite being left or deleted.
+        moderated (bool):
+            Whether the group chat is a Skype Moderated Group.
     """
 
-    attrs = SkypeChat.attrs + ("topic", "creatorId", "userIds", "adminIds", "open", "history", "picture", "active", "moderatedthread")
+    attrs = SkypeChat.attrs + ("topic", "creatorId", "userIds", "adminIds", "open", "history", "picture", "active",
+                               "moderated")
 
     @classmethod
     def rawToFields(cls, raw={}, active=False):
@@ -357,11 +360,11 @@ class SkypeGroupChat(SkypeChat):
                        "creatorId": SkypeUtils.noPrefix(props.get("creator")),
                        "userIds": userIds,
                        "adminIds": adminIds,
+                       "moderated": props.get("moderatedthread") == "true",
                        "open": props.get("joiningenabled", "") == "true",
                        "history": props.get("historydisclosed", "") == "true",
                        "picture": props.get("picture", "")[4:] or None,
-                       "active": active,
-                       "moderatedthread": props.get("moderatedthread")})
+                       "active": active})
         return fields
 
     @property
@@ -382,16 +385,17 @@ class SkypeGroupChat(SkypeChat):
                         auth=SkypeConnection.Auth.RegToken, params={"name": "topic"}, json={"topic": topic})
         self.topic = topic
 
-    def setModerated(self, moderate=True):
+    def setModerated(self, moderated=True):
         """
         Update the chat type, and make chat moderated.
 
         Args:
-            moderate (bool): moderating value. True as default
+            moderated (bool): whether to enable moderation restrictions
         """
         self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id),
-                        auth=SkypeConnection.Auth.RegToken, params={"name": "moderatedthread"}, json={"moderatedthread": moderate})
-        self.moderatedthread = moderate
+                        auth=SkypeConnection.Auth.RegToken, params={"name": "moderatedthread"},
+                        json={"moderatedthread": moderated})
+        self.moderated = moderated
 
     def setOpen(self, open):
         """
@@ -509,12 +513,12 @@ class SkypeChats(SkypeObjs):
         Create a new group chat with the given users.
 
         The current user is automatically added to the conversation as an admin.  Any other admin identifiers must also
-        be present in the member list. You can also make the chat moderated by passing moderated value
+        be present in the member list.
 
         Args:
             members (str list): user identifiers to initially join the conversation
             admins (str list): user identifiers to gain admin privileges
-            moderate (bool): moderating value. False as default
+            moderate (bool): whether to enable moderation restrictions
 
         Returns:
             :class:`SkypeGroupChat`: newly created group conversation
