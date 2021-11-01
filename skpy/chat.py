@@ -340,7 +340,7 @@ class SkypeGroupChat(SkypeChat):
             still appears in the recent list despite being left or deleted.
     """
 
-    attrs = SkypeChat.attrs + ("topic", "creatorId", "userIds", "adminIds", "open", "history", "picture", "active")
+    attrs = SkypeChat.attrs + ("topic", "creatorId", "userIds", "adminIds", "open", "history", "picture", "active", "moderatedthread")
 
     @classmethod
     def rawToFields(cls, raw={}, active=False):
@@ -360,7 +360,8 @@ class SkypeGroupChat(SkypeChat):
                        "open": props.get("joiningenabled", "") == "true",
                        "history": props.get("historydisclosed", "") == "true",
                        "picture": props.get("picture", "")[4:] or None,
-                       "active": active})
+                       "active": active,
+                       "moderatedthread": props.get("moderatedthread")})
         return fields
 
     @property
@@ -381,12 +382,12 @@ class SkypeGroupChat(SkypeChat):
                         auth=SkypeConnection.Auth.RegToken, params={"name": "topic"}, json={"topic": topic})
         self.topic = topic
 
-    def setIsModerateThread(self, moderate=True):
+    def setModerated(self, moderate=True):
         """
-        Update the chat type, and make chat moderated.  An empty value make chat moderating.
+        Update the chat type, and make chat moderated.
 
         Args:
-            moderate (bool): moderating value
+            moderate (bool): moderating value. True as default
         """
         self.skype.conn("PUT", "{0}/threads/{1}/properties".format(self.skype.conn.msgsHost, self.id),
                         auth=SkypeConnection.Auth.RegToken, params={"name": "moderatedthread"}, json={"moderatedthread": moderate})
@@ -503,27 +504,29 @@ class SkypeChats(SkypeObjs):
                                auth=SkypeConnection.Auth.RegToken, params={"view": "msnp24Equivalent"}).json()
         return self.merge(SkypeChat.fromRaw(self.skype, json))
 
-    def create(self, members=(), admins=()):
+    def create(self, members=(), admins=(), moderated=False):
         """
         Create a new group chat with the given users.
 
         The current user is automatically added to the conversation as an admin.  Any other admin identifiers must also
-        be present in the member list.
+        be present in the member list. You can also make the chat moderated by passing moderated value
 
         Args:
             members (str list): user identifiers to initially join the conversation
             admins (str list): user identifiers to gain admin privileges
+            moderate (bool): moderating value. False as default
 
         Returns:
             :class:`SkypeGroupChat`: newly created group conversation
         """
         memberObjs = [{"id": "8:{0}".format(self.skype.userId), "role": "Admin"}]
+        props = {"moderatedthread": moderated}
         for id in members:
             if id == self.skype.userId:
                 continue
             memberObjs.append({"id": "8:{0}".format(id), "role": "Admin" if id in admins else "User"})
         resp = self.skype.conn("POST", "{0}/threads".format(self.skype.conn.msgsHost),
-                               auth=SkypeConnection.Auth.RegToken, json={"members": memberObjs})
+                               auth=SkypeConnection.Auth.RegToken, json={"members": memberObjs, "properties": props})
         return self.chat(resp.headers["Location"].rsplit("/", 1)[1])
 
     @staticmethod
