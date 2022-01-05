@@ -109,21 +109,21 @@ class SkypeEndpointEvent(SkypeEvent):
             number type of skype app (etc. 2 web, 16 ios,17 andriod)
     """
 
-attrs = SkypeEvent.attrs + ("userId", "name", "capabilities", "version","typ")
+    attrs = SkypeEvent.attrs + ("userId", "name", "capabilities", "version","typ")
 
-@classmethod
-def rawToFields(cls, raw={}):
-    fields = super(SkypeEndpointEvent, cls).rawToFields(raw)
-    res = raw.get("resource", {})
-    fields.update({"userId": SkypeUtils.userToId(res.get("selfLink")),
-                   "name": res.get("privateInfo", {}).get("epname"),
-                   "capabilities": list(filter(None, res.get("publicInfo", {})
-                                                        .get("capabilities", "").split(" | "))),
-                   "version": res.get("publicInfo", {})
-                                        .get("skypeNameVersion",{}),
-                   "typ": res.get("publicInfo", {})
-                             .get("typ",{})})
-    return fields
+    @classmethod
+    def rawToFields(cls, raw={}):
+        fields = super(SkypeEndpointEvent, cls).rawToFields(raw)
+        res = raw.get("resource", {})
+        fields.update({"userId": SkypeUtils.userToId(res.get("selfLink")),
+                       "name": res.get("privateInfo", {}).get("epname"),
+                       "capabilities": list(filter(None, res.get("publicInfo", {})
+                                                            .get("capabilities", "").split(" | "))),
+                       "version": res.get("publicInfo", {})
+                                            .get("skypeNameVersion",{}),
+                       "typ": res.get("publicInfo", {})
+                                 .get("typ",{})})
+        return fields
 
 
 @SkypeUtils.initAttrs
