@@ -103,18 +103,24 @@ class SkypeEndpointEvent(SkypeEvent):
             Name of the device connected with this endpoint.
         capabilities (str list):
             Features available on the device.
+        type (str):
+            Numeric type of client that the device identifies as.
+        version (str):
+            Software version of the client.
     """
 
-    attrs = SkypeEvent.attrs + ("userId", "name", "capabilities")
+    attrs = SkypeEvent.attrs + ("userId", "name", "capabilities", "type", "version")
 
     @classmethod
     def rawToFields(cls, raw={}):
         fields = super(SkypeEndpointEvent, cls).rawToFields(raw)
         res = raw.get("resource", {})
+        public = res.get("publicInfo", {})
         fields.update({"userId": SkypeUtils.userToId(res.get("selfLink")),
                        "name": res.get("privateInfo", {}).get("epname"),
-                       "capabilities": list(filter(None, res.get("publicInfo", {})
-                                                            .get("capabilities", "").split(" | ")))})
+                       "capabilities": list(filter(None, public.get("capabilities", "").split(" | "))),
+                       "type": public.get("typ"),
+                       "version": public.get("skypeNameVersion")})
         return fields
 
 
