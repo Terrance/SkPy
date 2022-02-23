@@ -141,8 +141,8 @@ class Skype(SkypeObj):
         Args:
             image (file): a file-like object to read the image from
         """
-        self.conn("PUT", "{0}/users/{1}/profile/avatar".format(SkypeConnection.API_USER, self.userId),
-                  auth=SkypeConnection.Auth.SkypeToken, data=image.read())
+        self.conn("PUT", "{0}/v1/avatars/{1}".format(SkypeConnection.API_AVATAR, self.userId),
+                  auth=SkypeConnection.Auth.SkypeToken, data=image.read(), headers={"Content-Type": "image/jpeg"})
 
     def getUrlMeta(self, url):
         """
