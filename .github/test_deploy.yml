@@ -1,0 +1,55 @@
+name: Test and Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+  pull_request:
+
+jobs:
+  next_version:
+    name: Get Next Version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.tag }}
+      branch: ${{ steps.extract_branch.outputs.branch }}
+      environment: ${{ steps.env.outputs.environment }}
+      tag: ${{ steps.env.outputs.tag }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Configure
+        run: |
+          git config --global --add safe.directory /github/workspace
+
+      - name: Extract branch name
+        shell: bash
+        run: |
+          echo "##[set-output name=branch;]$(echo ${GITHUB_REF#refs/heads/})"; 
+          echo ${{github.ref}};
+        id: extract_branch
+      
+      - name: 'Get Environment'
+        id: env
+        run: |
+          if [[ "${{ steps.extract_branch.outputs.branch }}" == "production" ]]; then
+            echo "::set-output name=tag::prd"
+            echo "::set-output name=environment::production"
+          elif [[ "${{ steps.extract_branch.outputs.branch }}" == "staging" ]]; then
+            echo "::set-output name=tag::stg"
+            echo "::set-output name=environment::staging"
+          else
+            echo "::set-output name=tag::dev"
+            echo "::set-output name=environment::development"
+          fi
+      - name: Next Version
+        uses: anothrNick/github-tag-action@1.36.0
+        id: version
+        env:
+          RELEASE_BRANCHES: production
+          GITHUB_TOKEN: ${{ secrets.PERSONAL_ACCESS_TOKEN }}
+          WITH_V: true
+          PRERELEASE_SUFFIX: ${{ steps.extract_branch.outputs.branch }}
+          DRY_RUN: true
+        run: echo ${{ steps.extract_branch.outputs.branch }}
