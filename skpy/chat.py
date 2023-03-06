@@ -485,8 +485,9 @@ class SkypeChats(SkypeObjs):
         """
         url = "{0}/users/ME/conversations".format(self.skype.conn.msgsHost)
         params = {"startTime": 0,
-                  "view": "msnp24Equivalent",
-                  "targetType": "Passport|Skype|Lync|Thread"}
+                  "view": "supportsExtendedHistory|msnp24Equivalent",
+                  "targetType": "Passport|Skype|Lync|Thread|Agent|ShortCircuit|PSTN|Flxt|NotificationStream|"
+                                "ModernBots|secureThreads|InviteFree"}
         resp = self.skype.conn.syncStateCall("GET", url, params, auth=SkypeConnection.Auth.RegToken).json()
         chats = {}
         for json in resp.get("conversations", []):
