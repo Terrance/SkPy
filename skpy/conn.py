@@ -215,15 +215,19 @@ class SkypeConnection(SkypeObj):
         self.verifyToken(auth)
         if not headers:
             headers = {}
+        debugHeaders = dict(headers)
         if auth == self.Auth.SkypeToken:
             headers["X-SkypeToken"] = self.tokens["skype"]
+            debugHeaders["X-SkypeToken"] = "***"
         elif auth == self.Auth.Authorize:
             headers["Authorization"] = "skype_token {0}".format(self.tokens["skype"])
+            debugHeaders["Authorization"] = "***"
         elif auth == self.Auth.RegToken:
             headers["RegistrationToken"] = self.tokens["reg"]
+            debugHeaders["RegistrationToken"] = "***"
         if os.getenv("SKPY_DEBUG_HTTP"):
             print("<= [{0}] {1} {2}".format(datetime.now().strftime("%d/%m %H:%M:%S"), method, url))
-            print(pformat(kwargs))
+            print(pformat(dict(kwargs, headers=debugHeaders)))
         resp = self.sess.request(method, url, headers=headers, **kwargs)
         if os.getenv("SKPY_DEBUG_HTTP"):
             print("=> [{0}] {1}".format(datetime.now().strftime("%d/%m %H:%M:%S"), resp.status_code))
