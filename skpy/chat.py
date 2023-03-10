@@ -72,9 +72,12 @@ class SkypeChat(SkypeObj):
         return [SkypeMsg.fromRaw(self.skype, json) for json in resp.get("messages", [])]
 
     def createRaw(self, msg):
+        # All fields except timezone are required; 1418 = desktop client.
+        client = ("os=Windows; osVer=10; proc=x86; lcid=en-US; deviceType=1; country=US; "
+                  "clientName=skype4life; clientVer=1418/9.99.0.999//skype4life")
         resp = self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages"
                                        .format(self.skype.conn.msgsHost, self.id),
-                               auth=SkypeConnection.Auth.RegToken, json=msg)
+                               auth=SkypeConnection.Auth.RegToken, headers={"ClientInfo": client}, json=msg)
         url = resp.headers.get("Location")
         msgId = url.rsplit("/", 1)[-1] if url else None
         arriveTime = resp.json().get("OriginalArrivalTime")
