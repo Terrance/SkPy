@@ -1,0 +1,88 @@
+name: Bug
+description: Report any unexpected or incorrect behaviour.
+labels: ["bug"]
+body:
+  - type: checkboxes
+    attributes:
+      label: Before we start...
+      options:
+      - label: I've searched existing issues, but my problem hasn't been reported yet.
+        required: true
+      - label: I've read the documentation (including notes on error messages and rate limiting), but my problem is something else.
+        required: true
+      - label: I've tested the behaviour on [Skype for Web](https://web.skype.com), and it works there but not with SkPy.
+        required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the problem and context briefly.
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Code sample
+      description: >-
+        Add a [minimal, reproducible example](https://stackoverflow.com/help/minimal-reproducible-example) of code that shows the problem.
+
+        * You can `print(obj)` a SkPy object to produce a more readable summary of its contents.
+      placeholder: >
+        from skpy import Skype
+
+        sk = Skype(username, password)
+
+        ...
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Code output
+      description: >-
+        Run your code sample and paste the output below.
+
+        * Set the `SKPY_DEBUG_HTTP=1` environment variable so that requests to the Skype API are logged.
+
+        * Make sure to redact any personal information -- authentication tokens, passwords, usernames, email addresses, contact details etc.
+
+        * Tidying up the output:
+          * For a large log, try to reduce it to the relevant method or API call.
+          * For tracebacks, include the full stack trace (starting from `Traceback (most recent call last):` and ending with the exception message itself).
+          * If in doubt, paste the full output.
+      render: python
+    validations:
+      required: true
+  - type: textarea
+    id: explain
+    attributes:
+      label: Explain your code
+      description: >-
+        What went wrong?  How should this code behave instead?
+
+        * Test the corresponding action on [Skype for Web](https://web.skype.com) and describe how it differs.
+
+        * For authentication issues, say what credentials you're using -- Skype username, email address or phone number.
+
+        * For conversations or messages, say which chat types are affected (either 1-to-1s or groups, and with Skype contacts, external users or bots).
+
+        * If sending files or pictures in a message, attach or link a sample of what you're trying to send.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: SkPy version
+    validations:
+      required: true
+  - type: input
+    id: version-python
+    attributes:
+      label: Python version
+    validations:
+      required: true
+  - type: textarea
+    id: misc
+    attributes:
+      label: Anything else?

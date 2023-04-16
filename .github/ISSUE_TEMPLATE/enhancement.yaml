@@ -1,0 +1,52 @@
+name: Enhancement
+description: Request the addition of a new or missing feature.
+labels: ["enhancement"]
+body:
+  - type: checkboxes
+    attributes:
+      label: Before we start...
+      options:
+      - label: I've searched existing issues, but my request hasn't been submitted yet.
+        required: true
+      - label: I've read the documentation, but my request is something new.
+        required: true
+      - label: I've checked on [Skype for Web](https://web.skype.com), and the feature I'm requesting does exist there.
+        required: true
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: Describe the problem and context briefly.
+    validations:
+      required: true
+  - type: textarea
+    id: code
+    attributes:
+      label: Code sample
+      description: >-
+        Add a [minimal, reproducible example](https://stackoverflow.com/help/minimal-reproducible-example) of code that shows what you're trying to do.
+      placeholder: >
+        from skpy import Skype
+
+        sk = Skype(username, password)
+
+        ...
+      render: python
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: SkPy version
+    validations:
+      required: true
+  - type: input
+    id: version-python
+    attributes:
+      label: Python version
+    validations:
+      required: true
+  - type: textarea
+    id: misc
+    attributes:
+      label: Anything else?
