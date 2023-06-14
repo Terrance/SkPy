@@ -48,6 +48,30 @@ If you make too many authentication attempts, the Skype API may temporarily rate
 
 To avoid this, you should reuse the Skype token where possible. A token only appears to last 24 hours (web.skype.com forces re-authentication after that time), though you can check the expiry with ``sk.tokenExpiry``. Pass a filename as the third argument to the ``Skype()`` constructor to read and write session information to that file.
 
+WARNING : Close your sessions
+In case you are using this module as part of larger project, example in fastapi calls, make sure you close the session once you're done, as not doing it will lead to too many open sockets in `CLOSE-WAIT` state - which will cause you to hit a maximum limit of open files if too many of them pile up.
+Example code for fastapi project on how to close the Skype session:
+
+.. code:: python
+
+    @router.post("/amhook")
+    async def POST_amhook(alert: AlertGroup, log: Logger = Depends(getAccessLogger)):
+        log.info(f"Received payload from alertmanager: {alert.json()}")
+        log.info(f"Received alertname: {alert.alerts[0].labels['alertname']}")
+
+        try:
+            return {"success": True}
+        finally:
+            if alert.status == 'firing':
+                log.info("Sending skype notification...")
+                sk = Skype("username", "password", "/.skypeToken")
+                try:
+                    ch: SkypeSingleChat = sk.contacts['live:some_contact'].chat
+                    ch.sendMsg(f"Alert from alertmanager received:\n{alert.json()}")
+                finally:
+                    # Here we close the session
+                    sk.conn.sess.close()
+
 Event processing
 ----------------
 
