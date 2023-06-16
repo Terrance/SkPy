@@ -1,18 +1,18 @@
+import base64
+import functools
+import hashlib
 import os
 import re
-import functools
-from datetime import datetime, timedelta
 import time
-from types import MethodType
-import hashlib
-import base64
+from datetime import datetime, timedelta
 from pprint import pformat
+from types import MethodType
 from xml.etree import ElementTree
 
-from bs4 import BeautifulSoup
 import requests
+from bs4 import BeautifulSoup
 
-from .core import SkypeObj, SkypeEnum, SkypeApiException, SkypeAuthException
+from .core import SkypeApiException, SkypeAuthException, SkypeEnum, SkypeObj
 
 
 class SkypeConnection(SkypeObj):
@@ -141,13 +141,16 @@ class SkypeConnection(SkypeObj):
     API_URL = "https://urlp.asm.skype.com/v1/url/info"
     API_CONTACTS = "https://contacts.skype.com/contacts/v2"
     API_MSGSHOST = "https://client-s.gateway.messenger.live.com/v1"
-    API_DIRECTORY = "https://skypegraph.skype.com/search/v1.1/namesearch/swx/"
+    API_DIRECTORY = "https://skypegraph.skype.com/v2.0/search/"
     # Version doesn't seem to be important, at least not for what we need.
     API_CONFIG = "https://a.config.skype.com/config/v1"
+    USER_AGENT = "SkPy"
+    SKYPE_CLIENT = "1418/9.99.0.999"
 
     attrs = ("userId", "tokenFile", "connected", "guest")
 
-    extSess = requests.session()
+    extSess = requests.Session()
+    extSess.headers["User-Agent"] = USER_AGENT
 
     def __init__(self):
         """
@@ -160,6 +163,7 @@ class SkypeConnection(SkypeObj):
         self.hasUserPwd = False
         self.msgsHost = self.API_MSGSHOST
         self.sess = requests.Session()
+        self.sess.headers["User-Agent"] = self.USER_AGENT
         self.endpoints = {"self": SkypeEndpoint(self, "SELF")}
         self.syncStates = {}
 
