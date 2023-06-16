@@ -149,7 +149,8 @@ class SkypeConnection(SkypeObj):
 
     attrs = ("userId", "tokenFile", "connected", "guest")
 
-    extSess = requests.session()
+    extSess = requests.Session()
+    extSess.headers["User-Agent"] = USER_AGENT
 
     def __init__(self):
         """
@@ -162,6 +163,7 @@ class SkypeConnection(SkypeObj):
         self.hasUserPwd = False
         self.msgsHost = self.API_MSGSHOST
         self.sess = requests.Session()
+        self.sess.headers["User-Agent"] = self.USER_AGENT
         self.endpoints = {"self": SkypeEndpoint(self, "SELF")}
         self.syncStates = {}
 
@@ -220,10 +222,6 @@ class SkypeConnection(SkypeObj):
         debugHeaders = dict(headers)
         if auth == self.Auth.SkypeToken:
             headers["X-SkypeToken"] = self.tokens["skype"]
-            headers["X-Ecs-Etag"] = self.ECS_ETAG
-            headers["X-Skype-Client"] = self.SKYPE_CLIENT
-            headers["X-Skypegraphservicesettings"] = str(self.SKYPE_GRAPH_SETTINGS)
-            headers["User-Agent"] = self.USER_AGENT
             debugHeaders["X-SkypeToken"] = "***"
         elif auth == self.Auth.Authorize:
             headers["Authorization"] = "skype_token {0}".format(self.tokens["skype"])
