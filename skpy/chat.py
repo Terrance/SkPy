@@ -74,7 +74,7 @@ class SkypeChat(SkypeObj):
     def createRaw(self, msg):
         # All fields except timezone are required; 1418 = desktop client.
         client = ("os=Windows; osVer=10; proc=x86; lcid=en-US; deviceType=1; country=US; "
-                  "clientName=skype4life; clientVer=1418/9.99.0.999//skype4life")
+                  "clientName=skype4life; clientVer={0}//skype4life").format(SkypeConnection.SKYPE_CLIENT)
         resp = self.skype.conn("POST", "{0}/users/ME/conversations/{1}/messages"
                                        .format(self.skype.conn.msgsHost, self.id),
                                auth=SkypeConnection.Auth.RegToken, headers={"ClientInfo": client}, json=msg)

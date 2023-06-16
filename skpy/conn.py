@@ -144,7 +144,10 @@ class SkypeConnection(SkypeObj):
     API_DIRECTORY = "https://skypegraph.skype.com/v2.0/search/"
     # Version doesn't seem to be important, at least not for what we need.
     API_CONFIG = "https://a.config.skype.com/config/v1"
+
     USER_AGENT = "SkPy"
+    USER_AGENT_BROWSER = ("Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) "
+                          "Chrome/33.0.1750.117 Safari/537.36")
     SKYPE_CLIENT = "1418/9.99.0.999"
 
     attrs = ("userId", "tokenFile", "connected", "guest")
@@ -822,10 +825,8 @@ class SkypeGuestAuthProvider(SkypeAuthProvider):
         """
         urlId = url.split("/")[-1]
         # Pretend to be Chrome on Windows (required to avoid "unsupported device" messages).
-        agent = "Mozilla/5.0 (Windows NT 6.3; WOW64) AppleWebKit/537.36 (KHTML, like Gecko) " \
-                "Chrome/33.0.1750.117 Safari/537.36"
         cookies = self.conn("GET", "{0}/{1}".format(SkypeConnection.API_JOIN, urlId),
-                            headers={"User-Agent": agent}).cookies
+                            headers={"User-Agent": SkypeConnection.USER_AGENT_BROWSER}).cookies
         ids = self.conn("POST", "{0}/api/v2/conversation/".format(SkypeConnection.API_JOIN),
                         json={"shortId": urlId, "type": "wl"}).json()
         token = self.conn("POST", "{0}/api/v1/users/guests".format(SkypeConnection.API_JOIN),
