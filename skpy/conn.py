@@ -155,10 +155,13 @@ class SkypeConnection(SkypeObj):
     extSess = requests.Session()
     extSess.headers["User-Agent"] = USER_AGENT
 
-    def __init__(self):
+    def __init__(self, proxies=None):
         """
         Create a new, unconnected instance.
         """
+        if not proxies:
+            proxies = {}
+
         self.userId = None
         self.tokens = {}
         self.tokenExpiry = {}
@@ -167,6 +170,7 @@ class SkypeConnection(SkypeObj):
         self.msgsHost = self.API_MSGSHOST
         self.sess = requests.Session()
         self.sess.headers["User-Agent"] = self.USER_AGENT
+        self.sess.proxies.update(proxies)
         self.endpoints = {"self": SkypeEndpoint(self, "SELF")}
         self.syncStates = {}
 
@@ -1071,7 +1075,7 @@ class SkypeEndpoint(SkypeObj):
             name (str): display name for this endpoint
         """
         self.conn("PUT", "{0}/users/ME/endpoints/{1}/presenceDocs/messagingService"
-                         .format(self.conn.msgsHost, self.id),
+                  .format(self.conn.msgsHost, self.id),
                   auth=SkypeConnection.Auth.RegToken,
                   json={"id": "messagingService",
                         "type": "EndpointPresenceDoc",

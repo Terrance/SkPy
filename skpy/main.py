@@ -33,7 +33,7 @@ class Skype(SkypeObj):
 
     attrs = ("userId",)
 
-    def __init__(self, user=None, pwd=None, tokenFile=None, connect=True):
+    def __init__(self, user=None, pwd=None, tokenFile=None, connect=True, proxies=None):
         """
         Create a new Skype object and corresponding connection.
 
@@ -51,13 +51,14 @@ class Skype(SkypeObj):
             pwd (str): corresponding Skype account password
             tokenFile (str): path to file used for token storage
             connect (bool): whether to try and connect straight away
+            proxies (dict): proxy that will be used to communicate with skype
 
         Raises:
             .SkypeAuthException: if connecting, and the login request is rejected
             .SkypeApiException: if connecting, and the login form can't be processed
         """
         super(Skype, self).__init__(self)
-        self.conn = SkypeConnection()
+        self.conn = SkypeConnection(proxies=proxies)
         if tokenFile:
             self.conn.setTokenFile(tokenFile)
         if user and pwd:
