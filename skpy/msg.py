@@ -600,7 +600,7 @@ class SkypeFileMsg(SkypeMsg):
     def fileContent(self):
         if self.file:
             return self.skype.conn("GET", self.urlContent,
-                                   auth=SkypeConnection.Auth.Authorize).content
+                                   auth=SkypeConnection.Auth.ASM).content
         else:
             return None
 
