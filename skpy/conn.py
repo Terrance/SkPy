@@ -41,7 +41,7 @@ class SkypeConnection(SkypeObj):
             Whether the connected account only has guest privileges.
     """
 
-    Auth = SkypeEnum("SkypeConnection.Auth", ("SkypeToken", "Authorize", "RegToken"))
+    Auth = SkypeEnum("SkypeConnection.Auth", ("SkypeToken", "Authorize", "RegToken", "ASM"))
     """
     :class:`.SkypeEnum`: Authentication types for different API calls.
 
@@ -52,6 +52,8 @@ class SkypeConnection(SkypeObj):
             Add an ``Authorization`` header with the Skype token.
         Auth.RegToken:
             Add a ``RegistrationToken`` header with the registration token.
+        Auth.ASM:
+            Add a ``skypetoken_asm`` cookie with the Skype token.
     """
 
     @staticmethod
@@ -196,7 +198,7 @@ class SkypeConnection(SkypeObj):
             return method(*args, **kwargs)
         return MethodType(inner, self)
 
-    def __call__(self, method, url, codes=(200, 201, 202, 204, 207), auth=None, headers=None, **kwargs):
+    def __call__(self, method, url, codes=(200, 201, 202, 204, 207), auth=None, headers=None, cookies=None, **kwargs):
         """
         Make an API call.  Most parameters are passed directly to :mod:`requests`.
 
@@ -222,7 +224,10 @@ class SkypeConnection(SkypeObj):
         self.verifyToken(auth)
         if not headers:
             headers = {}
+        if not cookies:
+            cookies = {}
         debugHeaders = dict(headers)
+        debugCookies = dict(cookies)
         if auth == self.Auth.SkypeToken:
             headers["X-SkypeToken"] = self.tokens["skype"]
             debugHeaders["X-SkypeToken"] = "***"
@@ -232,10 +237,13 @@ class SkypeConnection(SkypeObj):
         elif auth == self.Auth.RegToken:
             headers["RegistrationToken"] = self.tokens["reg"]
             debugHeaders["RegistrationToken"] = "***"
+        elif auth == self.Auth.ASM:
+            cookies["skypetoken_asm"] = self.tokens["skype"]
+            debugCookies["skypetoken_asm"] = "***"
         if os.getenv("SKPY_DEBUG_HTTP"):
             print("<= [{0}] {1} {2}".format(datetime.now().strftime("%d/%m %H:%M:%S"), method, url))
-            print(pformat(dict(kwargs, headers=debugHeaders)))
-        resp = self.sess.request(method, url, headers=headers, **kwargs)
+            print(pformat(dict(kwargs, headers=debugHeaders, cookies=debugCookies)))
+        resp = self.sess.request(method, url, headers=headers, cookies=cookies, **kwargs)
         if os.getenv("SKPY_DEBUG_HTTP"):
             print("=> [{0}] {1}".format(datetime.now().strftime("%d/%m %H:%M:%S"), resp.status_code))
             print(pformat(dict(resp.headers)))
