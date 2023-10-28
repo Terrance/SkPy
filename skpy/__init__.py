@@ -11,7 +11,7 @@ from skpy.user import SkypeUser, SkypeContact, SkypeBotUser, SkypeContacts, Skyp
 from skpy.chat import SkypeChat, SkypeSingleChat, SkypeGroupChat, SkypeChats
 from skpy.msg import SkypeMsg, SkypeTextMsg, SkypeContactMsg, SkypeLocationMsg, SkypeCardMsg, \
                      SkypeFileMsg, SkypeImageMsg, SkypeCallMsg, SkypeMemberMsg, \
-                     SkypeAddMemberMsg, SkypeChangeMemberMsg, SkypeRemoveMemberMsg
+                     SkypeAddMemberMsg, SkypeChangeMemberMsg, SkypeRemoveMemberMsg,SkypeAudioMsg
 from skpy.event import SkypeEvent, SkypePresenceEvent, SkypeEndpointEvent, SkypeTypingEvent, \
                        SkypeMessageEvent, SkypeNewMessageEvent, SkypeEditMessageEvent, SkypeCallEvent, \
                        SkypeChatUpdateEvent, SkypeChatMemberEvent
