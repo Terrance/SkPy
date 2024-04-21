@@ -346,6 +346,9 @@ class SkypeConnection(SkypeObj):
         Return details of the current connection into a string.
 
         This can be used by :meth:`readTokenFromStr` to re-authenticate at a later time.
+
+        Returns:
+            str: A token string that can be used by :meth:`readTokenFromStr` to re-authenticate.
         """
         return "\n".join([
             self.userId,
