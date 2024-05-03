@@ -292,22 +292,19 @@ class SkypeConnection(SkypeObj):
         """
         self.tokenFile = path
 
-    def readToken(self):
+    def readTokenFromStr(self, tokens):
         """
-        Attempt to re-establish a connection using previously acquired tokens.
+        Attempt to re-establish a connection using previously acquired tokens from a string.
 
         If the Skype token is valid but the registration token is invalid, a new endpoint will be registered.
 
+        Args:
+            tokens (str): string containing tokens
+
         Raises:
-            .SkypeAuthException: if the token file cannot be used to authenticate
+            .SkypeAuthException: if the token string cannot be used to authenticate
         """
-        if not self.tokenFile:
-            raise SkypeAuthException("No token file specified")
-        try:
-            with open(self.tokenFile, "r") as f:
-                lines = f.read().splitlines()
-        except OSError:
-            raise SkypeAuthException("Token file doesn't exist or not readable")
+        lines = tokens.splitlines()
         try:
             user, skypeToken, skypeExpiry, regToken, regExpiry, msgsHost = lines
             skypeExpiry = datetime.fromtimestamp(int(skypeExpiry))
@@ -326,6 +323,42 @@ class SkypeConnection(SkypeObj):
         else:
             self.getRegToken()
 
+    def readToken(self):
+        """
+        Attempt to re-establish a connection using previously acquired tokens.
+
+        If the Skype token is valid but the registration token is invalid, a new endpoint will be registered.
+
+        Raises:
+            .SkypeAuthException: if the token file cannot be used to authenticate
+        """
+        if not self.tokenFile:
+            raise SkypeAuthException("No token file specified")
+        try:
+            with open(self.tokenFile, "r") as f:
+                tokens = f.read()
+        except OSError:
+            raise SkypeAuthException("Token file doesn't exist or not readable")
+        self.readTokenFromStr(tokens)
+
+    def writeTokenToStr(self):
+        """
+        Return details of the current connection into a string.
+
+        This can be used by :meth:`readTokenFromStr` to re-authenticate at a later time.
+
+        Returns:
+            str: A token string that can be used by :meth:`readTokenFromStr` to re-authenticate.
+        """
+        return "\n".join([
+            self.userId,
+            self.tokens["skype"],
+            str(int(time.mktime(self.tokenExpiry["skype"].timetuple()))),
+            self.tokens["reg"],
+            str(int(time.mktime(self.tokenExpiry["reg"].timetuple()))),
+            self.msgsHost
+        ]) + "\n"
+
     def writeToken(self):
         """
         Store details of the current connection in the named file.
@@ -336,12 +369,7 @@ class SkypeConnection(SkypeObj):
         with os.fdopen(os.open(self.tokenFile, os.O_WRONLY | os.O_CREAT, 0o600), "w") as f:
             # When opening files via os, truncation must be done manually.
             f.truncate()
-            f.write(self.userId + "\n")
-            f.write(self.tokens["skype"] + "\n")
-            f.write(str(int(time.mktime(self.tokenExpiry["skype"].timetuple()))) + "\n")
-            f.write(self.tokens["reg"] + "\n")
-            f.write(str(int(time.mktime(self.tokenExpiry["reg"].timetuple()))) + "\n")
-            f.write(self.msgsHost + "\n")
+            f.write(self.writeTokenToStr())
 
     def verifyToken(self, auth):
         """
