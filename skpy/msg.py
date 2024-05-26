@@ -6,7 +6,7 @@ import time
 
 from bs4 import BeautifulSoup, Tag
 
-from .core import SkypeObj, SkypeEnum
+from .core import SkypeObj, SkypeEnum, SkypeApiException
 from .util import SkypeUtils
 from .conn import SkypeConnection
 
@@ -593,16 +593,24 @@ class SkypeFileMsg(SkypeMsg):
 
     @property
     def urlContent(self):
+        return "{0}/views/{1}".format(self.file.urlFull, self.contentPath) if self.file else None
+
+    @property
+    def urlContentAsm(self):
         return "{0}/views/{1}".format(self.file.urlAsm, self.contentPath) if self.file else None
 
     @property
     @SkypeUtils.cacheResult
     def fileContent(self):
-        if self.file:
+        if not self.file:
+            return None
+        try:
             return self.skype.conn("GET", self.urlContent,
                                    auth=SkypeConnection.Auth.Authorize).content
-        else:
-            return None
+        except SkypeApiException:
+            # Try retrieving via the patched ASM URL instead.
+            return self.skype.conn("GET", self.urlContentAsm,
+                                   auth=SkypeConnection.Auth.Authorize).content
 
     @property
     def html(self):
