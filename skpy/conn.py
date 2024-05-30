@@ -855,16 +855,11 @@ class SkypeGuestAuthProvider(SkypeAuthProvider):
         # Pretend to be Chrome on Windows (required to avoid "unsupported device" messages).
         cookies = self.conn("GET", "{0}/{1}".format(SkypeConnection.API_JOIN, urlId),
                             headers={"User-Agent": SkypeConnection.USER_AGENT_BROWSER}).cookies
-        ids = self.conn("POST", "{0}/api/v2/conversation/".format(SkypeConnection.API_JOIN),
-                        json={"shortId": urlId, "type": "wl"}).json()
-        token = self.conn("POST", "{0}/api/v1/users/guests".format(SkypeConnection.API_JOIN),
+        ids = self.conn("GET", "{0}/meetings/{1}".format(SkypeConnection.API_JOIN_CREATE, urlId)).json()
+        token  = self.conn("POST", "{0}/threads/{1}/members".format(SkypeConnection.API_JOIN_CREATE, ids.get("threadId")),
                           headers={"csrf_token": cookies.get("csrf_token"),
                                    "X-Skype-Request-Id": cookies.get("launcher_session_id")},
-                          json={"flowId": cookies.get("launcher_session_id"),
-                                "shortId": urlId,
-                                "longId": ids.get("Long"),
-                                "threadId": ids.get("Resource"),
-                                "name": name}).json().get("skypetoken")
+                          json={"displayName": name}).json().get("skypetoken")
         # Assume the token lasts 24 hours, as a guest account only lasts that long anyway.
         expiry = datetime.now() + timedelta(days=1)
         return token, expiry
