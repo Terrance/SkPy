@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Discussion
+    about: Ask questions about usage, or post more general topics.
+    url: https://github.com/Terrance/SkPy/discussions
