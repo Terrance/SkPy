@@ -5,6 +5,7 @@ from datetime import datetime, date
 import time
 
 from bs4 import BeautifulSoup, Tag
+from requests import ConnectionError as RequestsConnectionError
 
 from .core import SkypeObj, SkypeEnum, SkypeApiException
 from .util import SkypeUtils
@@ -607,10 +608,14 @@ class SkypeFileMsg(SkypeMsg):
         try:
             return self.skype.conn("GET", self.urlContent,
                                    auth=SkypeConnection.Auth.Authorize).content
-        except SkypeApiException:
-            # Try retrieving via the patched ASM URL instead.
-            return self.skype.conn("GET", self.urlContentAsm,
-                                   auth=SkypeConnection.Auth.Authorize).content
+        except SkypeApiException as e:
+            try:
+                # Try retrieving via the patched ASM URL instead.
+                return self.skype.conn("GET", self.urlContentAsm,
+                                       auth=SkypeConnection.Auth.Authorize).content
+            except RequestsConnectionError:
+                # Likely the subdomain doesn't exist; re-raise the original error.
+                raise e
 
     @property
     def html(self):
