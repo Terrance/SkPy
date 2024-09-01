@@ -584,10 +584,11 @@ class SkypeAPIAuthProvider(SkypeAuthProvider):
         """
         # Wrap up the credentials ready to send.
         pwdHash = base64.b64encode(hashlib.md5((user + "\nskyper\n" + pwd).encode("utf-8")).digest()).decode("utf-8")
-        json = self.conn("POST", "{0}/login/skypetoken".format(SkypeConnection.API_USER),
-                         json={"username": user, "passwordHash": pwdHash, "scopes": "client"}).json()
+        resp = self.conn("POST", "{0}/login/skypetoken".format(SkypeConnection.API_USER),
+                         json={"username": user, "passwordHash": pwdHash, "scopes": "client"})
+        json = resp.json()
         if "skypetoken" not in json:
-            raise SkypeAuthException("Couldn't retrieve Skype token from response")
+            raise SkypeAuthException("Couldn't retrieve Skype token from response", resp)
         expiry = None
         if "expiresIn" in json:
             expiry = datetime.fromtimestamp(int(time.time()) + int(json["expiresIn"]))
