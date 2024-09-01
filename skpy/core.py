@@ -256,3 +256,9 @@ class SkypeAuthException(SkypeException):
     - a captcha being required
     - an update to the Terms of Service that must be accepted
     """
+
+
+class SkypeTokenException(SkypeAuthException):
+    """
+    An exception thrown when a token file isn't usable.
+    """

@@ -12,7 +12,8 @@ from xml.etree import ElementTree
 import requests
 from bs4 import BeautifulSoup
 
-from .core import SkypeApiException, SkypeAuthException, SkypeEnum, SkypeObj, SkypeRateLimitException
+from .core import SkypeApiException, SkypeAuthException, SkypeEnum, SkypeObj, SkypeRateLimitException, \
+                  SkypeTokenException
 
 
 class SkypeConnection(SkypeObj):
@@ -310,9 +311,9 @@ class SkypeConnection(SkypeObj):
             skypeExpiry = datetime.fromtimestamp(int(skypeExpiry))
             regExpiry = datetime.fromtimestamp(int(regExpiry))
         except ValueError:
-            raise SkypeAuthException("Token file is malformed")
+            raise SkypeTokenException("Token file is malformed")
         if datetime.now() >= skypeExpiry:
-            raise SkypeAuthException("Token file has expired")
+            raise SkypeTokenException("Token file has expired")
         self.userId = user
         self.tokens["skype"] = skypeToken
         self.tokenExpiry["skype"] = skypeExpiry
@@ -333,12 +334,12 @@ class SkypeConnection(SkypeObj):
             .SkypeAuthException: if the token file cannot be used to authenticate
         """
         if not self.tokenFile:
-            raise SkypeAuthException("No token file specified")
+            raise SkypeTokenException("No token file specified")
         try:
             with open(self.tokenFile, "r") as f:
                 tokens = f.read()
         except OSError:
-            raise SkypeAuthException("Token file doesn't exist or not readable")
+            raise SkypeTokenException("Token file doesn't exist or not readable")
         self.readTokenFromStr(tokens)
 
     def writeTokenToStr(self):
@@ -384,7 +385,7 @@ class SkypeConnection(SkypeObj):
         if auth in (self.Auth.SkypeToken, self.Auth.Authorize):
             if "skype" not in self.tokenExpiry or datetime.now() >= self.tokenExpiry["skype"]:
                 if not hasattr(self, "getSkypeToken"):
-                    raise SkypeAuthException("Skype token expired, and no password specified")
+                    raise SkypeTokenException("Skype token expired, and no password specified")
                 self.getSkypeToken()
         elif auth == self.Auth.RegToken:
             if "reg" not in self.tokenExpiry or datetime.now() >= self.tokenExpiry["reg"]:
@@ -489,7 +490,7 @@ class SkypeConnection(SkypeObj):
         Raises:
             .SkypeAuthException: if credentials were never provided
         """
-        raise SkypeAuthException("No username or password provided, and no valid token file")
+        raise SkypeTokenException("No username or password provided, and no valid token file")
 
     def refreshSkypeToken(self):
         """
