@@ -231,6 +231,16 @@ class SkypeApiException(SkypeException):
     """
 
 
+class SkypeRateLimitException(SkypeApiException):
+    """
+    An exception thrown if a limit has been reached.
+
+    Arguments will be of the form (``message``, ``response``).
+
+    This may be a cooldown on authentication, message sending, or another action performed too frequently.
+    """
+
+
 class SkypeAuthException(SkypeException):
     """
     An exception thrown when authentication cannot be completed.

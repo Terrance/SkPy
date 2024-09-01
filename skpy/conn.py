@@ -12,7 +12,7 @@ from xml.etree import ElementTree
 import requests
 from bs4 import BeautifulSoup
 
-from .core import SkypeApiException, SkypeAuthException, SkypeEnum, SkypeObj
+from .core import SkypeApiException, SkypeAuthException, SkypeEnum, SkypeObj, SkypeRateLimitException
 
 
 class SkypeConnection(SkypeObj):
@@ -245,7 +245,7 @@ class SkypeConnection(SkypeObj):
                 print(resp.text)
         if resp.status_code not in codes:
             if resp.status_code == 429:
-                raise SkypeAuthException("Auth rate limit exceeded", resp)
+                raise SkypeRateLimitException("Rate limit exceeded", resp)
             raise SkypeApiException("{0} response from {1} {2}".format(resp.status_code, method, url), resp)
         return resp
 
