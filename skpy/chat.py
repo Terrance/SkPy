@@ -39,7 +39,7 @@ class SkypeChat(SkypeObj):
                                   auth=SkypeConnection.Auth.RegToken,
                                   params={"view": "msnp24Equivalent"}).json()
             except SkypeApiException as e:
-                if e.args[1].status_code in (403, 404):
+                if e.args[1].status_code in (400, 403, 404):
                     active = False
                 else:
                     raise
